@@ -1,0 +1,10 @@
+
+#include "ofxsCore.h"
+//#include "ofxsMemory.h"
+//#include "ofxsLog.h"
+//#include "ofxsParam.h"
+//#include "ofxsMessage.h"
+//#include "ofxsImageEffect.h"
+//#include "ofxsMultiThread.h"
+//#include "ofxsHWNDInteract.h"
+//#include "ofxsInteract.h"

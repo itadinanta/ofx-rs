@@ -9,8 +9,8 @@
 #include "ofxMemory.h"
 #include "ofxPixels.h"
 #include "ofxParam.h"
-#include "ofxProperty.h"
 #include "ofxMessage.h"
+#include "ofxProperty.h"
 #include "ofxDialog.h"
 #include "ofxInteract.h"
 #include "ofxProgress.h"
@@ -21,3 +21,4 @@
 #include "ofxParametricParam.h"
 #include "ofxSonyVegas.h"
 #include "ofxTimeLine.h"
+
