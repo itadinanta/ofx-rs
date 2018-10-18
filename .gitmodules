@@ -1,0 +1,3 @@
+[submodule "native/openfx"]
+	path = native/openfx
+	url = https://github.com/NatronGitHub/openfx

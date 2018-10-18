@@ -1,0 +1,26 @@
+[package]
+name = "ofx_sys"
+version = "0.0.1"
+authors = ["Nicola Orru <nigu.orru@gmail.com>"]
+keywords = ["ofx", "openfx", "effects", "natron", "nuke"]
+#edition = "2018"
+description = "Bindings for OpenFX 1.4"
+repository = "https://github.com/itadinanta/ofx-rs"
+license = "Apache-2.0"
+# publish = false # insurance against accidents
+
+build = "build/main.rs"
+
+[lib]
+name="ofx_sys"
+crate-type = ["lib"]
+path="src/lib.rs"
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+bindgen = "0.42.2"
+
+[dev-dependencies]
+cgmath = "0.16"
