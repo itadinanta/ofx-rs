@@ -18,6 +18,7 @@ fn main() {
 	let support_bindings = bindgen::Builder::default()
 		//.enable_cxx_namespaces()
 		.raw_line("pub use super::*;")
+		.rust_target(bindgen::RustTarget::Nightly)
 		//		.raw_line("pub use self::root::*;")
 		.clang_arg("-xc++")
 		.clang_arg("-std=c++14")
