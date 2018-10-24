@@ -10,7 +10,7 @@ fn main() {
 	//println!("Bindings generated at {:?}", bindings_path);
 	let bindings = bindgen::Builder::default()
 		.clang_arg("-I../native/openfx/include")
-		.blacklist_type("max_align_t")
+		.rust_target(bindgen::RustTarget::Nightly)		
 		.header("build/wrapper.h")
 		.generate()
 		.expect("Unable to generate bindings");

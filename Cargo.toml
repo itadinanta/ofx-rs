@@ -3,4 +3,5 @@
 members = [
 	"ofx-sys",
 	"ofx",
+	"examples/simple",
 ]

@@ -1,0 +1,18 @@
+[package]
+name = "simple_plugin"
+version = "0.0.1"
+authors = ["Nicola Orru <nigu.orru@gmail.com>"]
+keywords = ["ofx", "openfx", "effects", "natron", "nuke"]
+description = "Bindings for OpenFX 1.4"
+repository = "https://github.com/itadinanta/ofx-rs"
+license = "Apache-2.0"
+publish = false # insurance against accidents
+
+[lib]
+name="simple_plugin"
+crate-type = ["cdylib"]
+path="src/lib.rs"
+
+[dependencies]
+libc = "0.2"
+ofx = { path = "../../ofx" }
