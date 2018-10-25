@@ -14,5 +14,6 @@ crate-type = ["cdylib"]
 path="src/lib.rs"
 
 [dependencies]
+lazy_static = "1.1"
 libc = "0.2"
 ofx = { path = "../../ofx" }
