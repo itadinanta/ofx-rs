@@ -7,4 +7,6 @@
 #include "ofxsImageEffect.h"
 #include "ofxsMultiThread.h"
 #include "ofxsInteract.h"
-//#include "ofxsHWNDInteract.h"
+#if WINDOWS
+#include "ofxsHWNDInteract.h"
+#endif
