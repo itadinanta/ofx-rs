@@ -42,25 +42,26 @@ pub struct Plugin {
 }
 
 pub struct Suites {
-	effect: Option<*const OfxImageEffectSuiteV1>,
-	prop: Option<*const OfxPropertySuiteV1>,
-	param: Option<*const OfxParameterSuiteV1>,
-	memory: Option<*const OfxMemorySuiteV1>,
-	thread: Option<*const OfxMultiThreadSuiteV1>,
-	message: Option<*const OfxMessageSuiteV1>,
+	effect: *const OfxImageEffectSuiteV1,
+	prop: *const OfxPropertySuiteV1,
+	param: *const OfxParameterSuiteV1,
+	memory: *const OfxMemorySuiteV1,
+	thread: *const OfxMultiThreadSuiteV1,
+	message: *const OfxMessageSuiteV1,
 	message_v2: Option<*const OfxMessageSuiteV2>,
-	progress: Option<*const OfxProgressSuiteV1>,
+	progress: *const OfxProgressSuiteV1,
 	progress_v2: Option<*const OfxProgressSuiteV2>,
-	time_line: Option<*const OfxTimeLineSuiteV1>,
+	time_line: *const OfxTimeLineSuiteV1,
 	parametric_parameter: Option<*const OfxParametricParameterSuiteV1>,
 	opengl_render: Option<*const OfxImageEffectOpenGLRenderSuiteV1>,
 }
 
+pub struct Host {}
+
 pub struct Version(pub types::UnsignedInt, pub types::UnsignedInt);
 
 pub struct Registry {
-	init: bool,
-	host: Option<OfxHost>,
+	host: Option<Host>,
 	suites: Option<Suites>,
 	plugins: Vec<Plugin>,
 }
@@ -68,21 +69,25 @@ pub struct Registry {
 impl Registry {
 	pub fn new() -> Registry {
 		Registry {
-			init: false,
 			host: None,
 			suites: None,
 			plugins: Vec::new(),
 		}
 	}
 
-	pub fn add(&mut self, name: &'static str, version: Version) -> types::UnsignedInt {
+	pub fn add(
+		&mut self,
+		name: &'static str,
+		api_version: types::Int,
+		plugin_version: Version,
+	) -> types::UnsignedInt {
 		let plugin_id = CString::new(name).unwrap();
 
 		let ofx_plugin = OfxPlugin {
 			pluginApi: static_str!(kOfxImageEffectPluginApi),
-			apiVersion: 1,
-			pluginVersionMajor: version.0,
-			pluginVersionMinor: version.1,
+			apiVersion: api_version,
+			pluginVersionMajor: plugin_version.0,
+			pluginVersionMinor: plugin_version.1,
 			pluginIdentifier: plugin_id.as_ptr(),
 			setHost: Some(set_host),
 			mainEntry: Some(entry_point),
@@ -105,25 +110,16 @@ impl Registry {
 		&self.plugins[index as usize].ofx_plugin
 	}
 
-	pub fn is_initialized(&self) -> bool {
-		self.init
-	}
-
-	pub fn set_initialized(&mut self) {
-		self.init = true
+	pub fn set_host(&mut self, host: &OfxHost) {
+		self.host = Some(Host {});
 	}
 }
 
-pub use ofx_sys::*;
-
-#[macro_export]
-macro_rules! static_str (
-	($name:expr) => { unsafe { CStr::from_bytes_with_nul_unchecked($name).as_ptr() } }
-);
-
 extern "C" fn set_host(host: *mut OfxHost) {
 	unsafe {
-		//HOST = Some(host);
+		if host as *const OfxHost != std::ptr::null() {
+			get_registry_mut().set_host(&*host);
+		}
 	}
 }
 
@@ -136,48 +132,53 @@ extern "C" fn entry_point(
 	0
 }
 
+pub use ofx_sys::*;
+
+#[macro_export]
+macro_rules! static_str (
+	($name:expr) => { unsafe { CStr::from_bytes_with_nul_unchecked($name).as_ptr() } }
+);
+
+static mut global_registry: Option<Registry> = None;
+
+pub fn init_registry<F>(init_function: F)
+where
+	F: Fn(&mut Registry),
+{
+	unsafe {
+		if global_registry.is_none() {
+			let mut registry = Registry::new();
+			init_function(&mut registry);
+			global_registry = Some(registry);
+		}
+	}
+}
+
+fn get_registry_mut() -> &'static mut Registry {
+	unsafe { global_registry.as_mut().unwrap() }
+}
+
+pub fn get_registry() -> &'static Registry {
+	unsafe { global_registry.as_ref().unwrap() }
+}
+
 #[macro_export]
 macro_rules! implement_registry {
 	($init_protocol:ident) => {
-		static mut global_registry: Option<Registry> = None;
-
-		pub fn get_registry_mut() -> &'static mut Registry {
-			init();
-			unsafe { global_registry.as_mut().unwrap() }
-		}
-
-		pub fn get_registry() -> &'static Registry {
-			init();
-			unsafe { global_registry.as_ref().unwrap() }
-		}
-
 		fn init() {
-			unsafe {
-				if global_registry.is_none() {
-					let mut registry = Registry::new();
-					$init_protocol(&mut registry);
-					global_registry = Some(registry);
-				}
-			}
+			init_registry($init_protocol);
 		}
 
 		#[no_mangle]
 		pub extern "C" fn OfxGetNumberOfPlugins() -> types::Int {
+			init();
 			get_registry().count()
 		}
 
 		#[no_mangle]
 		pub extern "C" fn OfxGetPlugin(nth: Int) -> *const OfxPlugin {
+			init();
 			get_registry().ofx_plugin(nth) as *const OfxPlugin
 		}
 	};
-}
-
-#[cfg(test)]
-mod tests {
-	#[test]
-	fn it_works() {
-		assert_eq!(2 + 2, 4);
-	}
-
 }
