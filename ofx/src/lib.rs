@@ -14,7 +14,7 @@ pub use ofx_sys::*;
 
 #[derive(Debug)]
 pub enum Error {
-	PluginIndexOutOfRange,
+	PluginNotFound,
 }
 
 impl fmt::Display for Error {
@@ -65,10 +65,12 @@ pub struct Suites {
 pub enum Action {
 	Nop,
 	Load,
+	Unload,
+	Render,
 }
 
 pub trait Dispatch {
-	fn dispatch(&mut self, dispatch: Message) -> Result<types::Int> {
+	fn dispatch(&mut self, message: Message) -> Result<types::Int> {
 		Ok(0)
 	}
 }
@@ -99,6 +101,7 @@ pub struct PluginDescriptor {
 	plugin_index: usize,
 	host: Option<OfxHost>,
 	suites: Option<Suites>,
+	instance: Box<Execute>,
 	ofx_plugin: OfxPlugin, // need an owned copy for the lifetime of the plugin
 }
 
@@ -161,6 +164,7 @@ pub struct Registry {
 	plugin_modules: HashMap<String, usize>,
 }
 
+#[derive(Debug)]
 pub enum Message<'a> {
 	SetHost {
 		host: &'a OfxHost,
@@ -187,6 +191,7 @@ impl Registry {
 		name: &'static str,
 		api_version: ApiVersion,
 		plugin_version: PluginVersion,
+		instance: Box<Execute>,
 		set_host: types::SetHost,
 		main_entry: types::MainEntry,
 	) -> usize {
@@ -211,6 +216,7 @@ impl Registry {
 			plugin_index,
 			module_name,
 			plugin_id,
+			instance,
 			host: None,
 			suites: None,
 			ofx_plugin,
@@ -237,12 +243,13 @@ impl Registry {
 	}
 
 	pub fn dispatch(&mut self, plugin_module: &str, message: Message) -> Result<types::Int> {
+		println!("{}:{:?}", plugin_module, message);
 		let found_plugin = self.plugin_modules.get(plugin_module).cloned();
 		if let Some(plugin_index) = found_plugin {
 			let plugin = self.get_plugin_mut(plugin_index);
 			plugin.dispatch(message)
 		} else {
-			Err(Error::PluginIndexOutOfRange)
+			Err(Error::PluginNotFound)
 		}
 	}
 }
@@ -308,13 +315,17 @@ macro_rules! static_str (
 
 #[macro_export]
 macro_rules! plugin_module {
-	($name:expr, $api_version:expr, $plugin_version:expr) => {
+	($name:expr, $api_version:expr, $plugin_version:expr, $factory:expr) => {
 		pub fn name() -> &'static str {
 			$name
 		}
 
 		pub fn module_name() -> &'static str {
 			module_path!().split("::").last().as_ref().unwrap()
+		}
+
+		pub fn new_instance() -> Box<Execute> {
+			Box::new($factory())
 		}
 
 		pub fn api_version() -> ApiVersion {
@@ -348,6 +359,7 @@ macro_rules! register_plugin {
 			$module::name(),
 			$module::api_version(),
 			$module::plugin_version(),
+			$module::new_instance(),
 			$module::set_host,
 			$module::main_entry,
 			);
@@ -370,6 +382,10 @@ macro_rules! build_plugin_registry {
 		#[no_mangle]
 		pub extern "C" fn OfxGetPlugin(nth: Int) -> *const OfxPlugin {
 			init();
+			//for descriptor in describe_plugins() {
+			//	println!("{}", descriptor);
+			//}
+			println!("{}", get_registry().get_plugin(nth as usize));
 			get_registry().ofx_plugin(nth) as *const OfxPlugin
 		}
 
