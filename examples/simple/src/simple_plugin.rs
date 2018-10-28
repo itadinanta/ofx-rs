@@ -5,3 +5,4 @@ plugin_module!(
 	ApiVersion(1),
 	PluginVersion(1, 0)
 );
+
