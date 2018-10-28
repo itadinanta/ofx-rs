@@ -39,7 +39,7 @@ pub mod types {
 	pub type VoidPtr = *const c_void;
 
 	pub type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
-	pub type EntryPoint = unsafe extern "C" fn(
+	pub type MainEntry = unsafe extern "C" fn(
 		*const i8,
 		VoidPtr,
 		*mut ofx_sys::OfxPropertySetStruct,
@@ -135,7 +135,7 @@ impl Dispatch for PluginDescriptor {
 				self.host = Some(host.clone());
 				Ok(0)
 			}
-			Message::EntryPoint {
+			Message::MainEntry {
 				action,
 				handle,
 				in_args,
@@ -165,7 +165,7 @@ pub enum Message<'a> {
 	SetHost {
 		host: &'a OfxHost,
 	},
-	EntryPoint {
+	MainEntry {
 		action: types::CharPtr,
 		handle: types::VoidPtr,
 		in_args: OfxPropertySetHandle,
@@ -188,7 +188,7 @@ impl Registry {
 		api_version: ApiVersion,
 		plugin_version: PluginVersion,
 		set_host: types::SetHost,
-		entry_point: types::EntryPoint,
+		main_entry: types::MainEntry,
 	) -> usize {
 		let plugin_id = CString::new(name).unwrap();
 
@@ -199,7 +199,7 @@ impl Registry {
 			pluginVersionMinor: plugin_version.1,
 			pluginIdentifier: plugin_id.as_ptr(),
 			setHost: Some(set_host),
-			mainEntry: Some(entry_point),
+			mainEntry: Some(main_entry),
 		};
 
 		let plugin_index = self.plugins.len();
@@ -255,7 +255,7 @@ pub fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
 	}
 }
 
-pub fn entry_point_for_plugin(
+pub fn main_entry_for_plugin(
 	plugin_module: &str,
 	action: types::CharPtr,
 	handle: types::VoidPtr,
@@ -266,7 +266,7 @@ pub fn entry_point_for_plugin(
 		get_registry_mut()
 			.dispatch(
 				plugin_module,
-				Message::EntryPoint {
+				Message::MainEntry {
 					action,
 					handle,
 					in_args,
@@ -308,9 +308,13 @@ macro_rules! static_str (
 
 #[macro_export]
 macro_rules! plugin_module {
-	($module_name:expr, $name:expr, $api_version:expr, $plugin_version:expr) => {
+	($name:expr, $api_version:expr, $plugin_version:expr) => {
 		pub fn name() -> &'static str {
 			$name
+		}
+
+		pub fn module_name() -> &'static str {
+			module_path!().split("::").last().as_ref().unwrap()
 		}
 
 		pub fn api_version() -> ApiVersion {
@@ -322,16 +326,16 @@ macro_rules! plugin_module {
 		}
 
 		pub extern "C" fn set_host(host: *mut ofx::OfxHost) {
-			ofx::set_host_for_plugin($module_name, host)
+			ofx::set_host_for_plugin(module_name(), host)
 		}
 
-		pub extern "C" fn entry_point(
+		pub extern "C" fn main_entry(
 			action: ofx::types::CharPtr,
 			handle: ofx::types::VoidPtr,
 			in_args: ofx::OfxPropertySetHandle,
 			out_args: ofx::OfxPropertySetHandle,
 		) -> super::types::Int {
-			ofx::entry_point_for_plugin($module_name, action, handle, in_args, out_args)
+			ofx::main_entry_for_plugin(module_name(), action, handle, in_args, out_args)
 		}
 	};
 }
@@ -340,12 +344,12 @@ macro_rules! plugin_module {
 macro_rules! register_plugin {
 	($registry:ident, $module:ident) => {
 		$registry.add(
-			stringify!($module),
+			$module::module_name(),
 			$module::name(),
 			$module::api_version(),
 			$module::plugin_version(),
 			$module::set_host,
-			$module::entry_point,
+			$module::main_entry,
 			);
 	};
 }
@@ -375,10 +379,12 @@ macro_rules! build_plugin_registry {
 				for i in 0..n {
 					OfxGetPlugin(i);
 				}
-				(0..n).map(|i| {
-					let plugin = get_registry().get_plugin(i as usize);
-					format!("{}", plugin)
-				}).collect()
+				(0..n)
+					.map(|i| {
+						let plugin = get_registry().get_plugin(i as usize);
+						format!("{}", plugin)
+					})
+					.collect()
 			}
 		}
 	};
