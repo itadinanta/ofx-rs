@@ -4,14 +4,18 @@
 #![allow(non_snake_case)]
 
 extern crate ofx_sys;
-#[macro_use]
-extern crate lazy_static;
 
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt;
+use std::fmt::Display;
+
+pub use ofx_sys::*;
 
 #[derive(Debug)]
-pub enum Error {}
+pub enum Error {
+	PluginIndexOutOfRange,
+}
 
 impl fmt::Display for Error {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -33,12 +37,14 @@ pub mod types {
 	pub type CStr = *const c_char;
 	pub type Void = ();
 	pub type VoidPtr = *const c_void;
-}
 
-pub struct Plugin {
-	plugin_index: types::UnsignedInt,
-	plugin_id: CString,
-	ofx_plugin: OfxPlugin,
+	pub type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
+	pub type EntryPoint = unsafe extern "C" fn(
+		*const i8,
+		VoidPtr,
+		*mut ofx_sys::OfxPropertySetStruct,
+		*mut ofx_sys::OfxPropertySetStruct,
+	) -> Int;
 }
 
 pub struct Suites {
@@ -56,36 +62,139 @@ pub struct Suites {
 	opengl_render: Option<*const OfxImageEffectOpenGLRenderSuiteV1>,
 }
 
-pub struct Host {}
+pub enum Action {
+	Nop,
+	Load,
+}
 
-pub struct Version(pub types::UnsignedInt, pub types::UnsignedInt);
+pub trait Dispatch {
+	fn dispatch(&mut self, dispatch: Message) -> Result<types::Int> {
+		Ok(0)
+	}
+}
+
+pub trait Execute {
+	fn execute(&mut self, action: Action) -> Result<types::Int> {
+		Ok(0)
+	}
+}
+
+pub trait MapAction {
+	fn map_action(
+		&self,
+		action: types::CharPtr,
+		handle: types::VoidPtr,
+		in_args: OfxPropertySetHandle,
+		out_args: OfxPropertySetHandle,
+	) -> Result<Action>;
+}
+
+pub trait Plugin: Dispatch + MapAction + Execute {
+	fn suites(&self) -> &Suites;
+}
+
+pub struct PluginDescriptor {
+	plugin_id: CString,
+	module_name: String,
+	plugin_index: usize,
+	host: Option<OfxHost>,
+	suites: Option<Suites>,
+	ofx_plugin: OfxPlugin, // need an owned copy for the lifetime of the plugin
+}
+
+impl PluginDescriptor {}
+
+impl Display for PluginDescriptor {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"{:?} {} {}",
+			self.plugin_id, self.module_name, self.plugin_index
+		)
+	}
+}
+
+impl MapAction for PluginDescriptor {
+	fn map_action(
+		&self,
+		action: types::CharPtr,
+		handle: types::VoidPtr,
+		in_args: OfxPropertySetHandle,
+		out_args: OfxPropertySetHandle,
+	) -> Result<Action> {
+		Ok(Action::Nop)
+	}
+}
+
+impl Execute for PluginDescriptor {}
+
+impl Dispatch for PluginDescriptor {
+	fn dispatch(&mut self, message: Message) -> Result<types::Int> {
+		match message {
+			Message::SetHost { host } => {
+				self.host = Some(host.clone());
+				Ok(0)
+			}
+			Message::EntryPoint {
+				action,
+				handle,
+				in_args,
+				out_args,
+			} => self
+				.map_action(action, handle, in_args, out_args)
+				.and_then(|action| self.execute(action)),
+		}
+	}
+}
+
+impl Plugin for PluginDescriptor {
+	fn suites(&self) -> &Suites {
+		&self.suites.as_ref().unwrap()
+	}
+}
+
+pub struct ApiVersion(pub types::Int);
+pub struct PluginVersion(pub types::UnsignedInt, pub types::UnsignedInt);
 
 pub struct Registry {
-	host: Option<Host>,
-	suites: Option<Suites>,
-	plugins: Vec<Plugin>,
+	plugins: Vec<PluginDescriptor>,
+	plugin_modules: HashMap<String, usize>,
+}
+
+pub enum Message<'a> {
+	SetHost {
+		host: &'a OfxHost,
+	},
+	EntryPoint {
+		action: types::CharPtr,
+		handle: types::VoidPtr,
+		in_args: OfxPropertySetHandle,
+		out_args: OfxPropertySetHandle,
+	},
 }
 
 impl Registry {
 	pub fn new() -> Registry {
 		Registry {
-			host: None,
-			suites: None,
+			plugin_modules: HashMap::new(),
 			plugins: Vec::new(),
 		}
 	}
 
 	pub fn add(
 		&mut self,
+		module_name: &'static str,
 		name: &'static str,
-		api_version: types::Int,
-		plugin_version: Version,
-	) -> types::UnsignedInt {
+		api_version: ApiVersion,
+		plugin_version: PluginVersion,
+		set_host: types::SetHost,
+		entry_point: types::EntryPoint,
+	) -> usize {
 		let plugin_id = CString::new(name).unwrap();
 
 		let ofx_plugin = OfxPlugin {
 			pluginApi: static_str!(kOfxImageEffectPluginApi),
-			apiVersion: api_version,
+			apiVersion: api_version.0,
 			pluginVersionMajor: plugin_version.0,
 			pluginVersionMinor: plugin_version.1,
 			pluginIdentifier: plugin_id.as_ptr(),
@@ -93,51 +202,81 @@ impl Registry {
 			mainEntry: Some(entry_point),
 		};
 
-		let plugin = Plugin {
-			plugin_index: self.plugins.len() as u32,
+		let plugin_index = self.plugins.len();
+		let module_name = module_name.to_owned();
+		self.plugin_modules
+			.insert(module_name.clone(), plugin_index as usize);
+
+		let plugin = PluginDescriptor {
+			plugin_index,
+			module_name,
 			plugin_id,
+			host: None,
+			suites: None,
 			ofx_plugin,
 		};
 
-		plugin.plugin_index
+		self.plugins.push(plugin);
+		plugin_index
 	}
 
 	pub fn count(&self) -> types::Int {
 		self.plugins.len() as types::Int
 	}
 
+	pub fn get_plugin_mut(&mut self, index: usize) -> &mut PluginDescriptor {
+		&mut self.plugins[index as usize]
+	}
+
+	pub fn get_plugin(&self, index: usize) -> &PluginDescriptor {
+		&self.plugins[index as usize]
+	}
+
 	pub fn ofx_plugin(&'static self, index: types::Int) -> &'static OfxPlugin {
 		&self.plugins[index as usize].ofx_plugin
 	}
 
-	pub fn set_host(&mut self, host: &OfxHost) {
-		self.host = Some(Host {});
-	}
-}
-
-extern "C" fn set_host(host: *mut OfxHost) {
-	unsafe {
-		if host as *const OfxHost != std::ptr::null() {
-			get_registry_mut().set_host(&*host);
+	pub fn dispatch(&mut self, plugin_module: &str, message: Message) -> Result<types::Int> {
+		let found_plugin = self.plugin_modules.get(plugin_module).cloned();
+		if let Some(plugin_index) = found_plugin {
+			let plugin = self.get_plugin_mut(plugin_index);
+			plugin.dispatch(message)
+		} else {
+			Err(Error::PluginIndexOutOfRange)
 		}
 	}
 }
 
-extern "C" fn entry_point(
+pub fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
+	unsafe {
+		get_registry_mut()
+			.dispatch(plugin_module, Message::SetHost { host: &*host })
+			.ok();
+	}
+}
+
+pub fn entry_point_for_plugin(
+	plugin_module: &str,
 	action: types::CharPtr,
 	handle: types::VoidPtr,
 	in_args: OfxPropertySetHandle,
 	out_args: OfxPropertySetHandle,
 ) -> types::Int {
-	0
+	unsafe {
+		get_registry_mut()
+			.dispatch(
+				plugin_module,
+				Message::EntryPoint {
+					action,
+					handle,
+					in_args,
+					out_args,
+				},
+			)
+			.ok()
+			.unwrap_or(-1)
+	}
 }
-
-pub use ofx_sys::*;
-
-#[macro_export]
-macro_rules! static_str (
-	($name:expr) => { unsafe { CStr::from_bytes_with_nul_unchecked($name).as_ptr() } }
-);
 
 static mut global_registry: Option<Registry> = None;
 
@@ -163,7 +302,56 @@ pub fn get_registry() -> &'static Registry {
 }
 
 #[macro_export]
-macro_rules! implement_registry {
+macro_rules! static_str (
+	($name:expr) => { unsafe { CStr::from_bytes_with_nul_unchecked($name).as_ptr() } }
+);
+
+#[macro_export]
+macro_rules! plugin_module {
+	($module_name:expr, $name:expr, $api_version:expr, $plugin_version:expr) => {
+		pub fn name() -> &'static str {
+			$name
+		}
+
+		pub fn api_version() -> ApiVersion {
+			$api_version
+		}
+
+		pub fn plugin_version() -> PluginVersion {
+			$plugin_version
+		}
+
+		pub extern "C" fn set_host(host: *mut ofx::OfxHost) {
+			ofx::set_host_for_plugin($module_name, host)
+		}
+
+		pub extern "C" fn entry_point(
+			action: ofx::types::CharPtr,
+			handle: ofx::types::VoidPtr,
+			in_args: ofx::OfxPropertySetHandle,
+			out_args: ofx::OfxPropertySetHandle,
+		) -> super::types::Int {
+			ofx::entry_point_for_plugin($module_name, action, handle, in_args, out_args)
+		}
+	};
+}
+
+#[macro_export]
+macro_rules! register_plugin {
+	($registry:ident, $module:ident) => {
+		$registry.add(
+			stringify!($module),
+			$module::name(),
+			$module::api_version(),
+			$module::plugin_version(),
+			$module::set_host,
+			$module::entry_point,
+			);
+	};
+}
+
+#[macro_export]
+macro_rules! build_plugin_registry {
 	($init_protocol:ident) => {
 		fn init() {
 			init_registry($init_protocol);
@@ -180,5 +368,30 @@ macro_rules! implement_registry {
 			init();
 			get_registry().ofx_plugin(nth) as *const OfxPlugin
 		}
+
+		pub fn describe_plugins() -> Vec<String> {
+			unsafe {
+				let n = OfxGetNumberOfPlugins();
+				for i in 0..n {
+					OfxGetPlugin(i);
+				}
+				(0..n).map(|i| {
+					let plugin = get_registry().get_plugin(i as usize);
+					format!("{}", plugin)
+				}).collect()
+			}
+		}
+	};
+}
+
+#[macro_export]
+macro_rules! register_modules {
+	( $ ($module:ident), *) => {
+		fn register_plugins(registry: &mut ofx::Registry) {
+			$(register_plugin!(registry, $module);
+			)*
+		}
+
+		build_plugin_registry!(register_plugins);
 	};
 }

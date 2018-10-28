@@ -1,11 +1,19 @@
+#[macro_use]
 extern crate ofx;
+
+mod simple_plugin;
 
 use ofx::types::*;
 use ofx::*;
 
-fn register_plugins(registry: &mut ofx::Registry) {
-	registry.add("net.itadinanta.ofx-rs.simple_plugin", 1, Version(1, 0));
-	registry.add("net.itadinanta.ofx-rs.simple_plugin", 1, Version(1, 0));
-}
+register_modules!(simple_plugin);
 
-implement_registry!(register_plugins);
+mod tests {
+	#[test]
+	fn enumerate_plugins() {
+		let descriptions = super::describe_plugins();
+		assert!(descriptions.len() == 1);
+		println!("{}", descriptions[0]);
+		assert!(descriptions[0] == "\"net.itadinanta.ofx-rs.simple_plugin_1\" simple_plugin 0");
+	}
+}
