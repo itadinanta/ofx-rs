@@ -2,6 +2,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![feature(concat_idents)]
 
 extern crate ofx_sys;
 
@@ -23,7 +24,9 @@ pub enum Error {
 	PropertyIndexOutOfBounds,
 	InvalidHandle,
 	InvalidValue,
+	InvalidSuite,
 	PluginNotReady,
+	HostNotReady,
 	UnknownError,
 }
 
@@ -40,6 +43,12 @@ impl From<OfxStatus> for Error {
 
 impl From<std::ffi::NulError> for Error {
 	fn from(_src: std::ffi::NulError) -> Error {
+		Error::InvalidNameEncoding
+	}
+}
+
+impl From<std::ffi::IntoStringError> for Error {
+	fn from(_src: std::ffi::IntoStringError) -> Error {
 		Error::InvalidNameEncoding
 	}
 }
@@ -73,6 +82,7 @@ pub mod types {
 	pub type CStr = *const c_char;
 	pub type Void = c_void;
 	pub type VoidPtr = *const c_void;
+	pub type VoidPtrMut = *mut c_void;
 	pub type Status = ofx_sys::OfxStatus;
 	pub type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
 	pub type MainEntry = unsafe extern "C" fn(
@@ -84,21 +94,21 @@ pub mod types {
 }
 
 pub struct Suites {
-	effect: *const OfxImageEffectSuiteV1,
-	prop: *const OfxPropertySuiteV1,
-	param: *const OfxParameterSuiteV1,
-	memory: *const OfxMemorySuiteV1,
-	thread: *const OfxMultiThreadSuiteV1,
-	message: *const OfxMessageSuiteV1,
-	message_v2: Option<*const OfxMessageSuiteV2>,
-	progress: *const OfxProgressSuiteV1,
-	progress_v2: Option<*const OfxProgressSuiteV2>,
-	time_line: *const OfxTimeLineSuiteV1,
-	parametric_parameter: Option<*const OfxParametricParameterSuiteV1>,
-	opengl_render: Option<*const OfxImageEffectOpenGLRenderSuiteV1>,
+	effect: &'static OfxImageEffectSuiteV1,
+	prop: &'static OfxPropertySuiteV1,
+	param: &'static OfxParameterSuiteV1,
+	memory: &'static OfxMemorySuiteV1,
+	thread: &'static OfxMultiThreadSuiteV1,
+	message: &'static OfxMessageSuiteV1,
+	message_v2: Option<&'static OfxMessageSuiteV2>,
+	progress: &'static OfxProgressSuiteV1,
+	progress_v2: Option<&'static OfxProgressSuiteV2>,
+	time_line: &'static OfxTimeLineSuiteV1,
+	parametric_parameter: Option<&'static OfxParametricParameterSuiteV1>,
+	opengl_render: Option<&'static OfxImageEffectOpenGLRenderSuiteV1>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum GlobalAction {
 	Load,
 	Describe,
@@ -108,17 +118,17 @@ pub enum GlobalAction {
 	CreateInstance,
 	DestroyInstance,
 	InstanceChanged,
-	BeginInstanceChange,
+	BeginInstanceChanged,
 	EndInstanceChanged,
 	BeginInstanceEdit,
 	EndInstanceEdit,
-	DescribeInteract,
-	CreateInstanceInterace,
-	DestroyInstanceInteract,
+//	DescribeInteract,
+//	CreateInstanceInteract,
+//	DestroyInstanceInteract,
 	Dialog,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum ImageEffectAction {
 	GetRegionOfDefinition,
 	GetRegionsOfInterest,
@@ -136,14 +146,46 @@ pub enum ImageEffectAction {
 	VegasKeyframeUplift,
 }
 
-#[derive(Clone, Copy)]
-pub struct InstanceHandle<'a> {
-	inner: types::VoidPtr,
-	_lifetime: PhantomData<&'a types::Void>,
+#[derive(Debug)]
+struct EnumIndex<T>
+where
+	T: std::cmp::Eq + std::hash::Hash + Clone,
+{
+	map: HashMap<String, T>,
+	inverse_map: HashMap<T, String>,
 }
 
-#[derive(Clone, Copy)]
-pub struct ImageEffectHandle<'a> {
+impl<T> EnumIndex<T>
+where
+	T: std::cmp::Eq + std::hash::Hash + Clone,
+{
+	pub fn new() -> EnumIndex<T> {
+		EnumIndex {
+			map: HashMap::new(),
+			inverse_map: HashMap::new(),
+		}
+	}
+
+	pub fn insert(&mut self, key_bytes: &[u8], value: T) {
+		if let Ok(cstr) = CStr::from_bytes_with_nul(key_bytes) {
+			if let Ok(key) = cstr.to_str() {
+				self.map.insert(key.to_owned(), value.clone());
+				self.inverse_map.insert(value, key.to_owned());
+			}
+		} else {
+			println!("Was unable to add {:?} key, this is a bug", key_bytes)
+		}
+	}
+
+	pub fn find(&self, c_key: &[u8]) -> Option<T> {
+		let cstr = CString::new(c_key).ok()?;
+		let key = cstr.into_string().ok()?;
+		self.map.get(&key).cloned()
+	}
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct GenericPluginHandle<'a> {
 	inner: types::VoidPtr,
 	_lifetime: PhantomData<&'a types::Void>,
 }
@@ -289,26 +331,45 @@ impl<'a, 'n> PropertyGet<String> for PropertyHandle<'a, 'n> {
 	}
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ImageEffectHandle<'a> {
+	inner: OfxImageEffectHandle,
+	_lifetime: PhantomData<&'a OfxImageEffectHandle>,
+}
+
+impl<'a> ImageEffectHandle<'a> {
+	pub fn new(ptr: types::VoidPtr) -> ImageEffectHandle<'a> {
+		ImageEffectHandle {
+			inner: unsafe { ptr as OfxImageEffectHandle },
+			_lifetime: PhantomData,
+		}
+	}
+}
+
 #[derive(Clone, Copy)]
 pub struct ImageEffectInstanceHandle<'a> {
 	inner: types::VoidPtr,
 	_lifetime: PhantomData<&'a types::Void>,
 }
 
+#[derive(Debug)]
 pub enum Action<'a> {
-	Global(GlobalAction, InstanceHandle<'a>),
-	ImageEffect(ImageEffectAction, ImageEffectHandle<'a>),
+	Load,
+	Unload,
+	Describe(ImageEffectHandle<'a>),
+	GenericGlobal(GlobalAction, GenericPluginHandle<'a>),
+	GenericImageEffect(ImageEffectAction, ImageEffectHandle<'a>),
 }
 
 pub trait Dispatch {
-	fn dispatch(&mut self, message: Message) -> Result<types::Int> {
-		Ok(0)
+	fn dispatch(&mut self, message: RawMessage) -> Result<types::Int> {
+		Ok(eOfxStatus_OK)
 	}
 }
 
 pub trait Execute {
 	fn execute(&mut self, action: Action) -> Result<types::Int> {
-		Ok(0)
+		Ok(eOfxStatus_OK)
 	}
 }
 
@@ -332,11 +393,12 @@ pub struct PluginDescriptor {
 	plugin_index: usize,
 	host: Option<OfxHost>,
 	suites: Option<Suites>,
+	cached_handle: Option<ImageEffectHandle<'static>>,
 	instance: Box<Execute>,
+	global_action_index: EnumIndex<GlobalAction>,
+	image_effect_action_index: EnumIndex<ImageEffectAction>,
 	ofx_plugin: OfxPlugin, // need an owned copy for the lifetime of the plugin
 }
-
-impl PluginDescriptor {}
 
 impl Display for PluginDescriptor {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -356,32 +418,132 @@ impl MapAction for PluginDescriptor {
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
 	) -> Result<Action<'a>> {
-		Err(Error::InvalidAction)
+		let name = unsafe { CStr::from_ptr(action) }.to_bytes();
+		if let Some(action) = self.image_effect_action_index.find(name) {
+			println!("Image effect action match {:?}", action);
+			match action {
+				_ => Err(Error::InvalidAction),
+			}
+		} else if let Some(action) = self.global_action_index.find(name) {
+			println!("Global action {:?}", action);
+			match action {
+				GlobalAction::Load => Ok(Action::Load),
+				GlobalAction::Unload => Ok(Action::Unload),
+				GlobalAction::Describe => Ok(Action::Describe(ImageEffectHandle::new(handle))),
+				_ => Err(Error::InvalidAction),
+			}
+		} else {
+			println!("No action matching");
+			Err(Error::InvalidAction)
+		}
 	}
 }
 
 impl Execute for PluginDescriptor {}
 
 impl Dispatch for PluginDescriptor {
-	fn dispatch(&mut self, message: Message) -> Result<types::Int> {
+	fn dispatch(&mut self, message: RawMessage) -> Result<types::Int> {
 		match message {
-			Message::SetHost { host } => {
+			RawMessage::SetHost { host } => {
 				self.host = Some(host.clone());
 				Ok(0)
 			}
-			Message::MainEntry {
+			RawMessage::MainEntry {
 				action,
 				handle,
 				in_args,
 				out_args,
 			} => {
 				let mapped_action = self.map_action(action, handle, in_args, out_args);
+				println!("Mapped action found: {:?}", mapped_action);
 				match mapped_action {
+					Ok(Action::Load) => self.load(),
+					Ok(Action::Unload) => self.unload(),
+					Ok(Action::Describe(handle)) => self.describe(handle),
+					//Ok(Action::DescribeInContext(handle)) => self.describe(handle),
 					Ok(a) => self.execute(a),
 					Err(e) => Err(e),
 				}
 			}
 		}
+	}
+}
+
+impl PluginDescriptor {
+	fn load(&mut self) -> Result<types::Int> {
+		let host = self.host.ok_or(Error::HostNotReady)?;
+		let fetchSuite = host.fetchSuite.ok_or(Error::HostNotReady)?;
+
+		const V1: types::Int = 1;
+		const V2: types::Int = 2;
+
+		println!("Fetching suites");
+		macro_rules! fetch_suite {
+			($suite_name:ident, $suite_version:ident) => {
+				unsafe {
+					let suiteptr = fetchSuite(
+						host.host as OfxPropertySetHandle,
+						CStr::from_bytes_with_nul_unchecked(concat_idents!(
+							kOfx,
+							$suite_name,
+							Suite
+						))
+						.as_ptr(),
+						$suite_version,
+						);
+					if suiteptr == std::ptr::null() {
+						println!("Failed to load {}", stringify!($suite_name));
+						None
+					} else {
+						println!("Found {} at {:?}", stringify!($suite_name), suiteptr);
+						unsafe {
+							Some(&*unsafe {
+								suiteptr
+									as *const concat_idents!(
+										Ofx,
+										$suite_name,
+										Suite,
+										$suite_version
+									)
+							})
+							}
+						}
+					}
+			};
+		};
+
+		let suites = Suites {
+			effect: fetch_suite!(ImageEffect, V1).ok_or(Error::InvalidSuite)?,
+			prop: fetch_suite!(Property, V1).ok_or(Error::InvalidSuite)?,
+			param: fetch_suite!(Parameter, V1).ok_or(Error::InvalidSuite)?,
+			memory: fetch_suite!(Memory, V1).ok_or(Error::InvalidSuite)?,
+			thread: fetch_suite!(MultiThread, V1).ok_or(Error::InvalidSuite)?,
+			message: fetch_suite!(Message, V1).ok_or(Error::InvalidSuite)?,
+			message_v2: fetch_suite!(Message, V2),
+			progress: fetch_suite!(Progress, V1).ok_or(Error::InvalidSuite)?,
+			progress_v2: fetch_suite!(Progress, V2),
+
+			time_line: fetch_suite!(TimeLine, V1).ok_or(Error::InvalidSuite)?,
+			parametric_parameter: fetch_suite!(ParametricParameter, V1),
+			opengl_render: fetch_suite!(ImageEffectOpenGLRender, V1),
+		};
+		self.suites = Some(suites);
+		println!("Loaded plugin");
+		Ok(eOfxStatus_OK)
+	}
+
+	fn unload(&mut self) -> Result<types::Int> {
+		Ok(eOfxStatus_OK)
+	}
+	
+	fn cache_handle(&mut self, handle: ImageEffectHandle<'static>) {
+		self.cached_handle = Some(handle);	
+	}
+	
+	fn describe(&mut self, handle: ImageEffectHandle<'static>) -> Result<types::Int> {
+		println!("Caching plugin instance handle {:?}", handle);
+		self.cache_handle(handle);
+		Ok(eOfxStatus_OK)
 	}
 }
 
@@ -400,7 +562,7 @@ pub struct Registry {
 }
 
 #[derive(Debug)]
-pub enum Message<'a> {
+pub enum RawMessage<'a> {
 	SetHost {
 		host: &'a OfxHost,
 	},
@@ -447,6 +609,55 @@ impl Registry {
 		self.plugin_modules
 			.insert(module_name.clone(), plugin_index as usize);
 
+		let mut global_action_index = EnumIndex::new();
+		let mut image_effect_action_index = EnumIndex::new();
+		use ofx_sys::*;
+		macro_rules! global_add {
+			($id:ident) => {
+				println!("{} {}", stringify!(concat_idents!(kOfxAction, $id)), stringify!(GlobalAction::$id));
+				global_action_index.insert(concat_idents!(kOfxAction, $id), GlobalAction::$id)
+			};
+		}
+		global_add!(Load);
+		global_add!(Describe);
+		global_add!(Unload);
+		global_add!(PurgeCaches);
+		global_add!(SyncPrivateData);
+		global_add!(CreateInstance);
+		global_add!(DestroyInstance);
+		global_add!(InstanceChanged);
+		global_add!(BeginInstanceChanged);
+		global_add!(EndInstanceChanged);
+		global_add!(BeginInstanceEdit);
+		global_add!(EndInstanceEdit);
+		//global_add!(DescribeInteract);
+		//global_add!(CreateInstanceInteract);
+		//global_add!(DestroyInstanceInteract);
+		global_add!(Dialog);
+		println!("{:?}", global_action_index);
+		macro_rules! image_effect_add {
+			($id:ident) => {
+				image_effect_action_index.insert(
+					concat_idents!(kOfxImageEffectAction, $id),
+					ImageEffectAction::$id,
+					)
+			};
+		}
+		image_effect_add!(GetRegionOfDefinition);
+		image_effect_add!(GetRegionsOfInterest);
+		image_effect_add!(GetTimeDomain);
+		image_effect_add!(GetFramesNeeded);
+		image_effect_add!(GetClipPreferences);
+		image_effect_add!(IsIdentity);
+		image_effect_add!(Render);
+		image_effect_add!(BeginSequenceRender);
+		image_effect_add!(EndSequenceRender);
+		image_effect_add!(DescribeInContext);
+		image_effect_add!(GetInverseDistortion);
+		image_effect_add!(InvokeHelp);
+		image_effect_add!(InvokeAbout);
+		image_effect_add!(VegasKeyframeUplift);
+
 		let plugin = PluginDescriptor {
 			plugin_index,
 			module_name,
@@ -454,6 +665,9 @@ impl Registry {
 			instance,
 			host: None,
 			suites: None,
+			cached_handle: None,
+			global_action_index,
+			image_effect_action_index,
 			ofx_plugin,
 		};
 
@@ -477,7 +691,7 @@ impl Registry {
 		&self.plugins[index as usize].ofx_plugin
 	}
 
-	pub fn dispatch(&mut self, plugin_module: &str, message: Message) -> Result<types::Int> {
+	pub fn dispatch(&mut self, plugin_module: &str, message: RawMessage) -> Result<types::Int> {
 		println!("{}:{:?}", plugin_module, message);
 		let found_plugin = self.plugin_modules.get(plugin_module).cloned();
 		if let Some(plugin_index) = found_plugin {
@@ -492,10 +706,12 @@ impl Registry {
 pub fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
 	unsafe {
 		get_registry_mut()
-			.dispatch(plugin_module, Message::SetHost { host: &*host })
+			.dispatch(plugin_module, RawMessage::SetHost { host: &*host })
 			.ok();
 	}
 }
+
+static mut global_registry: Option<Registry> = None;
 
 pub fn main_entry_for_plugin(
 	plugin_module: &str,
@@ -508,7 +724,7 @@ pub fn main_entry_for_plugin(
 		get_registry_mut()
 			.dispatch(
 				plugin_module,
-				Message::MainEntry {
+				RawMessage::MainEntry {
 					action,
 					handle,
 					in_args,
@@ -519,8 +735,6 @@ pub fn main_entry_for_plugin(
 			.unwrap_or(-1)
 	}
 }
-
-static mut global_registry: Option<Registry> = None;
 
 pub fn init_registry<F>(init_function: F)
 where
