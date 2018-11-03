@@ -22,3 +22,4 @@
 #include "ofxSonyVegas.h"
 #include "ofxTimeLine.h"
 
+#include "macro_constants.h"

@@ -9,12 +9,45 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::fmt::Display;
+use std::marker::PhantomData;
 
 pub use ofx_sys::*;
 
 #[derive(Debug)]
 pub enum Error {
 	PluginNotFound,
+	InvalidAction,
+	InvalidImageEffectAction,
+	InvalidNameEncoding,
+	InvalidResultEncoding,
+	PropertyIndexOutOfBounds,
+	InvalidHandle,
+	InvalidValue,
+	PluginNotReady,
+	UnknownError,
+}
+
+impl From<OfxStatus> for Error {
+	fn from(status: OfxStatus) -> Error {
+		match status {
+			ofx_sys::eOfxStatus_ErrBadHandle => Error::InvalidHandle,
+			ofx_sys::eOfxStatus_ErrBadIndex => Error::UnknownError,
+			ofx_sys::eOfxStatus_ErrValue => Error::UnknownError,
+			_ => Error::UnknownError,
+		}
+	}
+}
+
+impl From<std::ffi::NulError> for Error {
+	fn from(_src: std::ffi::NulError) -> Error {
+		Error::InvalidNameEncoding
+	}
+}
+
+impl From<std::str::Utf8Error> for Error {
+	fn from(_src: std::str::Utf8Error) -> Error {
+		Error::InvalidResultEncoding
+	}
 }
 
 impl fmt::Display for Error {
@@ -32,12 +65,15 @@ pub mod types {
 	use std::os::raw::*;
 	pub type Int = c_int;
 	pub type UnsignedInt = c_uint;
+	pub type Double = c_double;
+	pub type Float = c_float;
 	pub type Char = c_char;
 	pub type CharPtr = *const c_char;
+	pub type CharPtrMut = *mut c_char;
 	pub type CStr = *const c_char;
-	pub type Void = ();
+	pub type Void = c_void;
 	pub type VoidPtr = *const c_void;
-
+	pub type Status = ofx_sys::OfxStatus;
 	pub type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
 	pub type MainEntry = unsafe extern "C" fn(
 		*const i8,
@@ -62,11 +98,153 @@ pub struct Suites {
 	opengl_render: Option<*const OfxImageEffectOpenGLRenderSuiteV1>,
 }
 
-pub enum Action {
-	Nop,
+#[derive(Clone, Copy, Debug)]
+pub enum GlobalAction {
 	Load,
+	Describe,
 	Unload,
+	PurgeCaches,
+	SyncPrivateData,
+	CreateInstance,
+	DestroyInstance,
+	InstanceChanged,
+	BeginInstanceChange,
+	EndInstanceChanged,
+	BeginInstanceEdit,
+	EndInstanceEdit,
+	DescribeInteract,
+	CreateInstanceInterace,
+	DestroyInstanceInteract,
+	Dialog,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ImageEffectAction {
+	GetRegionOfDefinition,
+	GetRegionsOfInterest,
+	GetTimeDomain,
+	GetFramesNeeded,
+	GetClipPreferences,
+	IsIdentity,
 	Render,
+	BeginSequenceRender,
+	EndSequenceRender,
+	DescribeInContext,
+	GetInverseDistortion,
+	InvokeHelp,
+	InvokeAbout,
+	VegasKeyframeUplift,
+}
+
+#[derive(Clone, Copy)]
+pub struct InstanceHandle<'a> {
+	inner: types::VoidPtr,
+	_lifetime: PhantomData<&'a types::Void>,
+}
+
+#[derive(Clone, Copy)]
+pub struct ImageEffectHandle<'a> {
+	inner: types::VoidPtr,
+	_lifetime: PhantomData<&'a types::Void>,
+}
+
+#[derive(Clone, Copy)]
+pub struct PropertySetHandle<'a> {
+	inner: OfxPropertySetHandle,
+	prop: *const OfxPropertySuiteV1,
+	_lifetime: PhantomData<&'a types::Void>,
+}
+
+trait PropertySet {}
+trait PropertyGet {
+	fn get_double_index(&self, name: &str, index: usize) -> Result<types::Double>;
+	fn get_string_index(&self, name: &str, index: usize) -> Result<String>;
+	fn get_int_index(&self, name: &str, index: usize) -> Result<types::Int>;
+
+	fn get_string(&self, name: &str) -> Result<String> {
+		self.get_string_index(name, 0)
+	}
+	fn get_double(&self, name: &str, index: usize) -> Result<types::Double> {
+		self.get_double_index(name, 0)
+	}
+	fn get_int(&self, name: &str, index: usize) -> Result<types::Int> {
+		self.get_int_index(name, 0)
+	}
+}
+
+impl<'a> PropertySet for PropertySetHandle<'a> {}
+
+impl<'a> PropertyGet for PropertySetHandle<'a> {
+	fn get_int_index(&self, name: &str, index: usize) -> Result<types::Int> {
+		let c_name = CString::new(name)?.as_ptr();
+		let mut c_int_out: types::Int = 0;
+		let ofx_status = unsafe {
+			(*self.prop).propGetInt.map(|getter| {
+				getter(
+					self.inner,
+					c_name,
+					index as types::Int,
+					&mut c_int_out as *mut _,
+				)
+			})
+		};
+		match ofx_status {
+			Some(ofx_sys::eOfxStatus_OK) => Ok(c_int_out),
+			None => Err(Error::PluginNotReady),
+			Some(other) => Err(Error::from(other)),
+		}
+	}
+
+	fn get_double_index(&self, name: &str, index: usize) -> Result<types::Double> {
+		let c_name = CString::new(name)?.as_ptr();
+		let mut c_double_out: types::Double = 0.0;
+		let ofx_status = unsafe {
+			(*self.prop).propGetDouble.map(|getter| {
+				getter(
+					self.inner,
+					c_name,
+					index as types::Int,
+					&mut c_double_out as *mut _,
+				)
+			})
+		};
+		match ofx_status {
+			Some(ofx_sys::eOfxStatus_OK) => Ok(c_double_out),
+			None => Err(Error::PluginNotReady),
+			Some(other) => Err(Error::from(other)),
+		}
+	}
+
+	fn get_string_index(&self, name: &str, index: usize) -> Result<String> {
+		let c_name = CString::new(name)?.as_ptr();
+		unsafe {
+			let mut c_ptr_out: types::CharPtr = std::mem::uninitialized();
+			let ofx_status = (*self.prop).propGetString.map(|getter| {
+				getter(
+					self.inner,
+					c_name,
+					index as types::Int,
+					&mut c_ptr_out as *mut _,
+				) as i32
+			});
+			match ofx_status {
+				Some(ofx_sys::eOfxStatus_OK) => Ok(CStr::from_ptr(c_ptr_out).to_str()?.to_owned()),
+				None => Err(Error::PluginNotReady),
+				Some(other) => Err(Error::from(other)),
+			}
+		}
+	}
+}
+
+#[derive(Clone, Copy)]
+pub struct ImageEffectInstanceHandle<'a> {
+	inner: types::VoidPtr,
+	_lifetime: PhantomData<&'a types::Void>,
+}
+
+pub enum Action<'a> {
+	Global(GlobalAction, InstanceHandle<'a>),
+	ImageEffect(ImageEffectAction, ImageEffectHandle<'a>),
 }
 
 pub trait Dispatch {
@@ -82,13 +260,13 @@ pub trait Execute {
 }
 
 pub trait MapAction {
-	fn map_action(
+	fn map_action<'a>(
 		&self,
 		action: types::CharPtr,
 		handle: types::VoidPtr,
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
-	) -> Result<Action>;
+	) -> Result<Action<'a>>;
 }
 
 pub trait Plugin: Dispatch + MapAction + Execute {
@@ -118,14 +296,14 @@ impl Display for PluginDescriptor {
 }
 
 impl MapAction for PluginDescriptor {
-	fn map_action(
+	fn map_action<'a>(
 		&self,
 		action: types::CharPtr,
 		handle: types::VoidPtr,
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
-	) -> Result<Action> {
-		Ok(Action::Nop)
+	) -> Result<Action<'a>> {
+		Err(Error::InvalidAction)
 	}
 }
 
@@ -143,9 +321,13 @@ impl Dispatch for PluginDescriptor {
 				handle,
 				in_args,
 				out_args,
-			} => self
-				.map_action(action, handle, in_args, out_args)
-				.and_then(|action| self.execute(action)),
+			} => {
+				let mapped_action = self.map_action(action, handle, in_args, out_args);
+				match mapped_action {
+					Ok(a) => self.execute(a),
+					Err(e) => Err(e),
+				}
+			}
 		}
 	}
 }
