@@ -12,15 +12,14 @@ Replaces the client Support C++ layer, using the raw ofx* ABI via bindgen only.
 - each plugin in its own Rust module
 - centralised plugin registry per crate
 
-### Example plugin shell
+### Example plugin skeleton
 
-`lib.rs`:
+`lib.rs`
 
 ```rust
 extern crate ofx;
 
 mod simple_plugin;
-mod tests;
 
 use ofx::*;
 
