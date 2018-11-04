@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 
 mod action;
 mod plugin;
-mod prop;
+mod property;
 mod result;
 mod types;
 #[macro_use]
