@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use ofx_sys::OfxStatus;
 use std::os::raw::*;
 
 pub type Int = c_int;
@@ -13,9 +14,9 @@ pub type CStr = *const c_char;
 pub type Void = c_void;
 pub type VoidPtr = *const c_void;
 pub type VoidPtrMut = *mut c_void;
-pub type Status = ofx_sys::OfxStatus;
-pub type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
-pub type MainEntry = unsafe extern "C" fn(
+pub type Status = OfxStatus;
+pub(crate) type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
+pub(crate) type MainEntry = unsafe extern "C" fn(
 	*const i8,
 	VoidPtr,
 	*mut ofx_sys::OfxPropertySetStruct,

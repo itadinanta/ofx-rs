@@ -265,7 +265,7 @@ impl PluginDescriptor {
 
 	fn load(&mut self) -> Result<Int> {
 		let host = self.host.ok_or(Error::HostNotReady)?;
-		let fetchSuite = host.fetchSuite.ok_or(Error::HostNotReady)?;
+		let fetch_suite = host.fetchSuite.ok_or(Error::HostNotReady)?;
 
 		const V1: Int = 1;
 		const V2: Int = 2;
@@ -274,7 +274,7 @@ impl PluginDescriptor {
 		macro_rules! fetch_suite {
 			($suite_name:ident, $suite_version:ident) => {
 				unsafe {
-					let suiteptr = fetchSuite(
+					let suiteptr = fetch_suite(
 						host.host as OfxPropertySetHandle,
 						CStr::from_bytes_with_nul_unchecked(concat_idents!(
 							kOfx,
