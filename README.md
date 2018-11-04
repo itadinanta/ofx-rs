@@ -2,6 +2,8 @@
 
 Replaces the client Support C++ layer, using the raw ofx* ABI via bindgen only.
 
+11/2018 status: Not ready for use/evaluation - no `crates.io` availabilty as yet. Perhaps still good as a PoC
+
 ### Design goals
 
 - data and type safe
