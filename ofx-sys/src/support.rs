@@ -4,7 +4,7 @@
 
 #[repr(C)]
 pub struct std_string {
-	_unused: [u8; 16]
+	_unused: [u8; 16],
 }
 pub struct std_basic_string {}
 

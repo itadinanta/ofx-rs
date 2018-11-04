@@ -1,6 +1,6 @@
+use ofx_sys::*;
 use std::fmt;
 use std::fmt::Display;
-use ofx_sys::*;
 
 #[derive(Debug)]
 pub enum Error {

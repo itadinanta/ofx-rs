@@ -1,9 +1,9 @@
-use result::*;
 use action::*;
+use ofx_sys::*;
 use plugin::*;
+use result::*;
 use std::collections::HashMap;
 use types::*;
-use ofx_sys::*;
 
 pub struct Registry {
 	plugins: Vec<PluginDescriptor>,

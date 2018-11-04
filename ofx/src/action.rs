@@ -5,8 +5,8 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use ofx_sys::*;
-use types::*;
 use result::*;
+use types::*;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum GlobalAction {

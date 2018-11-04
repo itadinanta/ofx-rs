@@ -1,8 +1,8 @@
-use result::*;
-use types::*;
 use ofx_sys::*;
-use std::marker::PhantomData;
+use result::*;
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
+use types::*;
 
 #[derive(Clone, Copy)]
 pub struct PropertiesHandle<'a> {

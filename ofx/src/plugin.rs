@@ -329,7 +329,6 @@ impl PluginDescriptor {
 		Ok(eOfxStatus_OK)
 	}
 
-
 	fn cache_handle(&mut self, handle: ImageEffectHandle<'static>) {
 		self.cached_handle = Some(handle);
 	}
