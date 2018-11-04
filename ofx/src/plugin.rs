@@ -108,8 +108,8 @@ impl Display for PluginDescriptor {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(
 			f,
-			"{:?} {} {}",
-			self.plugin_id, self.module_name, self.plugin_index
+			"module:{} id:{:?} index:{}",
+			self.module_name, self.plugin_id, self.plugin_index
 		)
 	}
 }
@@ -201,10 +201,10 @@ impl PluginDescriptor {
 		use ofx_sys::*;
 		macro_rules! global_add {
 			($id:ident) => {
-				info!(
-					"{} {}",
-					stringify!(concat_idents!(kOfxAction, $id)),
-					stringify!(GlobalAction::$id)
+				debug!(
+					"kOfxAction{} GlobalAction::{}",
+					stringify!($id),
+					stringify!($id)
 					);
 				global_action_index.insert(concat_idents!(kOfxAction, $id), GlobalAction::$id)
 			};
@@ -228,6 +228,11 @@ impl PluginDescriptor {
 		info!("{:?}", global_action_index);
 		macro_rules! image_effect_add {
 			($id:ident) => {
+				debug!(
+					"kOfxImageEffectAction{} ImageEffectAction::{}",
+					stringify!($id),
+					stringify!($id)
+					);
 				image_effect_action_index.insert(
 					concat_idents!(kOfxImageEffectAction, $id),
 					ImageEffectAction::$id,

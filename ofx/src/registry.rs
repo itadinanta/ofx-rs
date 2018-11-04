@@ -123,18 +123,19 @@ where
 					"stdout".to_string(),
 					Box::new(ConsoleAppender::builder().build()),
 				))
-				.logger(Logger::builder().build("ofx".to_string(), log::LevelFilter::Info))
+				.logger(Logger::builder().build("ofx".to_string(), log::LevelFilter::Debug))
 				.build(
 					Root::builder()
 						.appender("stdout".to_string())
-						.build(log::LevelFilter::Info),
+						.build(log::LevelFilter::Error),
 				);
 			log4rs::init_config(config.unwrap()).unwrap();
 
-			info!("Starting module");
-
 			let mut registry = Registry::new();
 			init_function(&mut registry);
+			for plugin in &registry.plugins {
+				info!("Registered plugin {}", plugin);
+			}
 			_GLOBAL_REGISTRY = Some(registry);
 		}
 	}
@@ -156,7 +157,7 @@ macro_rules! plugin_module {
 		}
 
 		pub fn module_name() -> &'static str {
-			module_path!().split("::").last().as_ref().unwrap()
+			module_path!()//.split("::").last().as_ref().unwrap()
 		}
 
 		pub fn new_instance() -> Box<Execute> {
