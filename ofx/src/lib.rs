@@ -18,11 +18,17 @@ mod types;
 mod registry;
 
 pub use action::*;
-pub use ofx_sys::*;
 pub use plugin::*;
-pub use registry::*;
 pub use result::*;
 pub use types::*;
+
+use ofx_sys::*;
+use registry::*;
+
+pub use ofx_sys::{OfxHost, OfxPlugin, OfxPropertySetHandle};
+pub use registry::{
+	get_registry, init_registry, main_entry_for_plugin, set_host_for_plugin, Registry,
+};
 
 #[macro_export]
 macro_rules! register_modules {
