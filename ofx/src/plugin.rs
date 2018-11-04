@@ -42,7 +42,7 @@ where
 				self.inverse_map.insert(value, key.to_owned());
 			}
 		} else {
-			println!("Was unable to add {:?} key, this is a bug", key_bytes)
+			error!("Was unable to add {:?} key, this is a bug", key_bytes)
 		}
 	}
 
@@ -124,12 +124,12 @@ impl MapAction for PluginDescriptor {
 	) -> Result<Action<'a>> {
 		let name = unsafe { CStr::from_ptr(action) }.to_bytes();
 		if let Some(action) = self.image_effect_action_index.find(name) {
-			println!("Image effect action match {:?}", action);
+			info!("Image effect action match {:?}", action);
 			match action {
 				_ => Err(Error::InvalidAction),
 			}
 		} else if let Some(action) = self.global_action_index.find(name) {
-			println!("Global action {:?}", action);
+			info!("Global action {:?}", action);
 			match action {
 				GlobalAction::Load => Ok(Action::Load),
 				GlobalAction::Unload => Ok(Action::Unload),
@@ -137,7 +137,7 @@ impl MapAction for PluginDescriptor {
 				_ => Err(Error::InvalidAction),
 			}
 		} else {
-			println!("No action matching");
+			info!("No action matching");
 			Err(Error::InvalidAction)
 		}
 	}
@@ -159,7 +159,7 @@ impl Dispatch for PluginDescriptor {
 				out_args,
 			} => {
 				let mapped_action = self.map_action(action, handle, in_args, out_args);
-				println!("Mapped action found: {:?}", mapped_action);
+				info!("Mapped action found: {:?}", mapped_action);
 				match mapped_action {
 					Ok(Action::Load) => self.load(),
 					Ok(Action::Unload) => self.unload(),
@@ -201,7 +201,7 @@ impl PluginDescriptor {
 		use ofx_sys::*;
 		macro_rules! global_add {
 			($id:ident) => {
-				println!(
+				info!(
 					"{} {}",
 					stringify!(concat_idents!(kOfxAction, $id)),
 					stringify!(GlobalAction::$id)
@@ -225,7 +225,7 @@ impl PluginDescriptor {
 		//global_add!(CreateInstanceInteract);
 		//global_add!(DestroyInstanceInteract);
 		global_add!(Dialog);
-		println!("{:?}", global_action_index);
+		info!("{:?}", global_action_index);
 		macro_rules! image_effect_add {
 			($id:ident) => {
 				image_effect_action_index.insert(
@@ -270,7 +270,7 @@ impl PluginDescriptor {
 		const V1: Int = 1;
 		const V2: Int = 2;
 
-		println!("Fetching suites");
+		info!("Fetching suites");
 		macro_rules! fetch_suite {
 			($suite_name:ident, $suite_version:ident) => {
 				unsafe {
@@ -285,10 +285,10 @@ impl PluginDescriptor {
 						$suite_version,
 						);
 					if suiteptr == std::ptr::null() {
-						println!("Failed to load {}", stringify!($suite_name));
+						error!("Failed to load {}", stringify!($suite_name));
 						None
 					} else {
-						println!("Found {} at {:?}", stringify!($suite_name), suiteptr);
+						info!("Found {} at {:?}", stringify!($suite_name), suiteptr);
 						unsafe {
 							Some(&*unsafe {
 								suiteptr
@@ -321,7 +321,7 @@ impl PluginDescriptor {
 			image_effect_opengl_render: fetch_suite!(ImageEffectOpenGLRender, V1),
 		};
 		self.suites = Some(suites);
-		println!("Loaded plugin");
+		info!("Loaded plugin");
 		Ok(eOfxStatus_OK)
 	}
 
@@ -334,7 +334,7 @@ impl PluginDescriptor {
 	}
 
 	fn describe(&mut self, handle: ImageEffectHandle<'static>) -> Result<Int> {
-		println!("Caching plugin instance handle {:?}", handle);
+		info!("Caching plugin instance handle {:?}", handle);
 		self.cache_handle(handle);
 		Ok(eOfxStatus_OK)
 	}

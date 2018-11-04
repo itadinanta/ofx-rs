@@ -65,7 +65,7 @@ impl Registry {
 	}
 
 	pub fn dispatch(&mut self, plugin_module: &str, message: RawMessage) -> Result<Int> {
-		println!("{}:{:?}", plugin_module, message);
+		info!("{}:{:?}", plugin_module, message);
 		let found_plugin = self.plugin_modules.get(plugin_module).cloned();
 		if let Some(plugin_index) = found_plugin {
 			let plugin = self.get_plugin_mut(plugin_index);
@@ -115,6 +115,24 @@ where
 {
 	unsafe {
 		if _GLOBAL_REGISTRY.is_none() {
+			use log4rs::append::console::*;
+			use log4rs::config::*;
+
+			let config = Config::builder()
+				.appender(Appender::builder().build(
+					"stdout".to_string(),
+					Box::new(ConsoleAppender::builder().build()),
+				))
+				.logger(Logger::builder().build("ofx".to_string(), log::LevelFilter::Info))
+				.build(
+					Root::builder()
+						.appender("stdout".to_string())
+						.build(log::LevelFilter::Info),
+				);
+			log4rs::init_config(config.unwrap()).unwrap();
+
+			info!("Starting module");
+
 			let mut registry = Registry::new();
 			init_function(&mut registry);
 			_GLOBAL_REGISTRY = Some(registry);

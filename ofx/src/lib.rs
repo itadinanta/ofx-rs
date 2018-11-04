@@ -2,6 +2,9 @@
 #![feature(concat_idents)]
 
 extern crate ofx_sys;
+#[macro_use]
+extern crate log;
+extern crate log4rs;
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
