@@ -12,86 +12,13 @@ use std::fmt;
 use std::fmt::Display;
 use std::marker::PhantomData;
 
+mod result;
+mod types;
+mod prop;
+
 pub use ofx_sys::*;
-
-#[derive(Debug)]
-pub enum Error {
-	PluginNotFound,
-	InvalidAction,
-	InvalidImageEffectAction,
-	InvalidNameEncoding,
-	InvalidResultEncoding,
-	PropertyIndexOutOfBounds,
-	InvalidHandle,
-	InvalidValue,
-	InvalidSuite,
-	PluginNotReady,
-	HostNotReady,
-	UnknownError,
-}
-
-impl From<OfxStatus> for Error {
-	fn from(status: OfxStatus) -> Error {
-		match status {
-			ofx_sys::eOfxStatus_ErrBadHandle => Error::InvalidHandle,
-			ofx_sys::eOfxStatus_ErrBadIndex => Error::UnknownError,
-			ofx_sys::eOfxStatus_ErrValue => Error::UnknownError,
-			_ => Error::UnknownError,
-		}
-	}
-}
-
-impl From<std::ffi::NulError> for Error {
-	fn from(_src: std::ffi::NulError) -> Error {
-		Error::InvalidNameEncoding
-	}
-}
-
-impl From<std::ffi::IntoStringError> for Error {
-	fn from(_src: std::ffi::IntoStringError) -> Error {
-		Error::InvalidNameEncoding
-	}
-}
-
-impl From<std::str::Utf8Error> for Error {
-	fn from(_src: std::str::Utf8Error) -> Error {
-		Error::InvalidResultEncoding
-	}
-}
-
-impl fmt::Display for Error {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Openfx error")
-	}
-}
-
-impl std::error::Error for Error {}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
-#[allow(unused)]
-pub mod types {
-	use std::os::raw::*;
-	pub type Int = c_int;
-	pub type UnsignedInt = c_uint;
-	pub type Double = c_double;
-	pub type Float = c_float;
-	pub type Char = c_char;
-	pub type CharPtr = *const c_char;
-	pub type CharPtrMut = *mut c_char;
-	pub type CStr = *const c_char;
-	pub type Void = c_void;
-	pub type VoidPtr = *const c_void;
-	pub type VoidPtrMut = *mut c_void;
-	pub type Status = ofx_sys::OfxStatus;
-	pub type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
-	pub type MainEntry = unsafe extern "C" fn(
-		*const i8,
-		VoidPtr,
-		*mut ofx_sys::OfxPropertySetStruct,
-		*mut ofx_sys::OfxPropertySetStruct,
-	) -> Int;
-}
+pub use result::*;
+pub use types::*;
 
 pub struct Suites {
 	effect: &'static OfxImageEffectSuiteV1,
@@ -122,9 +49,9 @@ pub enum GlobalAction {
 	EndInstanceChanged,
 	BeginInstanceEdit,
 	EndInstanceEdit,
-//	DescribeInteract,
-//	CreateInstanceInteract,
-//	DestroyInstanceInteract,
+	//	DescribeInteract,
+	//	CreateInstanceInteract,
+	//	DestroyInstanceInteract,
 	Dialog,
 }
 
@@ -186,150 +113,11 @@ where
 
 #[derive(Clone, Copy, Debug)]
 pub struct GenericPluginHandle<'a> {
-	inner: types::VoidPtr,
-	_lifetime: PhantomData<&'a types::Void>,
+	inner: VoidPtr,
+	_lifetime: PhantomData<&'a Void>,
 }
 
-#[derive(Clone, Copy)]
-pub struct PropertiesHandle<'a> {
-	inner: OfxPropertySetHandle,
-	prop: *const OfxPropertySuiteV1,
-	_lifetime: PhantomData<&'a types::Void>,
-}
 
-trait StringId {
-	fn as_ptr(&self) -> Result<types::CharPtr>;
-}
-
-impl StringId for str {
-	fn as_ptr(&self) -> Result<types::CharPtr> {
-		Ok(CString::new(self)?.as_ptr())
-	}
-}
-
-impl StringId for String {
-	fn as_ptr(&self) -> Result<types::CharPtr> {
-		Ok(CString::new(&self[..])?.as_ptr())
-	}
-}
-
-impl StringId for types::CharPtr {
-	fn as_ptr(&self) -> Result<types::CharPtr> {
-		Ok(*self)
-	}
-}
-
-trait PropertySet<T> {
-	fn set_by_index(&mut self, index: usize, value: T) -> Result<()>;
-	fn set(&mut self, value: T) -> Result<()> {
-		self.set_by_index(0, value)
-	}
-}
-trait PropertyGet<T> {
-	fn get_by_index(&self, index: usize) -> Result<T>;
-	fn get(&self) -> Result<T> {
-		self.get_by_index(0)
-	}
-}
-
-struct PropertyHandle<'a, 'n>
-where
-	'n: 'a,
-{
-	parent: PropertiesHandle<'a>,
-	name: &'n StringId,
-}
-
-// identical struct, but different properties
-struct PropertyHandleMut<'a, 'n>
-where
-	'n: 'a,
-{
-	parent: PropertiesHandle<'a>,
-	name: &'n StringId,
-}
-
-impl<'a> PropertiesHandle<'a> {
-	fn property<'n, T>(&'a self, name: &'n StringId) -> PropertyHandle<'a, 'n> {
-		PropertyHandle {
-			parent: self.clone(),
-			name,
-		}
-	}
-
-	fn property_mut<'n>(&'a mut self, name: &'n StringId) -> PropertyHandleMut<'a, 'n> {
-		PropertyHandleMut {
-			parent: self.clone(),
-			name,
-		}
-	}
-}
-
-impl<'a, 'n> PropertyGet<types::Int> for PropertyHandle<'a, 'n> {
-	fn get_by_index(&self, index: usize) -> Result<types::Int> {
-		let c_name = self.name.as_ptr()?;
-		let mut c_int_out: types::Int = 0;
-		let ofx_status = unsafe {
-			(*self.parent.prop).propGetInt.map(|getter| {
-				getter(
-					self.parent.inner,
-					c_name,
-					index as types::Int,
-					&mut c_int_out as *mut _,
-				)
-			})
-		};
-		match ofx_status {
-			Some(ofx_sys::eOfxStatus_OK) => Ok(c_int_out),
-			None => Err(Error::PluginNotReady),
-			Some(other) => Err(Error::from(other)),
-		}
-	}
-}
-
-impl<'a, 'n> PropertyGet<types::Double> for PropertyHandle<'a, 'n> {
-	fn get_by_index(&self, index: usize) -> Result<types::Double> {
-		let c_name = self.name.as_ptr()?;
-		let mut c_double_out: types::Double = 0.0;
-		let ofx_status = unsafe {
-			(*self.parent.prop).propGetDouble.map(|getter| {
-				getter(
-					self.parent.inner,
-					c_name,
-					index as types::Int,
-					&mut c_double_out as *mut _,
-				)
-			})
-		};
-		match ofx_status {
-			Some(ofx_sys::eOfxStatus_OK) => Ok(c_double_out),
-			None => Err(Error::PluginNotReady),
-			Some(other) => Err(Error::from(other)),
-		}
-	}
-}
-
-impl<'a, 'n> PropertyGet<String> for PropertyHandle<'a, 'n> {
-	fn get_by_index(&self, index: usize) -> Result<String> {
-		let c_name = self.name.as_ptr()?;
-		unsafe {
-			let mut c_ptr_out: types::CharPtr = std::mem::uninitialized();
-			let ofx_status = (*self.parent.prop).propGetString.map(|getter| {
-				getter(
-					self.parent.inner,
-					c_name,
-					index as types::Int,
-					&mut c_ptr_out as *mut _,
-				) as i32
-			});
-			match ofx_status {
-				Some(ofx_sys::eOfxStatus_OK) => Ok(CStr::from_ptr(c_ptr_out).to_str()?.to_owned()),
-				None => Err(Error::PluginNotReady),
-				Some(other) => Err(Error::from(other)),
-			}
-		}
-	}
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ImageEffectHandle<'a> {
@@ -338,7 +126,7 @@ pub struct ImageEffectHandle<'a> {
 }
 
 impl<'a> ImageEffectHandle<'a> {
-	pub fn new(ptr: types::VoidPtr) -> ImageEffectHandle<'a> {
+	pub fn new(ptr: VoidPtr) -> ImageEffectHandle<'a> {
 		ImageEffectHandle {
 			inner: unsafe { ptr as OfxImageEffectHandle },
 			_lifetime: PhantomData,
@@ -348,8 +136,8 @@ impl<'a> ImageEffectHandle<'a> {
 
 #[derive(Clone, Copy)]
 pub struct ImageEffectInstanceHandle<'a> {
-	inner: types::VoidPtr,
-	_lifetime: PhantomData<&'a types::Void>,
+	inner: VoidPtr,
+	_lifetime: PhantomData<&'a Void>,
 }
 
 #[derive(Debug)]
@@ -362,13 +150,13 @@ pub enum Action<'a> {
 }
 
 pub trait Dispatch {
-	fn dispatch(&mut self, message: RawMessage) -> Result<types::Int> {
+	fn dispatch(&mut self, message: RawMessage) -> Result<Int> {
 		Ok(eOfxStatus_OK)
 	}
 }
 
 pub trait Execute {
-	fn execute(&mut self, action: Action) -> Result<types::Int> {
+	fn execute(&mut self, action: Action) -> Result<Int> {
 		Ok(eOfxStatus_OK)
 	}
 }
@@ -376,8 +164,8 @@ pub trait Execute {
 pub trait MapAction {
 	fn map_action<'a>(
 		&self,
-		action: types::CharPtr,
-		handle: types::VoidPtr,
+		action: CharPtr,
+		handle: VoidPtr,
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
 	) -> Result<Action<'a>>;
@@ -413,8 +201,8 @@ impl Display for PluginDescriptor {
 impl MapAction for PluginDescriptor {
 	fn map_action<'a>(
 		&self,
-		action: types::CharPtr,
-		handle: types::VoidPtr,
+		action: CharPtr,
+		handle: VoidPtr,
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
 	) -> Result<Action<'a>> {
@@ -442,7 +230,7 @@ impl MapAction for PluginDescriptor {
 impl Execute for PluginDescriptor {}
 
 impl Dispatch for PluginDescriptor {
-	fn dispatch(&mut self, message: RawMessage) -> Result<types::Int> {
+	fn dispatch(&mut self, message: RawMessage) -> Result<Int> {
 		match message {
 			RawMessage::SetHost { host } => {
 				self.host = Some(host.clone());
@@ -470,12 +258,12 @@ impl Dispatch for PluginDescriptor {
 }
 
 impl PluginDescriptor {
-	fn load(&mut self) -> Result<types::Int> {
+	fn load(&mut self) -> Result<Int> {
 		let host = self.host.ok_or(Error::HostNotReady)?;
 		let fetchSuite = host.fetchSuite.ok_or(Error::HostNotReady)?;
 
-		const V1: types::Int = 1;
-		const V2: types::Int = 2;
+		const V1: Int = 1;
+		const V2: Int = 2;
 
 		println!("Fetching suites");
 		macro_rules! fetch_suite {
@@ -532,15 +320,15 @@ impl PluginDescriptor {
 		Ok(eOfxStatus_OK)
 	}
 
-	fn unload(&mut self) -> Result<types::Int> {
+	fn unload(&mut self) -> Result<Int> {
 		Ok(eOfxStatus_OK)
 	}
-	
+
 	fn cache_handle(&mut self, handle: ImageEffectHandle<'static>) {
-		self.cached_handle = Some(handle);	
+		self.cached_handle = Some(handle);
 	}
-	
-	fn describe(&mut self, handle: ImageEffectHandle<'static>) -> Result<types::Int> {
+
+	fn describe(&mut self, handle: ImageEffectHandle<'static>) -> Result<Int> {
 		println!("Caching plugin instance handle {:?}", handle);
 		self.cache_handle(handle);
 		Ok(eOfxStatus_OK)
@@ -553,8 +341,8 @@ impl Plugin for PluginDescriptor {
 	}
 }
 
-pub struct ApiVersion(pub types::Int);
-pub struct PluginVersion(pub types::UnsignedInt, pub types::UnsignedInt);
+pub struct ApiVersion(pub Int);
+pub struct PluginVersion(pub UnsignedInt, pub UnsignedInt);
 
 pub struct Registry {
 	plugins: Vec<PluginDescriptor>,
@@ -567,8 +355,8 @@ pub enum RawMessage<'a> {
 		host: &'a OfxHost,
 	},
 	MainEntry {
-		action: types::CharPtr,
-		handle: types::VoidPtr,
+		action: CharPtr,
+		handle: VoidPtr,
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
 	},
@@ -589,8 +377,8 @@ impl Registry {
 		api_version: ApiVersion,
 		plugin_version: PluginVersion,
 		instance: Box<Execute>,
-		set_host: types::SetHost,
-		main_entry: types::MainEntry,
+		set_host: SetHost,
+		main_entry: MainEntry,
 	) -> usize {
 		let plugin_id = CString::new(name).unwrap();
 
@@ -614,7 +402,11 @@ impl Registry {
 		use ofx_sys::*;
 		macro_rules! global_add {
 			($id:ident) => {
-				println!("{} {}", stringify!(concat_idents!(kOfxAction, $id)), stringify!(GlobalAction::$id));
+				println!(
+					"{} {}",
+					stringify!(concat_idents!(kOfxAction, $id)),
+					stringify!(GlobalAction::$id)
+					);
 				global_action_index.insert(concat_idents!(kOfxAction, $id), GlobalAction::$id)
 			};
 		}
@@ -675,8 +467,8 @@ impl Registry {
 		plugin_index
 	}
 
-	pub fn count(&self) -> types::Int {
-		self.plugins.len() as types::Int
+	pub fn count(&self) -> Int {
+		self.plugins.len() as Int
 	}
 
 	pub fn get_plugin_mut(&mut self, index: usize) -> &mut PluginDescriptor {
@@ -687,11 +479,11 @@ impl Registry {
 		&self.plugins[index as usize]
 	}
 
-	pub fn ofx_plugin(&'static self, index: types::Int) -> &'static OfxPlugin {
+	pub fn ofx_plugin(&'static self, index: Int) -> &'static OfxPlugin {
 		&self.plugins[index as usize].ofx_plugin
 	}
 
-	pub fn dispatch(&mut self, plugin_module: &str, message: RawMessage) -> Result<types::Int> {
+	pub fn dispatch(&mut self, plugin_module: &str, message: RawMessage) -> Result<Int> {
 		println!("{}:{:?}", plugin_module, message);
 		let found_plugin = self.plugin_modules.get(plugin_module).cloned();
 		if let Some(plugin_index) = found_plugin {
@@ -715,11 +507,11 @@ static mut global_registry: Option<Registry> = None;
 
 pub fn main_entry_for_plugin(
 	plugin_module: &str,
-	action: types::CharPtr,
-	handle: types::VoidPtr,
+	action: CharPtr,
+	handle: VoidPtr,
 	in_args: OfxPropertySetHandle,
 	out_args: OfxPropertySetHandle,
-) -> types::Int {
+) -> Int {
 	unsafe {
 		get_registry_mut()
 			.dispatch(
@@ -790,11 +582,11 @@ macro_rules! plugin_module {
 		}
 
 		pub extern "C" fn main_entry(
-			action: ofx::types::CharPtr,
-			handle: ofx::types::VoidPtr,
+			action: ofx::CharPtr,
+			handle: ofx::VoidPtr,
 			in_args: ofx::OfxPropertySetHandle,
 			out_args: ofx::OfxPropertySetHandle,
-		) -> super::types::Int {
+		) -> super::Int {
 			ofx::main_entry_for_plugin(module_name(), action, handle, in_args, out_args)
 		}
 	};
@@ -817,13 +609,13 @@ macro_rules! register_plugin {
 
 #[macro_export]
 macro_rules! build_plugin_registry {
-	($init_protocol:ident) => {
+	($init_callback:ident) => {
 		fn init() {
-			init_registry($init_protocol);
+			init_registry($init_callback);
 		}
 
 		#[no_mangle]
-		pub extern "C" fn OfxGetNumberOfPlugins() -> types::Int {
+		pub extern "C" fn OfxGetNumberOfPlugins() -> Int {
 			init();
 			get_registry().count()
 		}
@@ -831,10 +623,6 @@ macro_rules! build_plugin_registry {
 		#[no_mangle]
 		pub extern "C" fn OfxGetPlugin(nth: Int) -> *const OfxPlugin {
 			init();
-			//for descriptor in describe_plugins() {
-			//	println!("{}", descriptor);
-			//}
-			println!("{}", get_registry().get_plugin(nth as usize));
 			get_registry().ofx_plugin(nth) as *const OfxPlugin
 		}
 
