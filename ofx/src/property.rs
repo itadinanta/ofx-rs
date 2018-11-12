@@ -59,6 +59,7 @@ where
 }
 
 trait PropertyNamed {
+	type ReturnType: PropertyValueType;
 	fn name() -> &'static [u8];
 	fn name_owned() -> Result<String> {
 		CString::new(Self::name())
@@ -81,8 +82,30 @@ struct PropType;
 impl PropertyReadWrite<String> for PropType {}
 
 impl PropertyNamed for PropType {
+	type ReturnType = String;
 	fn name() -> &'static [u8] {
 		ofx_sys::kOfxPropType
+	}
+}
+
+struct PropIndex;
+impl PropertyReadWrite<Int> for PropIndex {}
+impl PropertyNamed for PropIndex {
+	type ReturnType = Int;
+	fn name() -> &'static [u8] {
+		ofx_sys::kOfxPropType
+	}
+}
+
+impl<T> StringId for T
+where
+	T: PropertyNamed,
+{
+	fn as_ptr(&self) -> Result<CharPtr> {
+		let ptr = CString::new(Self::name())
+			.map_err(|_| Error::InvalidNameEncoding)?
+			.as_ptr();
+		Ok(ptr)
 	}
 }
 
@@ -199,5 +222,34 @@ impl<'a, 'n> PropertySet<String> for PropertyHandleMut<'a, 'n> {
 				Some(other) => Err(Error::from(other)),
 			}
 		}
+	}
+}
+
+trait PropertyReader<R>
+where
+	R: PropertyNamed,
+{
+	fn get(&self) -> Result<R::ReturnType>;
+}
+
+struct Dummy {}
+impl PropertyReader<PropType> for Dummy {
+	fn get(&self) -> Result<String> {
+		Ok(String::from("bah"))
+	}
+}
+
+impl PropertyReader<PropIndex> for Dummy {
+	fn get(&self) -> Result<Int> {
+		Ok(1)
+	}
+}
+
+mod tests {
+	use super::*;
+	#[test]
+	fn prop_dummy() {
+		let d = Dummy {};
+		let sv = <Dummy as PropertyReader<PropIndex>>::get(&d);
 	}
 }
