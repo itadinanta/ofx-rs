@@ -221,7 +221,7 @@ macro_rules! build_plugin_registry {
 			get_registry().ofx_plugin(nth) as *const OfxPlugin
 		}
 
-		pub fn describe_plugins() -> Vec<String> {
+		pub fn show_plugins() -> Vec<String> {
 			unsafe {
 				let n = OfxGetNumberOfPlugins();
 				for i in 0..n {

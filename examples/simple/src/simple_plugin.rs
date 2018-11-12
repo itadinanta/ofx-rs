@@ -15,4 +15,11 @@ impl SimplePlugin {
 	}
 }
 
-impl Execute for SimplePlugin {}
+impl Execute for SimplePlugin {
+	fn execute(&mut self, action: Action) -> Result<Int> {
+		match action {
+			Action::Describe(handle) => Ok(eOfxStatus_OK),
+			_ => Ok(eOfxStatus_OK),
+		}
+	}
+}

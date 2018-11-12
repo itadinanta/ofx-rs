@@ -33,16 +33,56 @@ impl StringId for CharPtr {
 	}
 }
 
-trait PropertySet<T> {
+trait PropertyValueType {}
+impl PropertyValueType for Int {}
+impl PropertyValueType for Double {}
+impl PropertyValueType for String {}
+
+trait PropertyGet<T>
+where
+	T: PropertyValueType,
+{
+	fn get_by_index(&self, index: usize) -> Result<T>;
+	fn get(&self) -> Result<T> {
+		self.get_by_index(0)
+	}
+}
+
+trait PropertySet<T>
+where
+	T: PropertyValueType,
+{
 	fn set_by_index(&mut self, index: usize, value: T) -> Result<()>;
 	fn set(&mut self, value: T) -> Result<()> {
 		self.set_by_index(0, value)
 	}
 }
-trait PropertyGet<T> {
-	fn get_by_index(&self, index: usize) -> Result<T>;
-	fn get(&self) -> Result<T> {
-		self.get_by_index(0)
+
+trait PropertyNamed {
+	fn name() -> &'static [u8];
+	fn name_owned() -> Result<String> {
+		CString::new(Self::name())
+			.map_err(|_| Error::InvalidNameEncoding)?
+			.into_string()
+			.map_err(|_| Error::InvalidNameEncoding)
+	}
+}
+
+trait PropertyRead<T>: PropertyNamed {}
+
+trait PropertyWrite<T>: PropertyNamed {}
+
+trait PropertyReadWrite<T>: PropertyRead<T> + PropertyWrite<T> {}
+
+impl<A, T> PropertyRead<T> for A where A: PropertyReadWrite<T> {}
+impl<A, T> PropertyWrite<T> for A where A: PropertyReadWrite<T> {}
+
+struct PropType;
+impl PropertyReadWrite<String> for PropType {}
+
+impl PropertyNamed for PropType {
+	fn name() -> &'static [u8] {
+		ofx_sys::kOfxPropType
 	}
 }
 
@@ -138,6 +178,23 @@ impl<'a, 'n> PropertyGet<String> for PropertyHandle<'a, 'n> {
 			});
 			match ofx_status {
 				Some(ofx_sys::eOfxStatus_OK) => Ok(CStr::from_ptr(c_ptr_out).to_str()?.to_owned()),
+				None => Err(Error::PluginNotReady),
+				Some(other) => Err(Error::from(other)),
+			}
+		}
+	}
+}
+
+impl<'a, 'n> PropertySet<String> for PropertyHandleMut<'a, 'n> {
+	fn set_by_index(&mut self, index: usize, value: String) -> Result<()> {
+		let c_name = self.name.as_ptr()?;
+		unsafe {
+			let c_ptr_in: CharPtr = CString::new(value).unwrap().as_c_str().as_ptr();
+			let ofx_status = (*self.parent.prop)
+				.propSetString
+				.map(|setter| setter(self.parent.inner, c_name, index as Int, c_ptr_in) as i32);
+			match ofx_status {
+				Some(ofx_sys::eOfxStatus_OK) => Ok(()),
 				None => Err(Error::PluginNotReady),
 				Some(other) => Err(Error::from(other)),
 			}
