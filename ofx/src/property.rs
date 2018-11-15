@@ -61,7 +61,7 @@ where
 	I: Named,
 {
 	fn name() -> StaticName {
-		<Self as Named>::name()
+		I::name()
 	}
 }
 
@@ -69,13 +69,12 @@ trait ReadablePropertiesSet<R>
 where
 	R: ReadableAsProperties,
 {
-	fn get<N>(&self) -> Result<N::ReturnType>
+	fn get<P>(&self) -> Result<P::ReturnType>
 	where
-		N: Named + Get,
-		N::ReturnType: Default
+		P: Named + Get,
+		P::ReturnType: Default + ValueType + Sized + Getter
 	{
-		// self.property::<N>().get()
-		Ok(N::ReturnType::default())
+		<P::ReturnType as Getter>::get::<PropertyHandle<R, P>, P>(&self.property::<P>())
 	}
 
 	fn property<N>(&self) -> PropertyHandle<R, N>
@@ -189,21 +188,6 @@ impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for String {}
 
-trait Getter where Self: ValueType + Sized
-{
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named + Get<ReturnType = Self>;
-	fn get<R, P>(readable: &R) -> Result<Self> where R: ReadableAsProperties, P: Named + Get<ReturnType = Self> {
-		Self::get_by_index::<R, P>(readable, 0)
-	}
-}
-
-trait Setter where Self: ValueType + Sized
-{
-	fn set_by_index<W, P>(writable: &mut W, index: usize, value: Self) -> Result<()> where W: WriteableAsProperties, P: Named + Set<ValueType = Self>;
-	fn set<W, P>(writable: &mut W, value: Self) -> Result<()> where W: WriteableAsProperties, P: Named + Set<ValueType = Self>{
-		Self::set_by_index::<W, P>(writable, 0, value)
-	}
-}
 
 type StaticName = &'static [u8];
 trait Named {
@@ -226,7 +210,10 @@ trait Set: Named {
 	type ValueType: ValueType;
 }
 
-trait Edit: Get + Set {}
+trait Edit: Get + Set {
+	type ReturnType: ValueType;
+	type ValueType: ValueType;	
+}
 
 trait CanGet<P>
 where
@@ -276,6 +263,13 @@ where
 	}
 }
 */
+trait Getter where Self: ValueType + Sized
+{
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named + Get<ReturnType = Self>;
+	fn get<R, P>(readable: &R) -> Result<Self> where R: ReadableAsProperties, P: Named + Get<ReturnType = Self> {
+		Self::get_by_index::<R, P>(readable, 0)
+	}
+}
 
 
 impl Getter for Int
@@ -344,6 +338,14 @@ impl Getter for String
 				Some(other) => Err(Error::from(other)),
 			}
 		}
+	}
+}
+
+trait Setter where Self: ValueType + Sized
+{
+	fn set_by_index<W, P>(writable: &mut W, index: usize, value: Self) -> Result<()> where W: WriteableAsProperties, P: Named + Set<ValueType = Self>;
+	fn set<W, P>(writable: &mut W, value: Self) -> Result<()> where W: WriteableAsProperties, P: Named + Set<ValueType = Self>{
+		Self::set_by_index::<W, P>(writable, 0, value)
 	}
 }
 
