@@ -69,13 +69,13 @@ trait ReadablePropertiesSet<R>
 where
 	R: ReadableAsProperties,
 {
-	fn get<N>(&self) -> Result<N::Return>
+	fn get<N>(&self) -> Result<N::ReturnType>
 	where
-		N: Named + Getter,
-		N::Return: Default
+		N: Named + Get,
+		N::ReturnType: Default
 	{
 		// self.property::<N>().get()
-		Ok(N::Return::default())
+		Ok(N::ReturnType::default())
 	}
 
 	fn property<N>(&self) -> PropertyHandle<R, N>
@@ -107,9 +107,9 @@ trait WriteablePropertiesSet<W>
 where
 	W: WriteableAsProperties,
 {
-	fn set<N>(&self, new_value: N::Value) -> Result<()>
+	fn set<N>(&self, new_value: N::ValueType) -> Result<()>
 	where
-		N: Named + Setter,
+		N: Named + Set,
 	{
 //		self.property_mut::<N>().set(new_value)
 		Ok(())
@@ -189,21 +189,19 @@ impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for String {}
 
-trait Getter
+trait Getter where Self: ValueType + Sized
 {
-	type Return: ValueType;
-	fn get_by_index(&self, index: usize) -> Result<Self::Return>;
-	fn get(&self) -> Result<Self::Return> {
-		self.get_by_index(0)
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named + Get<ReturnType = Self>;
+	fn get<R, P>(readable: &R) -> Result<Self> where R: ReadableAsProperties, P: Named + Get<ReturnType = Self> {
+		Self::get_by_index::<R, P>(readable, 0)
 	}
 }
 
-trait Setter
+trait Setter where Self: ValueType + Sized
 {
-	type Value: ValueType;
-	fn set_by_index(&mut self, index: usize, value: Self::Value) -> Result<()>;
-	fn set(&mut self, value: Self::Value) -> Result<()> {
-		self.set_by_index(0, value)
+	fn set_by_index<W, P>(writable: &mut W, index: usize, value: Self) -> Result<()> where W: WriteableAsProperties, P: Named + Set<ValueType = Self>;
+	fn set<W, P>(writable: &mut W, value: Self) -> Result<()> where W: WriteableAsProperties, P: Named + Set<ValueType = Self>{
+		Self::set_by_index::<W, P>(writable, 0, value)
 	}
 }
 
@@ -225,7 +223,7 @@ trait Get: Named {
 }
 
 trait Set: Named {
-	type ReturnType: ValueType;
+	type ValueType: ValueType;
 }
 
 trait Edit: Get + Set {}
@@ -280,18 +278,15 @@ where
 */
 
 
-impl<T> Getter for T
-where
-	T: ReadableAsProperties + Named,
+impl Getter for Int
 {
-	type Return = Int;
-	fn get_by_index(&self, index: usize) -> Result<Int> {
-		let c_name = Self::name().c_str()?;
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named {
+		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
 		let ofx_status = unsafe {
-			(*self.suite()).propGetInt.map(|getter| {
+			(*readable.suite()).propGetInt.map(|getter| {
 				getter(
-					self.handle(),
+					readable.handle(),
 					c_name,
 					index as Int,
 					&mut c_int_out as *mut _,
@@ -305,19 +300,16 @@ where
 		}
 	}
 }
-/*
-impl<T> Getter for T
-where
-	T: ReadableAsProperties + Named,
+
+impl Getter for Double
 {
-	type T = Double;
-	fn get_by_index(&self, index: usize) -> Result<Double> {
-		let c_name = Self::name().c_str()?;
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named {
+		let c_name = P::name().c_str()?;
 		let mut c_double_out: Double = 0.0;
 		let ofx_status = unsafe {
-			(*self.suite()).propGetDouble.map(|getter| {
+			(*readable.suite()).propGetDouble.map(|getter| {
 				getter(
-					self.handle(),
+					readable.handle(),
 					c_name,
 					index as Int,
 					&mut c_double_out as *mut _,
@@ -332,18 +324,15 @@ where
 	}
 }
 
-impl<T> Getter for T
-where
-	T: ReadableAsProperties + Named,
+impl Getter for String
 {
-	type T = String;
-	fn get_by_index(&self, index: usize) -> Result<String> {
-		let c_name = Self::name().c_str()?;
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named {
+		let c_name = P::name().c_str()?;
 		unsafe {
 			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
-			let ofx_status = (*self.suite()).propGetString.map(|getter| {
+			let ofx_status = (*readable.suite()).propGetString.map(|getter| {
 				getter(
-					self.handle(),
+					readable.handle(),
 					c_name,
 					index as Int,
 					&mut c_ptr_out as *mut _,
@@ -357,19 +346,16 @@ where
 		}
 	}
 }
-*/
-impl<T> Setter for T
-where
-	T: WriteableAsProperties + Named,
+
+impl Setter for String
 {
-	type Value = String;
-	fn set_by_index(&mut self, index: usize, value: String) -> Result<()> {
-		let c_name = Self::name().c_str()?;
+	fn set_by_index<W, P>(writable: &mut W, index: usize, value: String) -> Result<()> where W: WriteableAsProperties, P: Named {
+		let c_name = P::name().c_str()?;
 		unsafe {
 			let c_ptr_in: CharPtr = CString::new(value).unwrap().as_c_str().as_ptr();
-			let ofx_status = (*self.suite())
+			let ofx_status = (*writable.suite())
 				.propSetString
-				.map(|setter| setter(self.handle(), c_name, index as Int, c_ptr_in) as i32);
+				.map(|setter| setter(writable.handle(), c_name, index as Int, c_ptr_in) as i32);
 			match ofx_status {
 				Some(ofx_sys::eOfxStatus_OK) => Ok(()),
 				None => Err(Error::PluginNotReady),
