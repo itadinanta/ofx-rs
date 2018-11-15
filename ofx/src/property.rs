@@ -23,28 +23,77 @@ trait ReadableAsProperties {
 	fn suite(&self) -> *const OfxPropertySuiteV1;
 }
 
+struct PropertyHandle<R, N>
+where
+	R: ReadableAsProperties,
+	N: Named,
+{
+	parent: R,
+	_named: PhantomData<N>,
+}
+
+// identical struct, but different properties
+struct PropertyHandleMut<W, N>
+where
+	W: WriteableAsProperties,
+	N: Named,
+{
+	parent: W,
+	_named: PhantomData<N>,
+}
+
+impl<R, I> ReadableAsProperties for PropertyHandle<R, I>
+where
+	R: ReadableAsProperties,
+	I: Named,
+{
+	fn handle(&self) -> OfxPropertySetHandle {
+		self.parent.handle()
+	}
+	fn suite(&self) -> *const OfxPropertySuiteV1 {
+		self.parent.suite()
+	}
+}
+
+impl<R, I> Named for PropertyHandle<R, I>
+where
+	R: ReadableAsProperties,
+	I: Named,
+{
+	fn name() -> StaticName {
+		<Self as Named>::name()
+	}
+}
+
 trait ReadablePropertiesSet<R>
 where
 	R: ReadableAsProperties,
 {
-	fn property<'n, 'a, I>(&'a self, name: &'n I) -> PropertyHandle<'n, R, I>
+	fn get<N>(&self) -> Result<N::Return>
 	where
-		'a: 'n,
-		I: StringId;
+		N: Named + Getter,
+		N::Return: Default
+	{
+		// self.property::<N>().get()
+		Ok(N::Return::default())
+	}
+
+	fn property<N>(&self) -> PropertyHandle<R, N>
+	where
+		N: Named;
 }
 
 impl<R> ReadablePropertiesSet<R> for R
 where
 	R: ReadableAsProperties + Clone,
 {
-	fn property<'n, 'a, I>(&'a self, name: &'n I) -> PropertyHandle<'n, R, I>
+	fn property<N>(&self) -> PropertyHandle<R, N>
 	where
-		'a: 'n,
-		I: StringId,
+		N: Named,
 	{
 		PropertyHandle {
 			parent: self.clone(),
-			name,
+			_named: PhantomData,
 		}
 	}
 }
@@ -58,24 +107,31 @@ trait WriteablePropertiesSet<W>
 where
 	W: WriteableAsProperties,
 {
-	fn property_mut<'n, 'a, I>(&'a mut self, name: &'n I) -> PropertyHandleMut<'n, W, I>
+	fn set<N>(&self, new_value: N::Value) -> Result<()>
 	where
-		'a: 'n,
-		I: StringId;
+		N: Named + Setter,
+	{
+//		self.property_mut::<N>().set(new_value)
+		Ok(())
+	}
+
+	fn property_mut<N>(&mut self) -> PropertyHandleMut<W, N>
+	where
+		N: Named;
 }
 
 impl<W> WriteablePropertiesSet<W> for W
 where
 	W: WriteableAsProperties + Clone,
 {
-	fn property_mut<'n, 'a, I>(&'a mut self, name: &'n I) -> PropertyHandleMut<'n, W, I>
+	
+	fn property_mut<N>(&mut self) -> PropertyHandleMut<W, N>
 	where
-		'a: 'n,
-		I: StringId,
+		N: Named,
 	{
 		PropertyHandleMut {
 			parent: self.clone(),
-			name,
+			_named: PhantomData,
 		}
 	}
 }
@@ -99,17 +155,17 @@ impl<'a> ReadableAsProperties for ImageEffectHandle<'a> {
 }
 
 trait StringId {
-	fn as_ptr(&self) -> Result<CharPtr>;
+	fn c_str(&self) -> Result<CharPtr>;
 }
 
 impl StringId for str {
-	fn as_ptr(&self) -> Result<CharPtr> {
+	fn c_str(&self) -> Result<CharPtr> {
 		Ok(CString::new(self)?.as_ptr())
 	}
 }
 
 impl StringId for &[u8] {
-	fn as_ptr(&self) -> Result<CharPtr> {
+	fn c_str(&self) -> Result<CharPtr> {
 		Ok(CStr::from_bytes_with_nul(self)
 			.map_err(|_| Error::InvalidNameEncoding)?
 			.as_ptr())
@@ -117,13 +173,13 @@ impl StringId for &[u8] {
 }
 
 impl StringId for String {
-	fn as_ptr(&self) -> Result<CharPtr> {
+	fn c_str(&self) -> Result<CharPtr> {
 		Ok(CString::new(&self[..])?.as_ptr())
 	}
 }
 
 impl StringId for CharPtr {
-	fn as_ptr(&self) -> Result<CharPtr> {
+	fn c_str(&self) -> Result<CharPtr> {
 		Ok(*self)
 	}
 }
@@ -133,34 +189,35 @@ impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for String {}
 
-trait Getter<T>
-where
-	T: ValueType,
+trait Getter
 {
-	fn get_by_index(&self, index: usize) -> Result<T>;
-	fn get(&self) -> Result<T> {
+	type Return: ValueType;
+	fn get_by_index(&self, index: usize) -> Result<Self::Return>;
+	fn get(&self) -> Result<Self::Return> {
 		self.get_by_index(0)
 	}
 }
 
-trait Setter<T>
-where
-	T: ValueType,
+trait Setter
 {
-	fn set_by_index(&mut self, index: usize, value: T) -> Result<()>;
-	fn set(&mut self, value: T) -> Result<()> {
+	type Value: ValueType;
+	fn set_by_index(&mut self, index: usize, value: Self::Value) -> Result<()>;
+	fn set(&mut self, value: Self::Value) -> Result<()> {
 		self.set_by_index(0, value)
 	}
 }
 
+type StaticName = &'static [u8];
 trait Named {
-	fn name() -> &'static [u8];
-	fn name_owned() -> Result<String> {
-		CString::new(Self::name())
-			.map_err(|_| Error::InvalidNameEncoding)?
-			.into_string()
-			.map_err(|_| Error::InvalidNameEncoding)
-	}
+	fn name() -> StaticName;
+	/*
+		fn name_owned() -> Result<String> {
+			CString::new(Self::name())
+				.map_err(|_| Error::InvalidNameEncoding)?
+				.into_string()
+				.map_err(|_| Error::InvalidNameEncoding)
+		}
+	*/
 }
 
 trait Get: Named {
@@ -208,6 +265,7 @@ impl Named for Index {
 	}
 }
 
+/*
 impl<T> StringId for T
 where
 	T: Named,
@@ -219,32 +277,16 @@ where
 		Ok(ptr)
 	}
 }
+*/
 
-struct PropertyHandle<'n, R, I>
-where
-	I: StringId,
-	R: ReadableAsProperties,
-{
-	parent: R,
-	name: &'n I,
-}
 
-// identical struct, but different properties
-struct PropertyHandleMut<'n, W, I>
-where
-	I: StringId,
-	W: WriteableAsProperties,
-{
-	parent: W,
-	name: &'n I,
-}
-
-impl<T> Getter<Int> for T
+impl<T> Getter for T
 where
 	T: ReadableAsProperties + Named,
 {
+	type Return = Int;
 	fn get_by_index(&self, index: usize) -> Result<Int> {
-		let c_name = StringId::as_ptr(&Self::name())?;
+		let c_name = Self::name().c_str()?;
 		let mut c_int_out: Int = 0;
 		let ofx_status = unsafe {
 			(*self.suite()).propGetInt.map(|getter| {
@@ -263,13 +305,14 @@ where
 		}
 	}
 }
-
-impl<T> Getter<Double> for T
+/*
+impl<T> Getter for T
 where
 	T: ReadableAsProperties + Named,
 {
+	type T = Double;
 	fn get_by_index(&self, index: usize) -> Result<Double> {
-		let c_name = StringId::as_ptr(&Self::name())?;
+		let c_name = Self::name().c_str()?;
 		let mut c_double_out: Double = 0.0;
 		let ofx_status = unsafe {
 			(*self.suite()).propGetDouble.map(|getter| {
@@ -289,12 +332,13 @@ where
 	}
 }
 
-impl<T> Getter<String> for T
+impl<T> Getter for T
 where
 	T: ReadableAsProperties + Named,
 {
+	type T = String;
 	fn get_by_index(&self, index: usize) -> Result<String> {
-		let c_name = StringId::as_ptr(&Self::name())?;
+		let c_name = Self::name().c_str()?;
 		unsafe {
 			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
 			let ofx_status = (*self.suite()).propGetString.map(|getter| {
@@ -313,13 +357,14 @@ where
 		}
 	}
 }
-
-impl<T> Setter<String> for T
+*/
+impl<T> Setter for T
 where
 	T: WriteableAsProperties + Named,
 {
+	type Value = String;
 	fn set_by_index(&mut self, index: usize, value: String) -> Result<()> {
-		let c_name = StringId::as_ptr(&Self::name())?;
+		let c_name = Self::name().c_str()?;
 		unsafe {
 			let c_ptr_in: CharPtr = CString::new(value).unwrap().as_c_str().as_ptr();
 			let ofx_status = (*self.suite())
@@ -341,24 +386,37 @@ where
 	fn get(&self) -> Result<R::ReturnType>;
 }
 
-struct Dummy {}
-impl Reader<Type> for Dummy {
-	fn get(&self) -> Result<String> {
-		Ok(String::from("bah"))
-	}
-}
-
-impl Reader<Index> for Dummy {
-	fn get(&self) -> Result<Int> {
-		Ok(1)
-	}
-}
-
 mod tests {
 	use super::*;
+
+	struct Dummy {}
+	impl Reader<Type> for Dummy {
+		fn get(&self) -> Result<String> {
+			Ok(String::from("bah"))
+		}
+	}
+
+	impl Reader<Index> for Dummy {
+		fn get(&self) -> Result<Int> {
+			Ok(1)
+		}
+	}
+
 	#[test]
 	fn prop_dummy() {
 		let d = Dummy {};
 		let sv = <Dummy as Reader<Index>>::get(&d);
 	}
+
+	// do not run, just compile!
+	fn prop_host() {
+		let mut handle = ImageEffectHandle {
+			inner: std::ptr::null::<OfxImageEffectStruct>() as OfxImageEffectHandle,
+			prop: std::ptr::null(),
+			_lifetime: PhantomData,
+		};
+
+		handle.get::<Type>();
+	}
+
 }
