@@ -157,7 +157,7 @@ macro_rules! plugin_module {
 		}
 
 		pub fn module_name() -> &'static str {
-			module_path!()//.split("::").last().as_ref().unwrap()
+			module_path!() //.split("::").last().as_ref().unwrap()
 		}
 
 		pub fn new_instance() -> Box<Execute> {

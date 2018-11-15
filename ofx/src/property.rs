@@ -1,3 +1,5 @@
+#![feature(concat_idents)]
+
 use ofx_sys::*;
 use result::*;
 use std::ffi::{CStr, CString};
@@ -35,7 +37,7 @@ where
 // identical struct, but different properties
 struct PropertyHandleMut<W, N>
 where
-	W: WriteableAsProperties,
+	W: WritableAsProperties,
 	N: Named,
 {
 	parent: W,
@@ -72,14 +74,14 @@ where
 	fn get<P>(&self) -> Result<P::ReturnType>
 	where
 		P: Named + Get,
-		P::ReturnType: Default + ValueType + Sized + Getter
+		P::ReturnType: Default + ValueType + Sized + Getter,
 	{
 		<P::ReturnType as Getter>::get::<PropertyHandle<R, P>, P>(&self.property::<P>())
 	}
 
-	fn property<N>(&self) -> PropertyHandle<R, N>
+	fn property<P>(&self) -> PropertyHandle<R, P>
 	where
-		N: Named;
+		P: Named;
 }
 
 impl<R> ReadablePropertiesSet<R> for R
@@ -97,33 +99,35 @@ where
 	}
 }
 
-trait WriteableAsProperties {
+trait WritableAsProperties {
 	fn handle(&self) -> OfxPropertySetHandle;
 	fn suite(&self) -> *const OfxPropertySuiteV1;
 }
 
-trait WriteablePropertiesSet<W>
+trait WritablePropertiesSet<W>
 where
-	W: WriteableAsProperties,
+	W: WritableAsProperties,
 {
-	fn set<N>(&self, new_value: N::ValueType) -> Result<()>
+	fn set<P>(&mut self, new_value: P::ValueType) -> Result<()>
 	where
-		N: Named + Set,
+		P: Named + Set,
+		P::ValueType: ValueType + Sized + Setter,
 	{
-//		self.property_mut::<N>().set(new_value)
-		Ok(())
+		<P::ValueType as Setter>::set::<PropertyHandleMut<W, P>, P>(
+			&mut self.property_mut::<P>(),
+			new_value,
+		)
 	}
 
-	fn property_mut<N>(&mut self) -> PropertyHandleMut<W, N>
+	fn property_mut<P>(&mut self) -> PropertyHandleMut<W, P>
 	where
-		N: Named;
+		P: Named;
 }
 
-impl<W> WriteablePropertiesSet<W> for W
+impl<W> WritablePropertiesSet<W> for W
 where
-	W: WriteableAsProperties + Clone,
+	W: WritableAsProperties + Clone,
 {
-	
 	fn property_mut<N>(&mut self) -> PropertyHandleMut<W, N>
 	where
 		N: Named,
@@ -132,6 +136,19 @@ where
 			parent: self.clone(),
 			_named: PhantomData,
 		}
+	}
+}
+
+impl<W, I> WritableAsProperties for PropertyHandleMut<W, I>
+where
+	W: WritableAsProperties,
+	I: Named,
+{
+	fn handle(&self) -> OfxPropertySetHandle {
+		self.parent.handle()
+	}
+	fn suite(&self) -> *const OfxPropertySuiteV1 {
+		self.parent.suite()
 	}
 }
 
@@ -145,6 +162,15 @@ impl<'a> ReadableAsProperties for PropertySetHandle<'a> {
 }
 
 impl<'a> ReadableAsProperties for ImageEffectHandle<'a> {
+	fn handle(&self) -> OfxPropertySetHandle {
+		self.inner as OfxPropertySetHandle
+	}
+	fn suite(&self) -> *const OfxPropertySuiteV1 {
+		self.prop
+	}
+}
+
+impl<'a> WritableAsProperties for ImageEffectHandle<'a> {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner as OfxPropertySetHandle
 	}
@@ -188,18 +214,9 @@ impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for String {}
 
-
 type StaticName = &'static [u8];
 trait Named {
 	fn name() -> StaticName;
-	/*
-		fn name_owned() -> Result<String> {
-			CString::new(Self::name())
-				.map_err(|_| Error::InvalidNameEncoding)?
-				.into_string()
-				.map_err(|_| Error::InvalidNameEncoding)
-		}
-	*/
 }
 
 trait Get: Named {
@@ -212,7 +229,7 @@ trait Set: Named {
 
 trait Edit: Get + Set {
 	type ReturnType: ValueType;
-	type ValueType: ValueType;	
+	type ValueType: ValueType;
 }
 
 trait CanGet<P>
@@ -229,52 +246,68 @@ where
 	fn set(&mut self) -> P;
 }
 
-struct Type;
-impl Get for Type {
-	type ReturnType = String;
+macro_rules! define_property {
+	(read_only $ofx_name:ident as $name:ident : $value_type:ty) => {
+		struct $name;
+		impl Get for $name {
+			type ReturnType = $value_type;
+		}
+		impl Named for $name {
+			fn name() -> &'static [u8] {
+				concat_idents!(kOfx, $ofx_name)
+			}
+		}
+	};
+	
+	(read_write $name:ident $value_type:ty, $ofx_name:ident) => {
+		struct $name;
+		impl Get for $name {
+			type ReturnType = $value_type;
+		}
+		impl Set for $name {
+			type ValueType = $value_type;
+		}		
+		impl Named for $name {
+			fn name() -> &'static [u8] {
+				concat_idents!(kOfx, $ofx_name)
+			}
+		}
+	}	
 }
 
-impl Named for Type {
-	fn name() -> &'static [u8] {
-		ofx_sys::kOfxPropType
-	}
-}
+define_property!(read_only PropAPIVersion as APIVersion: String);
+define_property!(read_only PropType as Type: String);
+define_property!(read_only PropName as Name: String);
+define_property!(read_only PropLabel as Label: String);
+define_property!(read_only PropVersion as Version: String);
+define_property!(read_only PropVersionLabel as VersionLabel: String);
 
-struct Index;
-impl Get for Index {
-	type ReturnType = Int;
-}
-impl Named for Index {
-	fn name() -> &'static [u8] {
-		ofx_sys::kOfxPropType
-	}
-}
+define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Int);
 
-/*
-impl<T> StringId for T
+
+trait Getter
 where
-	T: Named,
+	Self: ValueType + Sized,
 {
-	fn as_ptr(&self) -> Result<CharPtr> {
-		let ptr = CString::new(Self::name())
-			.map_err(|_| Error::InvalidNameEncoding)?
-			.as_ptr();
-		Ok(ptr)
-	}
-}
-*/
-trait Getter where Self: ValueType + Sized
-{
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named + Get<ReturnType = Self>;
-	fn get<R, P>(readable: &R) -> Result<Self> where R: ReadableAsProperties, P: Named + Get<ReturnType = Self> {
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	where
+		R: ReadableAsProperties,
+		P: Named + Get<ReturnType = Self>;
+	fn get<R, P>(readable: &R) -> Result<Self>
+	where
+		R: ReadableAsProperties,
+		P: Named + Get<ReturnType = Self>,
+	{
 		Self::get_by_index::<R, P>(readable, 0)
 	}
 }
 
-
-impl Getter for Int
-{
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named {
+impl Getter for Int {
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	where
+		R: ReadableAsProperties,
+		P: Named,
+	{
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
 		let ofx_status = unsafe {
@@ -295,9 +328,12 @@ impl Getter for Int
 	}
 }
 
-impl Getter for Double
-{
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named {
+impl Getter for Double {
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	where
+		R: ReadableAsProperties,
+		P: Named,
+	{
 		let c_name = P::name().c_str()?;
 		let mut c_double_out: Double = 0.0;
 		let ofx_status = unsafe {
@@ -318,9 +354,12 @@ impl Getter for Double
 	}
 }
 
-impl Getter for String
-{
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self> where R: ReadableAsProperties, P: Named {
+impl Getter for String {
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	where
+		R: ReadableAsProperties,
+		P: Named,
+	{
 		let c_name = P::name().c_str()?;
 		unsafe {
 			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
@@ -341,17 +380,29 @@ impl Getter for String
 	}
 }
 
-trait Setter where Self: ValueType + Sized
+trait Setter
+where
+	Self: ValueType + Sized,
 {
-	fn set_by_index<W, P>(writable: &mut W, index: usize, value: Self) -> Result<()> where W: WriteableAsProperties, P: Named + Set<ValueType = Self>;
-	fn set<W, P>(writable: &mut W, value: Self) -> Result<()> where W: WriteableAsProperties, P: Named + Set<ValueType = Self>{
+	fn set_by_index<W, P>(writable: &mut W, index: usize, value: Self) -> Result<()>
+	where
+		W: WritableAsProperties,
+		P: Named + Set<ValueType = Self>;
+	fn set<W, P>(writable: &mut W, value: Self) -> Result<()>
+	where
+		W: WritableAsProperties,
+		P: Named + Set<ValueType = Self>,
+	{
 		Self::set_by_index::<W, P>(writable, 0, value)
 	}
 }
 
-impl Setter for String
-{
-	fn set_by_index<W, P>(writable: &mut W, index: usize, value: String) -> Result<()> where W: WriteableAsProperties, P: Named {
+impl Setter for String {
+	fn set_by_index<W, P>(writable: &mut W, index: usize, value: String) -> Result<()>
+	where
+		W: WritableAsProperties,
+		P: Named,
+	{
 		let c_name = P::name().c_str()?;
 		unsafe {
 			let c_ptr_in: CharPtr = CString::new(value).unwrap().as_c_str().as_ptr();
@@ -384,7 +435,7 @@ mod tests {
 		}
 	}
 
-	impl Reader<Index> for Dummy {
+	impl Reader<IsBackground> for Dummy {
 		fn get(&self) -> Result<Int> {
 			Ok(1)
 		}
@@ -393,7 +444,7 @@ mod tests {
 	#[test]
 	fn prop_dummy() {
 		let d = Dummy {};
-		let sv = <Dummy as Reader<Index>>::get(&d);
+		let sv = <Dummy as Reader<IsBackground>>::get(&d);
 	}
 
 	// do not run, just compile!
@@ -405,6 +456,8 @@ mod tests {
 		};
 
 		handle.get::<Type>();
+		handle.get::<IsBackground>();
+		//handle.set::<Type>(""); type is read only
 	}
 
 }
