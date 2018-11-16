@@ -29,7 +29,7 @@ pub use types::*;
 pub use handle::*;
 pub use property::*;
 
-use ofx_sys::*;
+pub use ofx_sys::*;
 use registry::*;
 
 pub use ofx_sys::{OfxHost, OfxPlugin, OfxPropertySetHandle};

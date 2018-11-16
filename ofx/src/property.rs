@@ -1,5 +1,6 @@
 #![feature(concat_idents)]
 
+use handle::*;
 use ofx_sys::*;
 use result::*;
 use std::ffi::{CStr, CString};
@@ -9,6 +10,11 @@ use types::*;
 pub trait ReadableAsProperties {
 	fn handle(&self) -> OfxPropertySetHandle;
 	fn suite(&self) -> *const OfxPropertySuiteV1;
+}
+
+pub trait HasProperties<'a> {
+	fn properties(&'a self) -> Result<PropertySetHandle<'a>>;
+	fn properties_mut(&'a mut self) -> Result<PropertySetHandle<'a>>;
 }
 
 pub struct PropertyHandle<R, N>
@@ -102,6 +108,19 @@ where
 	{
 		<P::ValueType as Setter>::set::<PropertyHandleMut<W, P>, P, _>(
 			&mut self.property_mut::<P>(),
+			new_value,
+		)
+	}
+
+	fn set_at<P, V>(&mut self, index: usize, new_value: V) -> Result<()>
+	where
+		P: Named + Set,
+		V: Into<P::ValueType>,
+		P::ValueType: ValueType + Sized + Setter,
+	{
+		<P::ValueType as Setter>::set_by_index::<PropertyHandleMut<W, P>, P, _>(
+			&mut self.property_mut::<P>(),
+			index,
 			new_value,
 		)
 	}
@@ -251,6 +270,19 @@ define_property!(read_only PropVersionLabel as VersionLabel: String);
 
 define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool);
 
+pub mod image_effect_plugin {
+	use super::*;
+	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String);
+	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool);
+}
+
+pub mod image_effect {
+	use super::*;
+	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
+	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: String);
+	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: String);
+}
+
 pub trait Getter
 where
 	Self: ValueType + Sized,
@@ -399,8 +431,9 @@ impl Setter for String {
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
+		let c_str_in = CString::new(value.into())?;
 		unsafe {
-			let c_ptr_in: CharPtr = CString::new(value.into()).unwrap().as_c_str().as_ptr();
+			let c_ptr_in: CharPtr = c_str_in.as_c_str().as_ptr();
 			let ofx_status = (*writable.suite())
 				.propSetString
 				.map(|setter| setter(writable.handle(), c_name, index as Int, c_ptr_in) as i32);

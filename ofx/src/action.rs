@@ -57,7 +57,7 @@ pub enum Action<'a> {
 }
 
 pub trait Execute {
-	fn execute(&mut self, action: Action) -> Result<Int> {
+	fn execute(&mut self, action: &mut Action) -> Result<Int> {
 		Ok(eOfxStatus_OK)
 	}
 }

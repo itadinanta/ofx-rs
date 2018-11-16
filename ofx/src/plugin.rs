@@ -137,6 +137,7 @@ impl MapAction for PluginDescriptor {
 				GlobalAction::Describe => Ok(Action::Describe(ImageEffectHandle::new(
 					handle,
 					self.suites.as_ref().map(|s| s.property).unwrap(),
+					self.suites.as_ref().map(|s| s.image_effect).unwrap(),
 				))),
 				_ => Err(Error::InvalidAction),
 			}
@@ -146,8 +147,6 @@ impl MapAction for PluginDescriptor {
 		}
 	}
 }
-
-impl Execute for PluginDescriptor {}
 
 impl Dispatch for PluginDescriptor {
 	fn dispatch(&mut self, message: RawMessage) -> Result<Int> {
@@ -172,9 +171,17 @@ impl Dispatch for PluginDescriptor {
 					Err(e) => Err(e),
 				}?;
 
-				self.execute(mapped_action?)
+				self.execute(&mut mapped_action?)
 			}
 		}
+	}
+}
+
+impl Execute for PluginDescriptor {
+	fn execute(&mut self, action: &mut Action) -> Result<Int> {
+		let result = self.instance.execute(action);
+		info!("Executed {:?} of {} -> {:?}", action, self.module_name, result);
+		result
 	}
 }
 
@@ -298,7 +305,11 @@ impl PluginDescriptor {
 						error!("Failed to load {}", stringify!($suite_name));
 						None
 					} else {
-						info!("Found {} at {:?}", stringify!($suite_name), suiteptr);
+						info!(
+							"Found suite '{}' at {:?}",
+							stringify!($suite_name),
+							suiteptr
+						);
 						unsafe {
 							Some(&*unsafe {
 								suiteptr

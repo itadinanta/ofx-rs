@@ -9,6 +9,7 @@ enum eOfxStatus {
 	ErrUnknown = kOfxStatErrUnknown,
 	ErrMemory = kOfxStatErrMemory,
 	ErrUnsupported = kOfxStatErrUnsupported,
+	ErrMissingHostFeature = kOfxStatErrMissingHostFeature,
 };
 
 #define kOfxImageEffectOpenGLRenderSuite "OfxImageEffectOpenGLRenderSuite"

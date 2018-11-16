@@ -46,6 +46,12 @@ impl From<std::ffi::IntoStringError> for Error {
 	}
 }
 
+impl From<std::ffi::FromBytesWithNulError> for Error {
+	fn from(_src: std::ffi::FromBytesWithNulError) -> Error {
+		Error::InvalidResultEncoding
+	}
+}
+
 impl From<std::str::Utf8Error> for Error {
 	fn from(_src: std::str::Utf8Error) -> Error {
 		Error::InvalidResultEncoding

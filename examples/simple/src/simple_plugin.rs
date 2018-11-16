@@ -1,4 +1,5 @@
 use ofx::*;
+use std::ffi::CStr;
 
 plugin_module!(
 	"net.itadinanta.ofx-rs.simple_plugin_1",
@@ -16,14 +17,38 @@ impl SimplePlugin {
 }
 
 impl Execute for SimplePlugin {
-	fn execute(&mut self, mut action: Action) -> Result<Int> {
-		println!("We are here");
-		match action {
-			Action::Describe(ref mut effect_descriptor) => {
-				effect_descriptor.set::<Label, _>("ofx_rs_simple_plugin")?;
-				effect_descriptor.set::<ShortLabel, _>("simple plugin")?;
-				effect_descriptor.set::<LongLabel, _>(
-					"This is a longer desciptor for the ofx_rs_simple_plugin",
+	fn execute<'a>(&'a mut self, action: &'a mut Action) -> Result<Int> {
+		match *action {
+			Action::Describe(mut effect_descriptor) => {
+				let mut effect_properties = effect_descriptor.properties_mut()?;
+
+				effect_properties.set::<Label, _>("ofx_rs_simple_plugin")?;
+				effect_properties.set::<ShortLabel, _>("simple_plugin")?;
+				effect_properties.set::<LongLabel, _>("longer_description")?;
+				effect_properties.set::<image_effect_plugin::Grouping, _>("ofx_rs")?;
+
+				//effect_properties.set::<image_effect::SupportsMultipleClipDepths, _>(true)?;
+
+				effect_properties.set_at::<image_effect::SupportedPixelDepths, _>(
+					0,
+					CStr::from_bytes_with_nul(kOfxBitDepthByte)?.to_str()?,
+				)?;
+				effect_properties.set_at::<image_effect::SupportedPixelDepths, _>(
+					1,
+					CStr::from_bytes_with_nul(kOfxBitDepthShort)?.to_str()?,
+				)?;
+				effect_properties.set_at::<image_effect::SupportedPixelDepths, _>(
+					2,
+					CStr::from_bytes_with_nul(kOfxBitDepthFloat)?.to_str()?,
+				)?;
+
+				effect_properties.set_at::<image_effect::SupportedContexts, _>(
+					0,
+					CStr::from_bytes_with_nul(kOfxImageEffectContextFilter)?.to_str()?,
+				)?;
+				effect_properties.set_at::<image_effect::SupportedContexts, _>(
+					1,
+					CStr::from_bytes_with_nul(kOfxImageEffectContextFilter)?.to_str()?,
 				)?;
 
 				Ok(eOfxStatus_OK)
