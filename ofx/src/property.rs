@@ -118,7 +118,7 @@ where
 		V: Into<P::ValueType>,
 		P::ValueType: ValueType + Sized + Setter,
 	{
-		<P::ValueType as Setter>::set_by_index::<PropertyHandleMut<W, P>, P, _>(
+		<P::ValueType as Setter>::set_at::<PropertyHandleMut<W, P>, P, _>(
 			&mut self.property_mut::<P>(),
 			index,
 			new_value,
@@ -287,7 +287,7 @@ pub trait Getter
 where
 	Self: ValueType + Sized,
 {
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
 		R: ReadableAsProperties,
 		P: Named + Get<ReturnType = Self>;
@@ -296,12 +296,12 @@ where
 		R: ReadableAsProperties,
 		P: Named + Get<ReturnType = Self>,
 	{
-		Self::get_by_index::<R, P>(readable, 0)
+		Self::get_at::<R, P>(readable, 0)
 	}
 }
 
 impl Getter for Int {
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
 		R: ReadableAsProperties,
 		P: Named,
@@ -327,7 +327,7 @@ impl Getter for Int {
 }
 
 impl Getter for Bool {
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
 		R: ReadableAsProperties,
 		P: Named,
@@ -345,15 +345,15 @@ impl Getter for Bool {
 			})
 		};
 		match ofx_status {
-			Some(ofx_sys::eOfxStatus_OK) => Ok(c_int_out != 0),
 			None => Err(Error::PluginNotReady),
+			Some(ofx_sys::eOfxStatus_OK) => Ok(c_int_out != 0),
 			Some(other) => Err(Error::from(other)),
 		}
 	}
 }
 
 impl Getter for Double {
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
 		R: ReadableAsProperties,
 		P: Named,
@@ -371,15 +371,15 @@ impl Getter for Double {
 			})
 		};
 		match ofx_status {
-			Some(ofx_sys::eOfxStatus_OK) => Ok(c_double_out),
 			None => Err(Error::PluginNotReady),
+			Some(ofx_sys::eOfxStatus_OK) => Ok(c_double_out),
 			Some(other) => Err(Error::from(other)),
 		}
 	}
 }
 
 impl Getter for String {
-	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
 		R: ReadableAsProperties,
 		P: Named,
@@ -396,8 +396,8 @@ impl Getter for String {
 				) as i32
 			});
 			match ofx_status {
-				Some(ofx_sys::eOfxStatus_OK) => Ok(CStr::from_ptr(c_ptr_out).to_str()?.to_owned()),
 				None => Err(Error::PluginNotReady),
+				Some(ofx_sys::eOfxStatus_OK) => Ok(CStr::from_ptr(c_ptr_out).to_str()?.to_owned()),
 				Some(other) => Err(Error::from(other)),
 			}
 		}
@@ -408,7 +408,7 @@ pub trait Setter
 where
 	Self: ValueType + Sized,
 {
-	fn set_by_index<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
+	fn set_at<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
 	where
 		W: WritableAsProperties,
 		P: Named + Set<ValueType = Self>,
@@ -419,12 +419,12 @@ where
 		V: Into<Self>,
 		P: Named + Set<ValueType = Self>,
 	{
-		Self::set_by_index::<W, P, V>(writable, 0, value)
+		Self::set_at::<W, P, V>(writable, 0, value)
 	}
 }
 
 impl Setter for String {
-	fn set_by_index<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
+	fn set_at<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
 	where
 		W: WritableAsProperties,
 		V: Into<String>,
@@ -432,16 +432,16 @@ impl Setter for String {
 	{
 		let c_name = P::name().c_str()?;
 		let c_str_in = CString::new(value.into())?;
-		unsafe {
-			let c_ptr_in: CharPtr = c_str_in.as_c_str().as_ptr();
-			let ofx_status = (*writable.suite())
+		let c_ptr_in: CharPtr = c_str_in.as_c_str().as_ptr();
+		let ofx_status = unsafe {
+			(*writable.suite())
 				.propSetString
-				.map(|setter| setter(writable.handle(), c_name, index as Int, c_ptr_in) as i32);
-			match ofx_status {
-				Some(ofx_sys::eOfxStatus_OK) => Ok(()),
-				None => Err(Error::PluginNotReady),
-				Some(other) => Err(Error::from(other)),
-			}
+				.map(|setter| setter(writable.handle(), c_name, index as Int, c_ptr_in) as i32)
+		};
+		match ofx_status {
+			Some(ofx_sys::eOfxStatus_OK) => Ok(()),
+			None => Err(Error::PluginNotReady),
+			Some(other) => Err(Error::from(other)),
 		}
 	}
 }

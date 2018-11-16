@@ -19,15 +19,16 @@ impl SimplePlugin {
 impl Execute for SimplePlugin {
 	fn execute<'a>(&'a mut self, action: &'a mut Action) -> Result<Int> {
 		match *action {
-			Action::Describe(mut effect_descriptor) => {
-				let mut effect_properties = effect_descriptor.properties_mut()?;
+			Action::Describe(mut effect) => {
+				let mut effect_properties = effect.properties_mut()?;
 
-				effect_properties.set::<Label, _>("ofx_rs_simple_plugin")?;
-				effect_properties.set::<ShortLabel, _>("simple_plugin")?;
-				effect_properties.set::<LongLabel, _>("longer_description")?;
-				effect_properties.set::<image_effect_plugin::Grouping, _>("ofx_rs")?;
+				effect_properties.set::<image_effect_plugin::Grouping, _>("Ofx-rs")?;
+				effect_properties.set::<Label, _>("Ofx-rs simple_plugin sample")?;
+				effect_properties.set::<ShortLabel, _>("Ofx-rs simple_plugin")?;
+				effect_properties.set::<LongLabel, _>("Ofx-rs simple_plugin in examples")?;
 
-				//effect_properties.set::<image_effect::SupportsMultipleClipDepths, _>(true)?;
+				// TODO: implement host interface
+				// effect_properties.set::<image_effect::SupportsMultipleClipDepths, _>(true)?;
 
 				effect_properties.set_at::<image_effect::SupportedPixelDepths, _>(
 					0,
