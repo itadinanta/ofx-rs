@@ -7,7 +7,7 @@ pub use ofx_sys::eOfxStatus_ErrBadIndex;
 pub use ofx_sys::eOfxStatus_ErrValue;
 pub use ofx_sys::eOfxStatus_OK;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Error {
 	PluginNotFound,
 	InvalidAction,

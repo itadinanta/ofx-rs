@@ -1,4 +1,5 @@
 use action::*;
+use handle::*;
 use ofx_sys::*;
 use result::*;
 use std::collections::HashMap;
@@ -133,7 +134,10 @@ impl MapAction for PluginDescriptor {
 			match action {
 				GlobalAction::Load => Ok(Action::Load),
 				GlobalAction::Unload => Ok(Action::Unload),
-				GlobalAction::Describe => Ok(Action::Describe(ImageEffectHandle::new(handle))),
+				GlobalAction::Describe => Ok(Action::Describe(ImageEffectHandle::new(
+					handle,
+					self.suites.as_ref().map(|s| s.property).unwrap(),
+				))),
 				_ => Err(Error::InvalidAction),
 			}
 		} else {
@@ -164,10 +168,11 @@ impl Dispatch for PluginDescriptor {
 					Ok(Action::Load) => self.load(),
 					Ok(Action::Unload) => self.unload(),
 					Ok(Action::Describe(handle)) => self.describe(handle),
-					//Ok(Action::DescribeInContext(handle)) => self.describe(handle),
-					Ok(a) => self.execute(a),
+					_ => Ok(0),
 					Err(e) => Err(e),
-				}
+				}?;
+
+				self.execute(mapped_action?)
 			}
 		}
 	}

@@ -4,6 +4,7 @@ use std::fmt;
 use std::fmt::Display;
 use std::marker::PhantomData;
 
+use handle::*;
 use ofx_sys::*;
 use result::*;
 use types::*;
@@ -44,33 +45,6 @@ pub enum ImageEffectAction {
 	InvokeHelp,
 	InvokeAbout,
 	VegasKeyframeUplift,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct GenericPluginHandle<'a> {
-	inner: VoidPtr,
-	_lifetime: PhantomData<&'a Void>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct ImageEffectHandle<'a> {
-	inner: OfxImageEffectHandle,
-	_lifetime: PhantomData<&'a OfxImageEffectHandle>,
-}
-
-impl<'a> ImageEffectHandle<'a> {
-	pub fn new(ptr: VoidPtr) -> ImageEffectHandle<'a> {
-		ImageEffectHandle {
-			inner: unsafe { ptr as OfxImageEffectHandle },
-			_lifetime: PhantomData,
-		}
-	}
-}
-
-#[derive(Clone, Copy)]
-pub struct ImageEffectInstanceHandle<'a> {
-	inner: VoidPtr,
-	_lifetime: PhantomData<&'a Void>,
 }
 
 #[derive(Debug)]

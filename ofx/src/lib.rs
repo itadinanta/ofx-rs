@@ -18,6 +18,7 @@ mod plugin;
 mod property;
 mod result;
 mod types;
+mod handle;
 #[macro_use]
 mod registry;
 
@@ -25,6 +26,7 @@ pub use action::*;
 pub use plugin::*;
 pub use result::*;
 pub use types::*;
+pub use handle::*;
 pub use property::*;
 
 use ofx_sys::*;

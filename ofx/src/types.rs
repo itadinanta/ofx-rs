@@ -7,6 +7,7 @@ pub type Int = c_int;
 pub type UnsignedInt = c_uint;
 pub type Double = c_double;
 pub type Float = c_float;
+pub type Bool = bool;
 pub type Char = c_char;
 pub type CharPtr = *const c_char;
 pub type CharPtrMut = *mut c_char;

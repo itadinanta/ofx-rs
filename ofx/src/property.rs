@@ -6,26 +6,12 @@ use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use types::*;
 
-#[derive(Clone, Copy)]
-pub struct PropertySetHandle<'a> {
-	inner: OfxPropertySetHandle,
-	prop: *const OfxPropertySuiteV1,
-	_lifetime: PhantomData<&'a Void>,
-}
-
-#[derive(Clone, Copy)]
-pub struct ImageEffectHandle<'a> {
-	inner: OfxImageEffectHandle,
-	prop: *const OfxPropertySuiteV1,
-	_lifetime: PhantomData<&'a Void>,
-}
-
-trait ReadableAsProperties {
+pub trait ReadableAsProperties {
 	fn handle(&self) -> OfxPropertySetHandle;
 	fn suite(&self) -> *const OfxPropertySuiteV1;
 }
 
-struct PropertyHandle<R, N>
+pub struct PropertyHandle<R, N>
 where
 	R: ReadableAsProperties,
 	N: Named,
@@ -35,7 +21,7 @@ where
 }
 
 // identical struct, but different properties
-struct PropertyHandleMut<W, N>
+pub struct PropertyHandleMut<W, N>
 where
 	W: WritableAsProperties,
 	N: Named,
@@ -67,7 +53,7 @@ where
 	}
 }
 
-trait ReadablePropertiesSet<R>
+pub trait ReadablePropertiesSet<R>
 where
 	R: ReadableAsProperties,
 {
@@ -99,21 +85,22 @@ where
 	}
 }
 
-trait WritableAsProperties {
+pub trait WritableAsProperties {
 	fn handle(&self) -> OfxPropertySetHandle;
 	fn suite(&self) -> *const OfxPropertySuiteV1;
 }
 
-trait WritablePropertiesSet<W>
+pub trait WritablePropertiesSet<W>
 where
 	W: WritableAsProperties,
 {
-	fn set<P>(&mut self, new_value: P::ValueType) -> Result<()>
+	fn set<P, V>(&mut self, new_value: V) -> Result<()>
 	where
 		P: Named + Set,
+		V: Into<P::ValueType>,
 		P::ValueType: ValueType + Sized + Setter,
 	{
-		<P::ValueType as Setter>::set::<PropertyHandleMut<W, P>, P>(
+		<P::ValueType as Setter>::set::<PropertyHandleMut<W, P>, P, _>(
 			&mut self.property_mut::<P>(),
 			new_value,
 		)
@@ -152,34 +139,7 @@ where
 	}
 }
 
-impl<'a> ReadableAsProperties for PropertySetHandle<'a> {
-	fn handle(&self) -> OfxPropertySetHandle {
-		self.inner
-	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.prop
-	}
-}
-
-impl<'a> ReadableAsProperties for ImageEffectHandle<'a> {
-	fn handle(&self) -> OfxPropertySetHandle {
-		self.inner as OfxPropertySetHandle
-	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.prop
-	}
-}
-
-impl<'a> WritableAsProperties for ImageEffectHandle<'a> {
-	fn handle(&self) -> OfxPropertySetHandle {
-		self.inner as OfxPropertySetHandle
-	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.prop
-	}
-}
-
-trait StringId {
+pub trait StringId {
 	fn c_str(&self) -> Result<CharPtr>;
 }
 
@@ -209,25 +169,27 @@ impl StringId for CharPtr {
 	}
 }
 
-trait ValueType {}
+pub trait ValueType {}
+impl ValueType for Bool {}
 impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for String {}
+impl ValueType for &str {}
 
 type StaticName = &'static [u8];
-trait Named {
+pub trait Named {
 	fn name() -> StaticName;
 }
 
-trait Get: Named {
+pub trait Get: Named {
 	type ReturnType: ValueType;
 }
 
-trait Set: Named {
+pub trait Set: Named {
 	type ValueType: ValueType;
 }
 
-trait Edit: Get + Set {
+pub trait Edit: Get + Set {
 	type ReturnType: ValueType;
 	type ValueType: ValueType;
 }
@@ -248,7 +210,7 @@ where
 
 macro_rules! define_property {
 	(read_only $ofx_name:ident as $name:ident : $value_type:ty) => {
-		struct $name;
+		pub struct $name;
 		impl Get for $name {
 			type ReturnType = $value_type;
 		}
@@ -258,34 +220,38 @@ macro_rules! define_property {
 			}
 		}
 	};
-	
-	(read_write $name:ident $value_type:ty, $ofx_name:ident) => {
-		struct $name;
+
+	(read_write $ofx_name:ident as $name:ident : $value_type:ty) => {
+		pub struct $name;
 		impl Get for $name {
 			type ReturnType = $value_type;
 		}
 		impl Set for $name {
 			type ValueType = $value_type;
-		}		
+		}
 		impl Named for $name {
 			fn name() -> &'static [u8] {
 				concat_idents!(kOfx, $ofx_name)
 			}
 		}
-	}	
+	};
 }
 
 define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
 define_property!(read_only PropName as Name: String);
-define_property!(read_only PropLabel as Label: String);
+
+define_property!(read_write PropLabel as Label: String);
+define_property!(read_write PropShortLabel as ShortLabel: String);
+define_property!(read_write PropLongLabel as LongLabel: String);
+define_property!(read_write PropPluginDescription as PluginDescription: String);
+
 define_property!(read_only PropVersion as Version: String);
 define_property!(read_only PropVersionLabel as VersionLabel: String);
 
-define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Int);
+define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool);
 
-
-trait Getter
+pub trait Getter
 where
 	Self: ValueType + Sized,
 {
@@ -322,6 +288,32 @@ impl Getter for Int {
 		};
 		match ofx_status {
 			Some(ofx_sys::eOfxStatus_OK) => Ok(c_int_out),
+			None => Err(Error::PluginNotReady),
+			Some(other) => Err(Error::from(other)),
+		}
+	}
+}
+
+impl Getter for Bool {
+	fn get_by_index<R, P>(readable: &R, index: usize) -> Result<Self>
+	where
+		R: ReadableAsProperties,
+		P: Named,
+	{
+		let c_name = P::name().c_str()?;
+		let mut c_int_out: Int = 0;
+		let ofx_status = unsafe {
+			(*readable.suite()).propGetInt.map(|getter| {
+				getter(
+					readable.handle(),
+					c_name,
+					index as Int,
+					&mut c_int_out as *mut _,
+				)
+			})
+		};
+		match ofx_status {
+			Some(ofx_sys::eOfxStatus_OK) => Ok(c_int_out != 0),
 			None => Err(Error::PluginNotReady),
 			Some(other) => Err(Error::from(other)),
 		}
@@ -380,32 +372,35 @@ impl Getter for String {
 	}
 }
 
-trait Setter
+pub trait Setter
 where
 	Self: ValueType + Sized,
 {
-	fn set_by_index<W, P>(writable: &mut W, index: usize, value: Self) -> Result<()>
-	where
-		W: WritableAsProperties,
-		P: Named + Set<ValueType = Self>;
-	fn set<W, P>(writable: &mut W, value: Self) -> Result<()>
+	fn set_by_index<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
 	where
 		W: WritableAsProperties,
 		P: Named + Set<ValueType = Self>,
+		V: Into<Self>;
+	fn set<W, P, V>(writable: &mut W, value: V) -> Result<()>
+	where
+		W: WritableAsProperties,
+		V: Into<Self>,
+		P: Named + Set<ValueType = Self>,
 	{
-		Self::set_by_index::<W, P>(writable, 0, value)
+		Self::set_by_index::<W, P, V>(writable, 0, value)
 	}
 }
 
 impl Setter for String {
-	fn set_by_index<W, P>(writable: &mut W, index: usize, value: String) -> Result<()>
+	fn set_by_index<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
 	where
 		W: WritableAsProperties,
+		V: Into<String>,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
 		unsafe {
-			let c_ptr_in: CharPtr = CString::new(value).unwrap().as_c_str().as_ptr();
+			let c_ptr_in: CharPtr = CString::new(value.into()).unwrap().as_c_str().as_ptr();
 			let ofx_status = (*writable.suite())
 				.propSetString
 				.map(|setter| setter(writable.handle(), c_name, index as Int, c_ptr_in) as i32);
@@ -436,8 +431,8 @@ mod tests {
 	}
 
 	impl Reader<IsBackground> for Dummy {
-		fn get(&self) -> Result<Int> {
-			Ok(1)
+		fn get(&self) -> Result<Bool> {
+			Ok(false)
 		}
 	}
 
@@ -445,19 +440,6 @@ mod tests {
 	fn prop_dummy() {
 		let d = Dummy {};
 		let sv = <Dummy as Reader<IsBackground>>::get(&d);
-	}
-
-	// do not run, just compile!
-	fn prop_host() {
-		let mut handle = ImageEffectHandle {
-			inner: std::ptr::null::<OfxImageEffectStruct>() as OfxImageEffectHandle,
-			prop: std::ptr::null(),
-			_lifetime: PhantomData,
-		};
-
-		handle.get::<Type>();
-		handle.get::<IsBackground>();
-		//handle.set::<Type>(""); type is read only
 	}
 
 }

@@ -16,9 +16,18 @@ impl SimplePlugin {
 }
 
 impl Execute for SimplePlugin {
-	fn execute(&mut self, action: Action) -> Result<Int> {
+	fn execute(&mut self, mut action: Action) -> Result<Int> {
+		println!("We are here");
 		match action {
-			Action::Describe(handle) => Ok(eOfxStatus_OK),
+			Action::Describe(ref mut effect_descriptor) => {
+				effect_descriptor.set::<Label, _>("ofx_rs_simple_plugin")?;
+				effect_descriptor.set::<ShortLabel, _>("simple plugin")?;
+				effect_descriptor.set::<LongLabel, _>(
+					"This is a longer desciptor for the ofx_rs_simple_plugin",
+				)?;
+
+				Ok(eOfxStatus_OK)
+			}
 			_ => Ok(eOfxStatus_OK),
 		}
 	}
