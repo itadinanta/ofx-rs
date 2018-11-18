@@ -25,21 +25,27 @@ pub trait Readable: AsProperties + Sized + Clone {
 	{
 		<P::ReturnType as Getter<Self, P>>::get(&self)
 	}
+
+	fn get_at<P>(&mut self, index: usize) -> Result<P::ReturnType>
+	where
+		P: Named + Get,
+		P::ReturnType: Default + ValueType + Sized + Getter<Self, P>,
+	{
+		<P::ReturnType as Getter<Self, P>>::get_at(self, index)
+	}
 }
 
-pub trait Writable: Readable + AsProperties + Sized + Clone {
-	fn set<P, V>(&mut self, new_value: V) -> Result<()>
+pub trait Writable: AsProperties + Sized + Clone {
+	fn set<P>(&mut self, new_value: P::ValueType) -> Result<()>
 	where
-		V: Into<P::ValueType>,
 		P: Named + Set,
 		P::ValueType: ValueType + Sized + Setter<Self, P>,
 	{
-		<P::ValueType as Setter<Self, P>>::set(self, new_value)
+		<P::ValueType as Setter<_, _>>::set(self, new_value)
 	}
 
-	fn set_at<P, V>(&mut self, index: usize, new_value: V) -> Result<()>
+	fn set_at<P>(&mut self, index: usize, new_value: P::ValueType) -> Result<()>
 	where
-		V: Into<P::ValueType>,
 		P: Named + Set,
 		P::ValueType: ValueType + Sized + Setter<Self, P>,
 	{
@@ -87,6 +93,8 @@ impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for String {}
 impl ValueType for &str {}
+impl ValueType for &[u8] {}
+impl ValueType for CharPtr {}
 
 type StaticName = &'static [u8];
 pub trait Named {
@@ -133,10 +141,10 @@ macro_rules! define_property {
 		}
 	};
 
-	(read_write $ofx_name:ident as $name:ident : $value_type:ty) => {
+	(read_write $ofx_name:ident as $name:ident : $return_type:ty, $value_type:ty) => {
 		pub struct $name;
 		impl Get for $name {
-			type ReturnType = $value_type;
+			type ReturnType = $return_type;
 		}
 		impl Set for $name {
 			type ValueType = $value_type;
@@ -159,10 +167,10 @@ define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
 define_property!(read_only PropName as Name: String);
 
-define_property!(read_write PropLabel as Label: String);
-define_property!(read_write PropShortLabel as ShortLabel: String);
-define_property!(read_write PropLongLabel as LongLabel: String);
-define_property!(read_write PropPluginDescription as PluginDescription: String);
+define_property!(read_write PropLabel as Label: String, &'static str);
+define_property!(read_write PropShortLabel as ShortLabel: String, &'static str);
+define_property!(read_write PropLongLabel as LongLabel: String, &'static str);
+define_property!(read_write PropPluginDescription as PluginDescription: String, &'static str);
 
 define_property!(read_only PropVersion as Version: String);
 define_property!(read_only PropVersionLabel as VersionLabel: String);
@@ -171,15 +179,15 @@ define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool
 
 pub mod image_effect_plugin {
 	use super::*;
-	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String);
-	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool);
+	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String, &'static str);
+	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool, Bool);
 }
 
 pub mod image_effect {
 	use super::*;
-	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
-	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: String);
-	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: String);
+	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool, Bool);
+	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: String, &'static [u8]);
+	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: String, &'static [u8]);
 }
 
 pub trait Getter<R, P>
@@ -304,32 +312,44 @@ where
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at<V>(writable: &mut W, index: usize, value: V) -> Result<()>
-	where
-		V: Into<Self>;
-	fn set<V>(writable: &mut W, value: V) -> Result<()>
-	where
-		V: Into<Self>,
-	{
-		Self::set_at::<V>(writable, 0, value)
+	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>;
+	fn set(writable: &mut W, value: Self) -> Result<()> {
+		Self::set_at(writable, 0, value)
 	}
 }
 
-impl<W, P> Setter<W, P> for String
+pub trait CStrWithNul {
+	fn as_c_str<'a>(self) -> Result<CString>;
+}
+
+impl CStrWithNul for &str {
+	fn as_c_str(self) -> Result<CString> {
+		Ok(CString::new(self)?)
+	}
+}
+
+impl CStrWithNul for &'static [u8] {
+	fn as_c_str<'a>(self) -> Result<CString> {
+		let c_str_in = CStr::from_bytes_with_nul(self)?;
+		Ok(c_str_in.to_owned())
+	}
+}
+
+impl<W, P, A> Setter<W, P> for A
 where
 	Self: ValueType + Sized,
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
+	A: CStrWithNul,
 {
-	fn set_at<V>(writable: &mut W, index: usize, value: V) -> Result<()>
+	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>
 	where
 		W: AsProperties,
-		V: Into<String>,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
-		let c_str_in = CString::new(value.into())?;
-		let c_ptr_in: CharPtr = c_str_in.as_c_str().as_ptr();
+		let c_str_in = value.as_c_str()?;
+		let c_ptr_in = c_str_in.as_c_str().as_ptr();
 		let ofx_status = unsafe {
 			(*writable.suite())
 				.propSetString
