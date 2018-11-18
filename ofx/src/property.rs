@@ -17,6 +17,7 @@ pub trait HasProperties<'a> {
 	fn properties_mut(&'a mut self) -> Result<PropertySetHandle<'a>>;
 }
 
+#[derive(Clone)]
 pub struct PropertyHandle<R, N>
 where
 	R: AsProperties,
@@ -64,9 +65,9 @@ pub trait Readable: AsProperties + Sized + Clone
 	fn get<P>(&self) -> Result<P::ReturnType>
 	where
 		P: Named + Get,
-		P::ReturnType: Default + ValueType + Sized + Getter,
+		P::ReturnType: Default + ValueType + Sized + Getter<Self, P>,
 	{
-		<P::ReturnType as Getter>::get::<PropertyHandle<Self, P>, P>(&self.property::<P>())
+		<P::ReturnType as Getter<Self, P>>::get(&self)
 	}
 
 	fn property<P>(&self) -> PropertyHandle<Self, P>
@@ -77,12 +78,6 @@ pub trait Readable: AsProperties + Sized + Clone
 			_named: PhantomData,
 		}
 	}
-}
-
-impl <R> Readable for R
-where
-	R: AsProperties + Sized + Clone,
-{
 }
 
 pub trait Writable: Readable + AsProperties + Sized + Clone
@@ -121,6 +116,13 @@ pub trait Writable: Readable + AsProperties + Sized + Clone
 		}
 	}
 }
+
+impl <R> Readable for R
+where
+	R: AsProperties + Sized + Clone,
+{
+}
+
 
 impl <W> Writable for W
 where
@@ -275,28 +277,25 @@ pub mod image_effect {
 	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: String);
 }
 
-pub trait Getter
+pub trait Getter<R, P>
 where
 	Self: ValueType + Sized,
+		R: Readable + AsProperties,
+		P: Named + Get<ReturnType = Self>
 {
-	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
-	where
-		R: AsProperties,
-		P: Named + Get<ReturnType = Self>;
-	fn get<R, P>(readable: &R) -> Result<Self>
-	where
-		R: AsProperties,
-		P: Named + Get<ReturnType = Self>,
+	fn get_at(readable: &R, index: usize) -> Result<Self>;
+	fn get(readable: &R) -> Result<Self>
 	{
-		Self::get_at::<R, P>(readable, 0)
+		Self::get_at(readable, 0)
 	}
 }
 
-impl Getter for Int {
-	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
+impl <R, P> Getter<R, P> for Int
 	where
-		R: AsProperties,
-		P: Named,
+		R: Readable + AsProperties,
+		P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, index: usize) -> Result<Self>
 	{
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
@@ -318,11 +317,12 @@ impl Getter for Int {
 	}
 }
 
-impl Getter for Bool {
-	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
+impl <R, P> Getter<R, P> for Bool
 	where
-		R: AsProperties,
-		P: Named,
+		R: Readable + AsProperties,
+		P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, index: usize) -> Result<Self>
 	{
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
@@ -344,11 +344,11 @@ impl Getter for Bool {
 	}
 }
 
-impl Getter for Double {
-	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
-	where
-		R: AsProperties,
-		P: Named,
+impl <R, P> Getter<R, P>  for Double
+where
+		R: Readable + AsProperties,
+		P: Named + Get<ReturnType = Self> {
+	fn get_at(readable: &R, index: usize) -> Result<Self>
 	{
 		let c_name = P::name().c_str()?;
 		let mut c_double_out: Double = 0.0;
@@ -370,11 +370,11 @@ impl Getter for Double {
 	}
 }
 
-impl Getter for String {
-	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
-	where
-		R: AsProperties,
-		P: Named,
+impl<R, P> Getter<R, P> for String
+where
+		R: Readable + AsProperties,
+		P: Named + Get<ReturnType = Self> {
+	fn get_at(readable: &R, index: usize) -> Result<Self>
 	{
 		let c_name = P::name().c_str()?;
 		unsafe {
