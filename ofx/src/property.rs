@@ -7,7 +7,7 @@ use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use types::*;
 
-pub trait ReadableAsProperties {
+pub trait AsProperties {
 	fn handle(&self) -> OfxPropertySetHandle;
 	fn suite(&self) -> *const OfxPropertySuiteV1;
 }
@@ -19,7 +19,7 @@ pub trait HasProperties<'a> {
 
 pub struct PropertyHandle<R, N>
 where
-	R: ReadableAsProperties,
+	R: AsProperties,
 	N: Named,
 {
 	parent: R,
@@ -29,16 +29,16 @@ where
 // identical struct, but different properties
 pub struct PropertyHandleMut<W, N>
 where
-	W: WritableAsProperties,
+	W: AsProperties,
 	N: Named,
 {
 	parent: W,
 	_named: PhantomData<N>,
 }
 
-impl<R, I> ReadableAsProperties for PropertyHandle<R, I>
+impl<R, I> AsProperties for PropertyHandle<R, I>
 where
-	R: ReadableAsProperties,
+	R: AsProperties,
 	I: Named,
 {
 	fn handle(&self) -> OfxPropertySetHandle {
@@ -51,7 +51,7 @@ where
 
 impl<R, I> Named for PropertyHandle<R, I>
 where
-	R: ReadableAsProperties,
+	R: AsProperties,
 	I: Named,
 {
 	fn name() -> StaticName {
@@ -59,31 +59,19 @@ where
 	}
 }
 
-pub trait ReadablePropertiesSet<R>
-where
-	R: ReadableAsProperties,
+pub trait Readable: AsProperties + Sized + Clone
 {
 	fn get<P>(&self) -> Result<P::ReturnType>
 	where
 		P: Named + Get,
 		P::ReturnType: Default + ValueType + Sized + Getter,
 	{
-		<P::ReturnType as Getter>::get::<PropertyHandle<R, P>, P>(&self.property::<P>())
+		<P::ReturnType as Getter>::get::<PropertyHandle<Self, P>, P>(&self.property::<P>())
 	}
 
-	fn property<P>(&self) -> PropertyHandle<R, P>
+	fn property<P>(&self) -> PropertyHandle<Self, P>
 	where
-		P: Named;
-}
-
-impl<R> ReadablePropertiesSet<R> for R
-where
-	R: ReadableAsProperties + Clone,
-{
-	fn property<N>(&self) -> PropertyHandle<R, N>
-	where
-		N: Named,
-	{
+		P: Named {
 		PropertyHandle {
 			parent: self.clone(),
 			_named: PhantomData,
@@ -91,14 +79,13 @@ where
 	}
 }
 
-pub trait WritableAsProperties {
-	fn handle(&self) -> OfxPropertySetHandle;
-	fn suite(&self) -> *const OfxPropertySuiteV1;
+impl <R> Readable for R
+where
+	R: AsProperties + Sized + Clone,
+{
 }
 
-pub trait WritablePropertiesSet<W>
-where
-	W: WritableAsProperties,
+pub trait Writable: Readable + AsProperties + Sized + Clone
 {
 	fn set<P, V>(&mut self, new_value: V) -> Result<()>
 	where
@@ -106,7 +93,7 @@ where
 		V: Into<P::ValueType>,
 		P::ValueType: ValueType + Sized + Setter,
 	{
-		<P::ValueType as Setter>::set::<PropertyHandleMut<W, P>, P, _>(
+		<P::ValueType as Setter>::set::<PropertyHandleMut<Self, P>, P, _>(
 			&mut self.property_mut::<P>(),
 			new_value,
 		)
@@ -118,26 +105,16 @@ where
 		V: Into<P::ValueType>,
 		P::ValueType: ValueType + Sized + Setter,
 	{
-		<P::ValueType as Setter>::set_at::<PropertyHandleMut<W, P>, P, _>(
+		<P::ValueType as Setter>::set_at::<PropertyHandleMut<Self, P>, P, _>(
 			&mut self.property_mut::<P>(),
 			index,
 			new_value,
 		)
 	}
 
-	fn property_mut<P>(&mut self) -> PropertyHandleMut<W, P>
+	fn property_mut<P>(&mut self) -> PropertyHandleMut<Self, P>
 	where
-		P: Named;
-}
-
-impl<W> WritablePropertiesSet<W> for W
-where
-	W: WritableAsProperties + Clone,
-{
-	fn property_mut<N>(&mut self) -> PropertyHandleMut<W, N>
-	where
-		N: Named,
-	{
+		P: Named 	{
 		PropertyHandleMut {
 			parent: self.clone(),
 			_named: PhantomData,
@@ -145,9 +122,15 @@ where
 	}
 }
 
-impl<W, I> WritableAsProperties for PropertyHandleMut<W, I>
+impl <W> Writable for W
 where
-	W: WritableAsProperties,
+	W: AsProperties + Sized + Clone,
+{
+}
+
+impl<W, I> AsProperties for PropertyHandleMut<W, I>
+where
+	W: AsProperties,
 	I: Named,
 {
 	fn handle(&self) -> OfxPropertySetHandle {
@@ -256,6 +239,15 @@ macro_rules! define_property {
 	};
 }
 
+macro_rules! define_interface {
+	(
+	trait $interface:ident {
+		
+	}
+	) => {
+	}
+}
+
 define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
 define_property!(read_only PropName as Name: String);
@@ -289,11 +281,11 @@ where
 {
 	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
-		R: ReadableAsProperties,
+		R: AsProperties,
 		P: Named + Get<ReturnType = Self>;
 	fn get<R, P>(readable: &R) -> Result<Self>
 	where
-		R: ReadableAsProperties,
+		R: AsProperties,
 		P: Named + Get<ReturnType = Self>,
 	{
 		Self::get_at::<R, P>(readable, 0)
@@ -303,7 +295,7 @@ where
 impl Getter for Int {
 	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
-		R: ReadableAsProperties,
+		R: AsProperties,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
@@ -329,7 +321,7 @@ impl Getter for Int {
 impl Getter for Bool {
 	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
-		R: ReadableAsProperties,
+		R: AsProperties,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
@@ -355,7 +347,7 @@ impl Getter for Bool {
 impl Getter for Double {
 	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
-		R: ReadableAsProperties,
+		R: AsProperties,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
@@ -381,7 +373,7 @@ impl Getter for Double {
 impl Getter for String {
 	fn get_at<R, P>(readable: &R, index: usize) -> Result<Self>
 	where
-		R: ReadableAsProperties,
+		R: AsProperties,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
@@ -410,12 +402,12 @@ where
 {
 	fn set_at<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
 	where
-		W: WritableAsProperties,
+		W: AsProperties,
 		P: Named + Set<ValueType = Self>,
 		V: Into<Self>;
 	fn set<W, P, V>(writable: &mut W, value: V) -> Result<()>
 	where
-		W: WritableAsProperties,
+		W: AsProperties,
 		V: Into<Self>,
 		P: Named + Set<ValueType = Self>,
 	{
@@ -426,7 +418,7 @@ where
 impl Setter for String {
 	fn set_at<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
 	where
-		W: WritableAsProperties,
+		W: AsProperties,
 		V: Into<String>,
 		P: Named,
 	{

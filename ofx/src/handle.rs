@@ -11,9 +11,23 @@ pub struct PropertySetHandle<'a> {
 	property: &'a OfxPropertySuiteV1,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct HostHandle<'a> {
+	inner: OfxPropertySetHandle,
+	property: &'a OfxPropertySuiteV1,
+}
+
 impl<'a> PropertySetHandle<'a> {
 	pub(crate) fn new(inner: OfxPropertySetHandle, property: &'a OfxPropertySuiteV1) -> Self {
 		PropertySetHandle { inner, property }
+	}
+
+	pub(crate) fn empty() -> Self {
+		panic!("Do not use, only for type validation testing");
+		PropertySetHandle {
+			inner: std::ptr::null::<OfxPropertySetStruct>() as *mut _,
+			property: unsafe { &*std::ptr::null() },
+		}
 	}
 }
 
@@ -48,15 +62,6 @@ impl<'a> ImageEffectHandle<'a> {
 			image_effect,
 		}
 	}
-
-	pub(crate) fn empty() -> Self {
-		panic!("Do not use, only for type validation testing");
-		ImageEffectHandle {
-			inner: std::ptr::null::<OfxImageEffectStruct>() as OfxImageEffectHandle,
-			property: unsafe { &*std::ptr::null() },
-			image_effect: unsafe { &*std::ptr::null() },
-		}
-	}
 }
 
 impl<'a> HasProperties<'a> for ImageEffectHandle<'a> {
@@ -87,7 +92,7 @@ impl<'a> HasProperties<'a> for ImageEffectHandle<'a> {
 	}
 }
 
-impl<'a> ReadableAsProperties for PropertySetHandle<'a> {
+impl<'a> AsProperties for PropertySetHandle<'a> {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner
 	}
@@ -96,25 +101,7 @@ impl<'a> ReadableAsProperties for PropertySetHandle<'a> {
 	}
 }
 
-impl<'a> WritableAsProperties for PropertySetHandle<'a> {
-	fn handle(&self) -> OfxPropertySetHandle {
-		self.inner as OfxPropertySetHandle
-	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.property
-	}
-}
-
-impl<'a> ReadableAsProperties for ImageEffectHandle<'a> {
-	fn handle(&self) -> OfxPropertySetHandle {
-		self.inner as OfxPropertySetHandle
-	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.property
-	}
-}
-
-impl<'a> WritableAsProperties for ImageEffectHandle<'a> {
+impl<'a> AsProperties for HostHandle<'a> {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner as OfxPropertySetHandle
 	}
@@ -130,7 +117,7 @@ mod tests {
 	// do not run, just compile!
 
 	fn prop_host() {
-		let mut handle = ImageEffectHandle::empty();
+		let mut handle = PropertySetHandle::empty();
 
 		handle.get::<Type>();
 		handle.get::<IsBackground>();

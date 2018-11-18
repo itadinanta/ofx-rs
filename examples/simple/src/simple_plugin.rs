@@ -16,6 +16,17 @@ impl SimplePlugin {
 	}
 }
 
+pub trait HasLabel: Writable {
+	fn set_label<S>(&mut self, value: S) -> Result<()>
+	where
+		S: Into<String>,
+	{
+		self.set::<Label, _>(value)
+	}
+}
+
+impl<'a> HasLabel for PropertySetHandle<'a> {}
+
 impl Execute for SimplePlugin {
 	fn execute<'a>(&'a mut self, action: &'a mut Action) -> Result<Int> {
 		match *action {
@@ -23,6 +34,7 @@ impl Execute for SimplePlugin {
 				let mut effect_properties = effect.properties_mut()?;
 
 				effect_properties.set::<image_effect_plugin::Grouping, _>("Ofx-rs")?;
+				//effect_properties.set::<Label, _>("Ofx-rs simple_plugin sample")?;
 				effect_properties.set::<Label, _>("Ofx-rs simple_plugin sample")?;
 				effect_properties.set::<ShortLabel, _>("Ofx-rs simple_plugin")?;
 				effect_properties.set::<LongLabel, _>("Ofx-rs simple_plugin in examples")?;
