@@ -6,19 +6,13 @@ use std::marker::PhantomData;
 use types::*;
 
 #[derive(Debug, Clone, Copy)]
-pub struct PropertySetHandle<'a> {
+pub struct PropertySetHandle {
 	inner: OfxPropertySetHandle,
-	property: &'a OfxPropertySuiteV1,
+	property: &'static OfxPropertySuiteV1,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct HostHandle<'a> {
-	inner: OfxPropertySetHandle,
-	property: &'a OfxPropertySuiteV1,
-}
-
-impl<'a> PropertySetHandle<'a> {
-	pub(crate) fn new(inner: OfxPropertySetHandle, property: &'a OfxPropertySuiteV1) -> Self {
+impl PropertySetHandle {
+	pub(crate) fn new(inner: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
 		PropertySetHandle { inner, property }
 	}
 
@@ -32,29 +26,29 @@ impl<'a> PropertySetHandle<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct GenericPluginHandle<'a> {
+pub struct GenericPluginHandle {
 	inner: VoidPtr,
-	property: &'a OfxPropertySuiteV1,
+	property: &'static OfxPropertySuiteV1,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ImageEffectHandle<'a> {
+pub struct ImageEffectHandle {
 	inner: OfxImageEffectHandle,
-	property: &'a OfxPropertySuiteV1,
-	image_effect: &'a OfxImageEffectSuiteV1,
+	property: &'static OfxPropertySuiteV1,
+	image_effect: &'static OfxImageEffectSuiteV1,
 }
 
 #[derive(Clone, Copy)]
-pub struct ImageEffectInstanceHandle<'a> {
+pub struct ImageEffectInstanceHandle {
 	inner: OfxImageEffectHandle,
-	property: &'a OfxPropertySuiteV1,
+	property: &'static OfxPropertySuiteV1,
 }
 
-impl<'a> ImageEffectHandle<'a> {
+impl<'a> ImageEffectHandle {
 	pub fn new(
 		ptr: VoidPtr,
-		property: &'a OfxPropertySuiteV1,
-		image_effect: &'a OfxImageEffectSuiteV1,
+		property: &'static OfxPropertySuiteV1,
+		image_effect: &'static OfxImageEffectSuiteV1,
 	) -> Self {
 		ImageEffectHandle {
 			inner: unsafe { ptr as OfxImageEffectHandle },
@@ -64,8 +58,13 @@ impl<'a> ImageEffectHandle<'a> {
 	}
 }
 
-impl<'a> HasProperties<'a> for ImageEffectHandle<'a> {
-	fn properties(&'a self) -> Result<PropertySetHandle<'a>> {
+#[derive(Clone)]
+pub struct HostProperties(PropertySetHandle);
+#[derive(Clone)]
+pub struct ImageEffectProperties(PropertySetHandle);
+
+impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
+	fn properties(&self) -> Result<ImageEffectProperties> {
 		let property_set_handle = unsafe {
 			let mut property_set_handle = std::mem::uninitialized();
 
@@ -75,9 +74,9 @@ impl<'a> HasProperties<'a> for ImageEffectHandle<'a> {
 
 			property_set_handle
 		};
-		Ok(PropertySetHandle::new(property_set_handle, self.property))
+		Ok(ImageEffectProperties(PropertySetHandle::new(property_set_handle, self.property)))
 	}
-	fn properties_mut(&'a mut self) -> Result<PropertySetHandle<'a>> {
+	fn properties_mut(&mut self) -> Result<ImageEffectProperties> {
 		// TODO: stricter type check
 		let property_set_handle = unsafe {
 			let mut property_set_handle = std::mem::uninitialized();
@@ -88,25 +87,25 @@ impl<'a> HasProperties<'a> for ImageEffectHandle<'a> {
 
 			property_set_handle
 		};
-		Ok(PropertySetHandle::new(property_set_handle, self.property))
+		Ok(ImageEffectProperties(PropertySetHandle::new(property_set_handle, self.property)))
 	}
 }
 
-impl<'a> AsProperties for PropertySetHandle<'a> {
+impl<'a> AsProperties for ImageEffectProperties {
 	fn handle(&self) -> OfxPropertySetHandle {
-		self.inner
+		self.0.inner
 	}
 	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.property
+		self.0.property
 	}
 }
 
-impl<'a> AsProperties for HostHandle<'a> {
+impl<'a> AsProperties for HostProperties {
 	fn handle(&self) -> OfxPropertySetHandle {
-		self.inner as OfxPropertySetHandle
+		self.0.inner
 	}
 	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.property
+		self.0.property
 	}
 }
 
@@ -117,7 +116,7 @@ mod tests {
 	// do not run, just compile!
 
 	fn prop_host() {
-		let mut handle = PropertySetHandle::empty();
+		let mut handle = ImageEffectProperties(PropertySetHandle::empty());
 
 		handle.get::<Type>();
 		handle.get::<IsBackground>();

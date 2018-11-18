@@ -12,9 +12,13 @@ pub trait AsProperties {
 	fn suite(&self) -> *const OfxPropertySuiteV1;
 }
 
-pub trait HasProperties<'a> {
-	fn properties(&'a self) -> Result<PropertySetHandle<'a>>;
-	fn properties_mut(&'a mut self) -> Result<PropertySetHandle<'a>>;
+pub trait HasProperties<T>
+where
+	T: AsProperties + Sized + Clone,
+{
+	fn properties(&self) -> Result<T>;
+	// TODO: probably unnecessary?
+	fn properties_mut(&mut self) -> Result<T>;
 }
 
 pub trait Readable: AsProperties + Sized + Clone {
@@ -319,7 +323,7 @@ where
 }
 
 pub trait CStrWithNul {
-	fn as_c_str<'a>(self) -> Result<CString>;
+	fn as_c_str(self) -> Result<CString>;
 }
 
 impl CStrWithNul for &str {
@@ -329,7 +333,7 @@ impl CStrWithNul for &str {
 }
 
 impl CStrWithNul for &'static [u8] {
-	fn as_c_str<'a>(self) -> Result<CString> {
+	fn as_c_str(self) -> Result<CString> {
 		let c_str_in = CStr::from_bytes_with_nul(self)?;
 		Ok(c_str_in.to_owned())
 	}
@@ -369,6 +373,46 @@ where
 {
 	fn get(&self) -> Result<R::ReturnType>;
 }
+
+pub trait CanSetLabel: Writable {
+	fn set_label<S>(&mut self, value: S) -> Result<()>
+	where
+		S: Into<&'static str>,
+	{
+		self.set::<Label>(value.into())
+	}
+	fn set_short_label<S>(&mut self, value: S) -> Result<()>
+	where
+		S: Into<&'static str>,
+	{
+		self.set::<Label>(value.into())
+	}
+	fn set_long_label<S>(&mut self, value: S) -> Result<()>
+	where
+		S: Into<&'static str>,
+	{
+		self.set::<Label>(value.into())
+	}
+}
+
+pub trait CanGetLabel: Readable {
+	fn get_label(&self) -> Result<<Label as Get>::ReturnType> {
+		self.get::<Label>()
+	}
+}
+
+pub trait CanSetGrouping: Writable {
+	fn set_image_effect_plugin_grouping<S>(&mut self, value: S) -> Result<()>
+	where
+		S: Into<&'static str>,
+	{
+		self.set::<image_effect_plugin::Grouping>(value.into())
+	}
+}
+
+impl CanSetLabel for ImageEffectProperties {}
+impl CanGetLabel for ImageEffectProperties {}
+impl CanSetGrouping for ImageEffectProperties {}
 
 mod tests {
 	use super::*;

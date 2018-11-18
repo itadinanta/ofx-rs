@@ -79,7 +79,7 @@ impl Registry {
 pub fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
 	unsafe {
 		get_registry_mut()
-			.dispatch(plugin_module, RawMessage::SetHost { host: &*host })
+			.dispatch(plugin_module, RawMessage::SetHost { host: *host })
 			.ok();
 	}
 }

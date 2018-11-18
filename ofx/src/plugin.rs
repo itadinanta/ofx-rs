@@ -70,9 +70,9 @@ pub struct Suites {
 }
 
 #[derive(Debug)]
-pub enum RawMessage<'a> {
+pub enum RawMessage {
 	SetHost {
-		host: &'a OfxHost,
+		host: OfxHost,
 	},
 	MainEntry {
 		action: CharPtr,
@@ -98,7 +98,7 @@ pub struct PluginDescriptor {
 	plugin_index: usize,
 	host: Option<OfxHost>,
 	suites: Option<Suites>,
-	cached_handle: Option<ImageEffectHandle<'static>>,
+	cached_handle: Option<ImageEffectHandle>,
 	instance: Box<Execute>,
 	global_action_index: EnumIndex<GlobalAction>,
 	image_effect_action_index: EnumIndex<ImageEffectAction>,
@@ -122,7 +122,7 @@ impl MapAction for PluginDescriptor {
 		handle: VoidPtr,
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
-	) -> Result<Action<'a>> {
+	) -> Result<Action> {
 		let name = unsafe { CStr::from_ptr(action) }.to_bytes();
 		if let Some(action) = self.image_effect_action_index.find(name) {
 			info!("Image effect action match {:?}", action);
@@ -353,11 +353,11 @@ impl PluginDescriptor {
 		Ok(eOfxStatus_OK)
 	}
 
-	fn cache_handle(&mut self, handle: ImageEffectHandle<'static>) {
+	fn cache_handle(&mut self, handle: ImageEffectHandle) {
 		self.cached_handle = Some(handle);
 	}
 
-	fn describe(&mut self, handle: ImageEffectHandle<'static>) -> Result<Int> {
+	fn describe(&mut self, handle: ImageEffectHandle) -> Result<Int> {
 		info!("Caching plugin instance handle {:?}", handle);
 		self.cache_handle(handle);
 		Ok(eOfxStatus_OK)

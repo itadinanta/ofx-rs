@@ -15,39 +15,6 @@ impl SimplePlugin {
 	}
 }
 
-pub trait CanSetLabel: Writable {
-	fn set_label<S>(&mut self, value: S) -> Result<()>
-	where
-		S: Into<&'static str>,
-	{
-		self.set::<Label>(value.into())
-	}
-	fn set_short_label<S>(&mut self, value: S) -> Result<()>
-	where
-		S: Into<&'static str>,
-	{
-		self.set::<Label>(value.into())
-	}
-	fn set_long_label<S>(&mut self, value: S) -> Result<()>
-	where
-		S: Into<&'static str>,
-	{
-		self.set::<Label>(value.into())
-	}
-}
-
-pub trait CanSetGrouping: Writable {
-	fn set_image_effect_plugin_grouping<S>(&mut self, value: S) -> Result<()>
-	where
-		S: Into<&'static str>,
-	{
-		self.set::<image_effect_plugin::Grouping>(value.into())
-	}
-}
-
-impl<'a> CanSetLabel for PropertySetHandle<'a> {}
-impl<'a> CanSetGrouping for PropertySetHandle<'a> {}
-
 impl Execute for SimplePlugin {
 	fn execute<'a>(&'a mut self, action: &'a mut Action) -> Result<Int> {
 		match *action {

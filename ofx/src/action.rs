@@ -48,12 +48,12 @@ pub enum ImageEffectAction {
 }
 
 #[derive(Debug)]
-pub enum Action<'a> {
+pub enum Action {
 	Load,
 	Unload,
-	Describe(ImageEffectHandle<'a>),
-	GenericGlobal(GlobalAction, GenericPluginHandle<'a>),
-	GenericImageEffect(ImageEffectAction, ImageEffectHandle<'a>),
+	Describe(ImageEffectHandle),
+	GenericGlobal(GlobalAction, GenericPluginHandle),
+	GenericImageEffect(ImageEffectAction, ImageEffectHandle),
 }
 
 pub trait Execute {
@@ -63,11 +63,11 @@ pub trait Execute {
 }
 
 pub trait MapAction {
-	fn map_action<'a>(
+	fn map_action(
 		&self,
 		action: CharPtr,
 		handle: VoidPtr,
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
-	) -> Result<Action<'a>>;
+	) -> Result<Action>;
 }
