@@ -17,51 +17,7 @@ pub trait HasProperties<'a> {
 	fn properties_mut(&'a mut self) -> Result<PropertySetHandle<'a>>;
 }
 
-#[derive(Clone)]
-pub struct PropertyHandle<R, N>
-where
-	R: AsProperties,
-	N: Named,
-{
-	parent: R,
-	_named: PhantomData<N>,
-}
-
-// identical struct, but different properties
-pub struct PropertyHandleMut<W, N>
-where
-	W: AsProperties,
-	N: Named,
-{
-	parent: W,
-	_named: PhantomData<N>,
-}
-
-impl<R, I> AsProperties for PropertyHandle<R, I>
-where
-	R: AsProperties,
-	I: Named,
-{
-	fn handle(&self) -> OfxPropertySetHandle {
-		self.parent.handle()
-	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.parent.suite()
-	}
-}
-
-impl<R, I> Named for PropertyHandle<R, I>
-where
-	R: AsProperties,
-	I: Named,
-{
-	fn name() -> StaticName {
-		I::name()
-	}
-}
-
-pub trait Readable: AsProperties + Sized + Clone
-{
+pub trait Readable: AsProperties + Sized + Clone {
 	fn get<P>(&self) -> Result<P::ReturnType>
 	where
 		P: Named + Get,
@@ -69,79 +25,31 @@ pub trait Readable: AsProperties + Sized + Clone
 	{
 		<P::ReturnType as Getter<Self, P>>::get(&self)
 	}
-
-	fn property<P>(&self) -> PropertyHandle<Self, P>
-	where
-		P: Named {
-		PropertyHandle {
-			parent: self.clone(),
-			_named: PhantomData,
-		}
-	}
 }
 
-pub trait Writable: Readable + AsProperties + Sized + Clone
-{
+pub trait Writable: Readable + AsProperties + Sized + Clone {
 	fn set<P, V>(&mut self, new_value: V) -> Result<()>
 	where
-		P: Named + Set,
 		V: Into<P::ValueType>,
-		P::ValueType: ValueType + Sized + Setter,
+		P: Named + Set,
+		P::ValueType: ValueType + Sized + Setter<Self, P>,
 	{
-		<P::ValueType as Setter>::set::<PropertyHandleMut<Self, P>, P, _>(
-			&mut self.property_mut::<P>(),
-			new_value,
-		)
+		<P::ValueType as Setter<Self, P>>::set(self, new_value)
 	}
 
 	fn set_at<P, V>(&mut self, index: usize, new_value: V) -> Result<()>
 	where
-		P: Named + Set,
 		V: Into<P::ValueType>,
-		P::ValueType: ValueType + Sized + Setter,
+		P: Named + Set,
+		P::ValueType: ValueType + Sized + Setter<Self, P>,
 	{
-		<P::ValueType as Setter>::set_at::<PropertyHandleMut<Self, P>, P, _>(
-			&mut self.property_mut::<P>(),
-			index,
-			new_value,
-		)
-	}
-
-	fn property_mut<P>(&mut self) -> PropertyHandleMut<Self, P>
-	where
-		P: Named 	{
-		PropertyHandleMut {
-			parent: self.clone(),
-			_named: PhantomData,
-		}
+		<P::ValueType as Setter<Self, P>>::set_at(self, index, new_value)
 	}
 }
 
-impl <R> Readable for R
-where
-	R: AsProperties + Sized + Clone,
-{
-}
+impl<R> Readable for R where R: AsProperties + Sized + Clone {}
 
-
-impl <W> Writable for W
-where
-	W: AsProperties + Sized + Clone,
-{
-}
-
-impl<W, I> AsProperties for PropertyHandleMut<W, I>
-where
-	W: AsProperties,
-	I: Named,
-{
-	fn handle(&self) -> OfxPropertySetHandle {
-		self.parent.handle()
-	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.parent.suite()
-	}
-}
+impl<W> Writable for W where W: AsProperties + Sized + Clone {}
 
 pub trait StringId {
 	fn c_str(&self) -> Result<CharPtr>;
@@ -241,14 +149,11 @@ macro_rules! define_property {
 	};
 }
 
-macro_rules! define_interface {
-	(
-	trait $interface:ident {
-		
-	}
-	) => {
-	}
-}
+//macro_rules! define_interface {
+//	(
+//	trait $interface:ident {}
+//	) => {};
+//}
 
 define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
@@ -280,23 +185,21 @@ pub mod image_effect {
 pub trait Getter<R, P>
 where
 	Self: ValueType + Sized,
-		R: Readable + AsProperties,
-		P: Named + Get<ReturnType = Self>
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
 {
 	fn get_at(readable: &R, index: usize) -> Result<Self>;
-	fn get(readable: &R) -> Result<Self>
-	{
+	fn get(readable: &R) -> Result<Self> {
 		Self::get_at(readable, 0)
 	}
 }
 
-impl <R, P> Getter<R, P> for Int
-	where
-		R: Readable + AsProperties,
-		P: Named + Get<ReturnType = Self>,
+impl<R, P> Getter<R, P> for Int
+where
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
 {
-	fn get_at(readable: &R, index: usize) -> Result<Self>
-	{
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
 		let ofx_status = unsafe {
@@ -317,13 +220,12 @@ impl <R, P> Getter<R, P> for Int
 	}
 }
 
-impl <R, P> Getter<R, P> for Bool
-	where
-		R: Readable + AsProperties,
-		P: Named + Get<ReturnType = Self>,
+impl<R, P> Getter<R, P> for Bool
+where
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
 {
-	fn get_at(readable: &R, index: usize) -> Result<Self>
-	{
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
 		let ofx_status = unsafe {
@@ -344,12 +246,12 @@ impl <R, P> Getter<R, P> for Bool
 	}
 }
 
-impl <R, P> Getter<R, P>  for Double
+impl<R, P> Getter<R, P> for Double
 where
-		R: Readable + AsProperties,
-		P: Named + Get<ReturnType = Self> {
-	fn get_at(readable: &R, index: usize) -> Result<Self>
-	{
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_double_out: Double = 0.0;
 		let ofx_status = unsafe {
@@ -372,10 +274,10 @@ where
 
 impl<R, P> Getter<R, P> for String
 where
-		R: Readable + AsProperties,
-		P: Named + Get<ReturnType = Self> {
-	fn get_at(readable: &R, index: usize) -> Result<Self>
-	{
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		unsafe {
 			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
@@ -396,27 +298,30 @@ where
 	}
 }
 
-pub trait Setter
+pub trait Setter<W, P>
 where
 	Self: ValueType + Sized,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
 {
-	fn set_at<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
+	fn set_at<V>(writable: &mut W, index: usize, value: V) -> Result<()>
 	where
-		W: AsProperties,
-		P: Named + Set<ValueType = Self>,
 		V: Into<Self>;
-	fn set<W, P, V>(writable: &mut W, value: V) -> Result<()>
+	fn set<V>(writable: &mut W, value: V) -> Result<()>
 	where
-		W: AsProperties,
 		V: Into<Self>,
-		P: Named + Set<ValueType = Self>,
 	{
-		Self::set_at::<W, P, V>(writable, 0, value)
+		Self::set_at::<V>(writable, 0, value)
 	}
 }
 
-impl Setter for String {
-	fn set_at<W, P, V>(writable: &mut W, index: usize, value: V) -> Result<()>
+impl<W, P> Setter<W, P> for String
+where
+	Self: ValueType + Sized,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at<V>(writable: &mut W, index: usize, value: V) -> Result<()>
 	where
 		W: AsProperties,
 		V: Into<String>,

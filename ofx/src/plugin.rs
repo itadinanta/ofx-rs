@@ -180,7 +180,10 @@ impl Dispatch for PluginDescriptor {
 impl Execute for PluginDescriptor {
 	fn execute(&mut self, action: &mut Action) -> Result<Int> {
 		let result = self.instance.execute(action);
-		info!("Executed {:?} of {} -> {:?}", action, self.module_name, result);
+		info!(
+			"Executed {:?} of {} -> {:?}",
+			action, self.module_name, result
+		);
 		result
 	}
 }
