@@ -19,6 +19,7 @@ mod plugin;
 mod property;
 mod result;
 mod types;
+mod enums;
 #[macro_use]
 mod registry;
 
@@ -28,6 +29,7 @@ pub use plugin::*;
 pub use property::*;
 pub use result::*;
 pub use types::*;
+pub use enums::*;
 
 pub use ofx_sys::*;
 use registry::*;

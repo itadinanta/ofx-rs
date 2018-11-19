@@ -31,6 +31,22 @@ pub struct GenericPluginHandle {
 	property: &'static OfxPropertySuiteV1,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct HostHandle {
+	inner: OfxPropertySetHandle,
+	property: &'static OfxPropertySuiteV1,
+}
+
+
+impl HostHandle {
+	pub fn new(host: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
+		HostHandle {
+			inner: host,
+			property,
+		}
+	}
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ImageEffectHandle {
 	inner: OfxImageEffectHandle,
@@ -38,13 +54,7 @@ pub struct ImageEffectHandle {
 	image_effect: &'static OfxImageEffectSuiteV1,
 }
 
-#[derive(Clone, Copy)]
-pub struct ImageEffectInstanceHandle {
-	inner: OfxImageEffectHandle,
-	property: &'static OfxPropertySuiteV1,
-}
-
-impl<'a> ImageEffectHandle {
+impl ImageEffectHandle {
 	pub fn new(
 		ptr: VoidPtr,
 		property: &'static OfxPropertySuiteV1,
@@ -56,6 +66,12 @@ impl<'a> ImageEffectHandle {
 			image_effect,
 		}
 	}
+}
+
+#[derive(Clone, Copy)]
+pub struct ImageEffectInstanceHandle {
+	inner: OfxImageEffectHandle,
+	property: &'static OfxPropertySuiteV1,
 }
 
 #[derive(Clone)]
@@ -74,20 +90,19 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 
 			property_set_handle
 		};
-		Ok(ImageEffectProperties(PropertySetHandle::new(property_set_handle, self.property)))
+		Ok(ImageEffectProperties(PropertySetHandle::new(
+			property_set_handle,
+			self.property,
+		)))
 	}
-	fn properties_mut(&mut self) -> Result<ImageEffectProperties> {
-		// TODO: stricter type check
-		let property_set_handle = unsafe {
-			let mut property_set_handle = std::mem::uninitialized();
+}
 
-			(self.image_effect.getPropertySet)
-				.map(|getter| getter(self.inner, &mut property_set_handle as *mut _))
-				.ok_or(0)?;
-
-			property_set_handle
-		};
-		Ok(ImageEffectProperties(PropertySetHandle::new(property_set_handle, self.property)))
+impl HasProperties<HostProperties> for HostHandle {
+	fn properties(&self) -> Result<HostProperties> {
+		Ok(HostProperties(PropertySetHandle::new(
+			self.inner,
+			self.property,
+		)))
 	}
 }
 

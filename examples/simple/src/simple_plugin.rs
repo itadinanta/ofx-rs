@@ -16,10 +16,10 @@ impl SimplePlugin {
 }
 
 impl Execute for SimplePlugin {
-	fn execute<'a>(&'a mut self, action: &'a mut Action) -> Result<Int> {
+	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
 			Action::Describe(mut effect) => {
-				let mut effect_properties = effect.properties_mut()?;
+				let mut effect_properties = effect.properties()?;
 
 				effect_properties.set_image_effect_plugin_grouping("Ofx-rs")?;
 
@@ -30,17 +30,15 @@ impl Execute for SimplePlugin {
 				// TODO: implement host interface
 				// effect_properties.set::<image_effect::SupportsMultipleClipDepths, _>(true)?;
 
-				effect_properties
-					.set_at::<image_effect::SupportedPixelDepths>(0, kOfxBitDepthByte)?;
-				effect_properties
-					.set_at::<image_effect::SupportedPixelDepths>(1, kOfxBitDepthShort)?;
-				effect_properties
-					.set_at::<image_effect::SupportedPixelDepths>(2, kOfxBitDepthFloat)?;
-
-				effect_properties
-					.set_at::<image_effect::SupportedContexts>(0, kOfxImageEffectContextFilter)?;
-				effect_properties
-					.set_at::<image_effect::SupportedContexts>(1, kOfxImageEffectContextFilter)?;
+				effect_properties.set_supported_pixel_depths(&[
+					kOfxBitDepthByte,
+					kOfxBitDepthShort,
+					kOfxBitDepthFloat,
+				])?;
+				effect_properties.set_supported_contexts(&[
+					kOfxImageEffectContextFilter,
+					kOfxImageEffectContextGeneral,
+				])?;
 
 				Ok(eOfxStatus_OK)
 			}

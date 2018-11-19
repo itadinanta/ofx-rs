@@ -17,8 +17,6 @@ where
 	T: AsProperties + Sized + Clone,
 {
 	fn properties(&self) -> Result<T>;
-	// TODO: probably unnecessary?
-	fn properties_mut(&mut self) -> Result<T>;
 }
 
 pub trait Readable: AsProperties + Sized + Clone {
@@ -410,9 +408,29 @@ pub trait CanSetGrouping: Writable {
 	}
 }
 
+pub trait CanSetPixelDepth: Writable {
+	fn set_supported_pixel_depths(&mut self, values: &[&'static [u8]]) -> Result<()> {
+		for (index, value) in values.iter().enumerate() {
+			self.set_at::<image_effect::SupportedPixelDepths>(index, value)?;
+		}
+		Ok(())
+	}
+}
+
+pub trait CanSetSupportedContexts: Writable {
+	fn set_supported_contexts(&mut self, values: &[&'static [u8]]) -> Result<()> {
+		for (index, value) in values.iter().enumerate() {
+			self.set_at::<image_effect::SupportedContexts>(index, value)?;
+		}
+		Ok(())
+	}
+}
+
 impl CanSetLabel for ImageEffectProperties {}
 impl CanGetLabel for ImageEffectProperties {}
 impl CanSetGrouping for ImageEffectProperties {}
+impl CanSetPixelDepth for ImageEffectProperties {}
+impl CanSetSupportedContexts for ImageEffectProperties {}
 
 mod tests {
 	use super::*;

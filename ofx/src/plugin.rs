@@ -54,6 +54,7 @@ where
 	}
 }
 
+#[derive(Clone)]
 pub struct Suites {
 	image_effect: &'static OfxImageEffectSuiteV1,
 	property: &'static OfxPropertySuiteV1,
@@ -103,6 +104,11 @@ pub struct PluginDescriptor {
 	global_action_index: EnumIndex<GlobalAction>,
 	image_effect_action_index: EnumIndex<ImageEffectAction>,
 	ofx_plugin: OfxPlugin, // need an owned copy for the lifetime of the plugin
+}
+
+pub struct PluginContext {
+	host: HostHandle,
+	suites: Suites,
 }
 
 impl Display for PluginDescriptor {
@@ -171,15 +177,27 @@ impl Dispatch for PluginDescriptor {
 					Err(e) => Err(e),
 				}?;
 
-				self.execute(&mut mapped_action?)
+				if let Some(host) = self.host.clone() {
+					if let Some(suites) = self.suites.clone() {
+						let plugin_context = PluginContext {
+							host: HostHandle::new(host.host, &*suites.property),
+							suites: suites.clone(),
+						};
+						self.execute(&plugin_context, &mut mapped_action?)
+					} else {
+						Ok(eOfxStatus_OK)
+					}
+				} else {
+					Ok(eOfxStatus_OK)
+				}
 			}
 		}
 	}
 }
 
 impl Execute for PluginDescriptor {
-	fn execute(&mut self, action: &mut Action) -> Result<Int> {
-		let result = self.instance.execute(action);
+	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
+		let result = self.instance.execute(context, action);
 		info!(
 			"Executed {:?} of {} -> {:?}",
 			action, self.module_name, result

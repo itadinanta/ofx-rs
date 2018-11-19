@@ -8,6 +8,7 @@ use handle::*;
 use ofx_sys::*;
 use result::*;
 use types::*;
+use plugin::PluginContext;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum GlobalAction {
@@ -57,7 +58,7 @@ pub enum Action {
 }
 
 pub trait Execute {
-	fn execute(&mut self, action: &mut Action) -> Result<Int> {
+	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
 		Ok(eOfxStatus_OK)
 	}
 }
