@@ -6,6 +6,8 @@ extern crate ofx_sys;
 #[macro_use]
 extern crate log;
 extern crate log4rs;
+#[macro_use]
+extern crate lazy_static;
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};

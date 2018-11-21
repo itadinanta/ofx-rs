@@ -1,3 +1,5 @@
+#![feature(plugin)]
+
 use action::*;
 use handle::*;
 use ofx_sys::*;

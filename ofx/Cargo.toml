@@ -20,3 +20,4 @@ lazy_static = "1.1"
 log="*"
 log4rs = "*"
 ofx_sys = { path = "../ofx-sys" }
+phf = "0.7"
