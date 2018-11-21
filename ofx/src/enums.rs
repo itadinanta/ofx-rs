@@ -1,5 +1,4 @@
 use ofx_sys::*;
-extern crate phf;
 
 trait IdentifiedEnum: Sized {
 	fn into(&self) -> &'static [u8];
