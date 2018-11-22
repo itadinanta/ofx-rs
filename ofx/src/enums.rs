@@ -7,13 +7,13 @@ pub trait IdentifiedEnum: Sized {
 
 // TODO allow mixing
 macro_rules! identified_enum {
+	($visibility:vis enum $name:ident {
+		$($key:ident => $value:ident),
+		*
+	}) =>
 	{
-		pub enum $name:ident {
-			$($key:ident => $value:ident),*
-		}
-	} => {
 		#[derive(Copy, Clone)]
-		pub enum $name {
+		$visibility enum $name {
 			$($key),
 			*
 		}
@@ -33,13 +33,12 @@ macro_rules! identified_enum {
 			}
 		}
 	};
-	{
-		pub enum $name:ident {
-			$($key:ident),*
-		}
-	} => {
+	($visibility:vis enum $name:ident {
+		$($key:ident),
+		*
+	}) => {
 		#[derive(Copy, Clone)]
-		pub enum $name {
+		$visibility enum $name {
 			$($key),
 			*
 		}
@@ -82,5 +81,5 @@ mod tests {
 	fn auto_enum_names() {
 		assert!(ImageEffectContext::Filter.to_bytes() == kOfxImageEffectContextFilter);
 		assert!(ImageEffectContext::General.to_bytes() == kOfxImageEffectContextGeneral);
-	}	
+	}
 }
