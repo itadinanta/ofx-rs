@@ -1,5 +1,6 @@
 #![feature(concat_idents)]
 
+use enums::*;
 use handle::*;
 use ofx_sys::*;
 use result::*;
@@ -408,19 +409,19 @@ pub trait CanSetGrouping: Writable {
 	}
 }
 
-pub trait CanSetPixelDepth: Writable {
-	fn set_supported_pixel_depths(&mut self, values: &[&'static [u8]]) -> Result<()> {
+pub trait CanSetSupportedPixelDepths: Writable {
+	fn set_supported_pixel_depths(&mut self, values: &[BitDepth]) -> Result<()> {
 		for (index, value) in values.iter().enumerate() {
-			self.set_at::<image_effect::SupportedPixelDepths>(index, value)?;
+			self.set_at::<image_effect::SupportedPixelDepths>(index, value.to_bytes())?;
 		}
 		Ok(())
 	}
 }
 
 pub trait CanSetSupportedContexts: Writable {
-	fn set_supported_contexts(&mut self, values: &[&'static [u8]]) -> Result<()> {
+	fn set_supported_contexts(&mut self, values: &[ImageEffectContext]) -> Result<()> {
 		for (index, value) in values.iter().enumerate() {
-			self.set_at::<image_effect::SupportedContexts>(index, value)?;
+			self.set_at::<image_effect::SupportedContexts>(index, value.to_bytes())?;
 		}
 		Ok(())
 	}
@@ -429,7 +430,7 @@ pub trait CanSetSupportedContexts: Writable {
 impl CanSetLabel for ImageEffectProperties {}
 impl CanGetLabel for ImageEffectProperties {}
 impl CanSetGrouping for ImageEffectProperties {}
-impl CanSetPixelDepth for ImageEffectProperties {}
+impl CanSetSupportedPixelDepths for ImageEffectProperties {}
 impl CanSetSupportedContexts for ImageEffectProperties {}
 
 mod tests {

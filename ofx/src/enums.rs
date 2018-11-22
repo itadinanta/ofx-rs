@@ -1,8 +1,8 @@
 use ofx_sys::*;
 
-trait IdentifiedEnum: Sized {
-	fn into(&self) -> &'static [u8];
-	fn from(ofx_name: &'static [u8]) -> Option<Self>;
+pub trait IdentifiedEnum: Sized {
+	fn to_bytes(&self) -> &'static [u8];
+	fn from_bytes(ofx_name: &'static [u8]) -> Option<Self>;
 }
 
 macro_rules! identified_enum {{
@@ -17,14 +17,14 @@ macro_rules! identified_enum {{
 		}
 
 		impl IdentifiedEnum for $name {
-			fn into(&self) -> &'static [u8] {
+			fn to_bytes(&self) -> &'static [u8] {
 				match *self {
 					$($name::$key => $value),
 					*
 				}
 			}
 
-			fn from(ofx_name: &'static [u8]) -> Option<Self> {
+			fn from_bytes(ofx_name: &'static [u8]) -> Option<Self> {
 				$(if ofx_name == $value {
 					Some($name::$key)
 				} else)

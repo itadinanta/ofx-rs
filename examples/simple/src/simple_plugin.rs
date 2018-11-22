@@ -16,9 +16,9 @@ impl SimplePlugin {
 }
 
 impl Execute for SimplePlugin {
-	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
+	fn execute(&mut self, _context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
-			Action::Describe(mut effect) => {
+			Action::Describe(effect) => {
 				let mut effect_properties = effect.properties()?;
 
 				effect_properties.set_image_effect_plugin_grouping("Ofx-rs")?;
@@ -31,13 +31,13 @@ impl Execute for SimplePlugin {
 				// effect_properties.set::<image_effect::SupportsMultipleClipDepths, _>(true)?;
 
 				effect_properties.set_supported_pixel_depths(&[
-					kOfxBitDepthByte,
-					kOfxBitDepthShort,
-					kOfxBitDepthFloat,
+					BitDepth::Byte,
+					BitDepth::Short,
+					BitDepth::Float,
 				])?;
 				effect_properties.set_supported_contexts(&[
-					kOfxImageEffectContextFilter,
-					kOfxImageEffectContextGeneral,
+					ImageEffectContext::Filter,
+					ImageEffectContext::General,
 				])?;
 
 				Ok(eOfxStatus_OK)
