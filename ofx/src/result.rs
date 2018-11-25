@@ -1,6 +1,7 @@
 use ofx_sys::*;
 use std::fmt;
 use std::fmt::Display;
+use types::*;
 
 pub use ofx_sys::eOfxStatus_ErrBadHandle;
 pub use ofx_sys::eOfxStatus_ErrBadIndex;
@@ -22,6 +23,8 @@ pub enum Error {
 	HostNotReady,
 	UnknownError,
 }
+
+pub const OK: Result<Int> = Ok(eOfxStatus_OK);
 
 impl From<OfxStatus> for Error {
 	fn from(status: OfxStatus) -> Error {

@@ -160,12 +160,6 @@ macro_rules! define_property {
 	};
 }
 
-//macro_rules! define_interface {
-//	(
-//	trait $interface:ident {}
-//	) => {};
-//}
-
 define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
 define_property!(read_only PropName as Name: String);
@@ -188,6 +182,7 @@ pub mod image_effect_plugin {
 
 pub mod image_effect {
 	use super::*;
+	define_property!(read_only ImageEffectPropContext as Context: String);
 	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool, Bool);
 	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: String, &'static [u8]);
 	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: String, &'static [u8]);
@@ -395,6 +390,12 @@ macro_rules! can_set_property {
 }
 
 macro_rules! can_get_property {
+	($function_name: ident, $property_name:path, enum $enum_value_type:ty) => {
+		fn $function_name(&self) -> Result<<$property_name as Get>::ReturnType> {
+			self.get::<$property_name>()
+		}
+	};
+
 	($function_name: ident, $property_name:path) => {
 		fn $function_name(&self) -> Result<<$property_name as Get>::ReturnType> {
 			self.get::<$property_name>()
@@ -428,6 +429,10 @@ pub trait CanSetSupportedPixelDepths: Writable {
 	);
 }
 
+pub trait CanGetContext: Readable {
+	can_get_property!(get_context, image_effect::Context, enum Context);
+}
+
 pub trait CanSetSupportedContexts: Writable {
 	can_set_property!(
 		set_supported_contexts,
@@ -437,11 +442,10 @@ pub trait CanSetSupportedContexts: Writable {
 }
 
 pub trait CanGetSupportsMultipleClipDepths: Readable {
-	fn get_supports_multiple_clip_depths(
-		&self,
-	) -> Result<<image_effect::SupportsMultipleClipDepths as Get>::ReturnType> {
-		self.get::<image_effect::SupportsMultipleClipDepths>()
-	}
+	can_get_property!(
+		get_supports_multiple_clip_depths,
+		image_effect::SupportsMultipleClipDepths
+	);
 }
 
 impl CanGetSupportsMultipleClipDepths for HostHandle {}
@@ -450,6 +454,8 @@ impl CanGetLabel for ImageEffectProperties {}
 impl CanSetGrouping for ImageEffectProperties {}
 impl CanSetSupportedPixelDepths for ImageEffectProperties {}
 impl CanSetSupportedContexts for ImageEffectProperties {}
+
+impl CanGetContext for DescribeInContextInArgs {}
 
 mod tests {
 	use super::*;

@@ -1,6 +1,7 @@
 #![feature(plugin)]
 
 use action::*;
+use enums::*;
 use handle::*;
 use ofx_sys::*;
 use result::*;
@@ -87,7 +88,7 @@ pub enum RawMessage {
 
 pub trait Dispatch {
 	fn dispatch(&mut self, message: RawMessage) -> Result<Int> {
-		Ok(eOfxStatus_OK)
+		OK
 	}
 }
 
@@ -141,6 +142,13 @@ impl MapAction for PluginDescriptor {
 		if let Some(action) = self.image_effect_action_index.find(name) {
 			info!("Image effect action match {:?}", action);
 			match action {
+				ImageEffectAction::DescribeInContext => {
+					//let context = DescribeInContextInArgs(in_args).get_context().unwrap();
+					Ok(Action::DescribeInContext(
+						self.new_image_effect(handle),
+						ImageEffectContext::General,
+					))
+				}
 				_ => Err(Error::InvalidAction),
 			}
 		} else if let Some(action) = self.global_action_index.find(name) {
@@ -148,11 +156,7 @@ impl MapAction for PluginDescriptor {
 			match action {
 				GlobalAction::Load => Ok(Action::Load),
 				GlobalAction::Unload => Ok(Action::Unload),
-				GlobalAction::Describe => Ok(Action::Describe(ImageEffectHandle::new(
-					handle,
-					self.suites.as_ref().map(|s| s.property).unwrap(),
-					self.suites.as_ref().map(|s| s.image_effect).unwrap(),
-				))),
+				GlobalAction::Describe => Ok(Action::Describe(self.new_image_effect(handle))),
 				_ => Err(Error::InvalidAction),
 			}
 		} else {
@@ -167,7 +171,7 @@ impl Dispatch for PluginDescriptor {
 		match message {
 			RawMessage::SetHost { host } => {
 				self.host = Some(host.clone());
-				Ok(0)
+				OK
 			}
 			RawMessage::MainEntry {
 				action,
@@ -193,10 +197,10 @@ impl Dispatch for PluginDescriptor {
 						};
 						self.execute(&plugin_context, &mut mapped_action?)
 					} else {
-						Ok(eOfxStatus_OK)
+						OK
 					}
 				} else {
-					Ok(eOfxStatus_OK)
+					OK
 				}
 			}
 		}
@@ -309,6 +313,12 @@ impl PluginDescriptor {
 		}
 	}
 
+	fn new_image_effect(&self, handle: VoidPtr) -> ImageEffectHandle {
+		let property_suite = self.suites.as_ref().map(|s| s.property).unwrap();
+		let image_effect_suite = self.suites.as_ref().map(|s| s.image_effect).unwrap();
+		ImageEffectHandle::new(handle, property_suite, image_effect_suite)
+	}
+
 	fn load(&mut self) -> Result<Int> {
 		let host = self.host.ok_or(Error::HostNotReady)?;
 		let fetch_suite = host.fetchSuite.ok_or(Error::HostNotReady)?;
@@ -372,11 +382,11 @@ impl PluginDescriptor {
 		};
 		self.suites = Some(suites);
 		info!("Loaded plugin");
-		Ok(eOfxStatus_OK)
+		OK
 	}
 
 	fn unload(&mut self) -> Result<Int> {
-		Ok(eOfxStatus_OK)
+		OK
 	}
 
 	fn cache_handle(&mut self, handle: ImageEffectHandle) {
@@ -386,7 +396,7 @@ impl PluginDescriptor {
 	fn describe(&mut self, handle: ImageEffectHandle) -> Result<Int> {
 		info!("Caching plugin instance handle {:?}", handle);
 		self.cache_handle(handle);
-		Ok(eOfxStatus_OK)
+		OK
 	}
 
 	pub fn ofx_plugin(&self) -> &OfxPlugin {

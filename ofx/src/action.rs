@@ -5,6 +5,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use handle::*;
+use enums::*;
 use ofx_sys::*;
 use result::*;
 use types::*;
@@ -53,6 +54,7 @@ pub enum Action {
 	Load,
 	Unload,
 	Describe(ImageEffectHandle),
+	DescribeInContext(ImageEffectHandle, ImageEffectContext),
 	GenericGlobal(GlobalAction, GenericPluginHandle),
 	GenericImageEffect(ImageEffectAction, ImageEffectHandle),
 }

@@ -12,7 +12,7 @@ macro_rules! identified_enum {
 		*
 	}) =>
 	{
-		#[derive(Copy, Clone)]
+		#[derive(Copy, Clone, Debug)]
 		$visibility enum $name {
 			$($key),
 			*
@@ -37,7 +37,7 @@ macro_rules! identified_enum {
 		$($key:ident),
 		*
 	}) => {
-		#[derive(Copy, Clone)]
+		#[derive(Copy, Clone, Debug)]
 		$visibility enum $name {
 			$($key),
 			*

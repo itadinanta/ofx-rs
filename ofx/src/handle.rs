@@ -37,7 +37,6 @@ pub struct HostHandle {
 	property: &'static OfxPropertySuiteV1,
 }
 
-
 impl HostHandle {
 	pub fn new(host: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
 		HostHandle {
@@ -74,10 +73,25 @@ pub struct ImageEffectInstanceHandle {
 	property: &'static OfxPropertySuiteV1,
 }
 
-#[derive(Clone)]
-pub struct HostProperties(PropertySetHandle);
-#[derive(Clone)]
-pub struct ImageEffectProperties(PropertySetHandle);
+macro_rules! properties_newtype {
+	($name:ident) => {
+		#[derive(Clone)]
+		pub struct $name(PropertySetHandle);
+
+		impl<'a> AsProperties for $name {
+			fn handle(&self) -> OfxPropertySetHandle {
+				self.0.inner
+			}
+			fn suite(&self) -> *const OfxPropertySuiteV1 {
+				self.0.property
+			}
+		}
+	};
+}
+
+properties_newtype!(HostProperties);
+properties_newtype!(ImageEffectProperties);
+properties_newtype!(DescribeInContextInArgs);
 
 impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 	fn properties(&self) -> Result<ImageEffectProperties> {
@@ -94,15 +108,6 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 			property_set_handle,
 			self.property,
 		)))
-	}
-}
-
-impl<'a> AsProperties for ImageEffectProperties {
-	fn handle(&self) -> OfxPropertySetHandle {
-		self.0.inner
-	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.0.property
 	}
 }
 
