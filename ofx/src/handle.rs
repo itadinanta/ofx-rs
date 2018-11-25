@@ -97,15 +97,6 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 	}
 }
 
-impl HasProperties<HostProperties> for HostHandle {
-	fn properties(&self) -> Result<HostProperties> {
-		Ok(HostProperties(PropertySetHandle::new(
-			self.inner,
-			self.property,
-		)))
-	}
-}
-
 impl<'a> AsProperties for ImageEffectProperties {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.0.inner
@@ -115,12 +106,12 @@ impl<'a> AsProperties for ImageEffectProperties {
 	}
 }
 
-impl<'a> AsProperties for HostProperties {
+impl<'a> AsProperties for HostHandle {
 	fn handle(&self) -> OfxPropertySetHandle {
-		self.0.inner
+		self.inner
 	}
 	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.0.property
+		self.property
 	}
 }
 

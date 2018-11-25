@@ -373,60 +373,78 @@ where
 	fn get(&self) -> Result<R::ReturnType>;
 }
 
+macro_rules! can_set_property {
+	($function_name: ident, $property_name:path) => {
+		can_set_property($function_name, $property_name, <$property_name as Set>::ValueType);
+	};
+
+	($function_name: ident, $property_name:path, &[enum $enum_value_type:ty]) => {
+		fn $function_name(&mut self, values: &[$enum_value_type]) -> Result<()> {
+			for (index, value) in values.iter().enumerate() {
+				self.set_at::<$property_name>(index, value.to_bytes())?;
+			}
+			Ok(())
+		}
+	};
+
+	($function_name: ident, $property_name:path, $value_type:ty) => {
+		fn $function_name<S>(&mut self, value: S) -> Result<()> where S: Into<$value_type> {
+			self.set::<$property_name>(value.into())
+		}
+	};
+}
+
+macro_rules! can_get_property {
+	($function_name: ident, $property_name:path) => {
+		fn $function_name(&self) -> Result<<$property_name as Get>::ReturnType> {
+			self.get::<$property_name>()
+		}
+	}
+}
+
 pub trait CanSetLabel: Writable {
-	fn set_label<S>(&mut self, value: S) -> Result<()>
-	where
-		S: Into<&'static str>,
-	{
-		self.set::<Label>(value.into())
-	}
-	fn set_short_label<S>(&mut self, value: S) -> Result<()>
-	where
-		S: Into<&'static str>,
-	{
-		self.set::<Label>(value.into())
-	}
-	fn set_long_label<S>(&mut self, value: S) -> Result<()>
-	where
-		S: Into<&'static str>,
-	{
-		self.set::<Label>(value.into())
-	}
+	can_set_property!(set_label, Label, &'static str);
+	can_set_property!(set_short_label, ShortLabel, &'static str);
+	can_set_property!(set_long_label, LongLabel, &'static str);
 }
 
 pub trait CanGetLabel: Readable {
-	fn get_label(&self) -> Result<<Label as Get>::ReturnType> {
-		self.get::<Label>()
-	}
+	can_get_property!(get_label, Label);
 }
 
 pub trait CanSetGrouping: Writable {
-	fn set_image_effect_plugin_grouping<S>(&mut self, value: S) -> Result<()>
-	where
-		S: Into<&'static str>,
-	{
-		self.set::<image_effect_plugin::Grouping>(value.into())
-	}
+	can_set_property!(
+		set_image_effect_plugin_grouping,
+		image_effect_plugin::Grouping,
+		&'static str
+	);
 }
 
 pub trait CanSetSupportedPixelDepths: Writable {
-	fn set_supported_pixel_depths(&mut self, values: &[BitDepth]) -> Result<()> {
-		for (index, value) in values.iter().enumerate() {
-			self.set_at::<image_effect::SupportedPixelDepths>(index, value.to_bytes())?;
-		}
-		Ok(())
-	}
+	can_set_property!(
+		set_supported_pixel_depths,
+		image_effect::SupportedPixelDepths,
+		&[enum BitDepth]
+	);
 }
 
 pub trait CanSetSupportedContexts: Writable {
-	fn set_supported_contexts(&mut self, values: &[ImageEffectContext]) -> Result<()> {
-		for (index, value) in values.iter().enumerate() {
-			self.set_at::<image_effect::SupportedContexts>(index, value.to_bytes())?;
-		}
-		Ok(())
+	can_set_property!(
+		set_supported_contexts,
+		image_effect::SupportedContexts,
+		&[enum ImageEffectContext]
+	);
+}
+
+pub trait CanGetSupportsMultipleClipDepths: Readable {
+	fn get_supports_multiple_clip_depths(
+		&self,
+	) -> Result<<image_effect::SupportsMultipleClipDepths as Get>::ReturnType> {
+		self.get::<image_effect::SupportsMultipleClipDepths>()
 	}
 }
 
+impl CanGetSupportsMultipleClipDepths for HostHandle {}
 impl CanSetLabel for ImageEffectProperties {}
 impl CanGetLabel for ImageEffectProperties {}
 impl CanSetGrouping for ImageEffectProperties {}

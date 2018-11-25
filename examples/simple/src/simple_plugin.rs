@@ -16,11 +16,11 @@ impl SimplePlugin {
 }
 
 impl Execute for SimplePlugin {
-	fn execute(&mut self, _context: &PluginContext, action: &mut Action) -> Result<Int> {
+	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
 			Action::Describe(effect) => {
+				context.get_host().get_supports_multiple_clip_depths();
 				let mut effect_properties = effect.properties()?;
-
 				effect_properties.set_image_effect_plugin_grouping("Ofx-rs")?;
 
 				effect_properties.set_label("Ofx-rs simple_plugin sample")?;

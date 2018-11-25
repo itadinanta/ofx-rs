@@ -113,6 +113,12 @@ pub struct PluginContext {
 	suites: Suites,
 }
 
+impl PluginContext {
+	pub fn get_host(&self) -> HostHandle {
+		self.host.clone()
+	}
+}
+
 impl Display for PluginDescriptor {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(
