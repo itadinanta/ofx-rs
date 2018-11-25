@@ -7,11 +7,14 @@ plugin_module!(
 	SimplePlugin::new
 );
 
-struct SimplePlugin {}
+#[derive(Default)]
+struct SimplePlugin {
+	host_supports_multiple_clip_depths: Option<Bool>,
+}
 
 impl SimplePlugin {
 	pub fn new() -> SimplePlugin {
-		SimplePlugin {}
+		SimplePlugin::default()
 	}
 }
 
@@ -19,16 +22,15 @@ impl Execute for SimplePlugin {
 	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
 			Action::Describe(effect) => {
-				context.get_host().get_supports_multiple_clip_depths();
+				self.host_supports_multiple_clip_depths =
+					Some(context.get_host().get_supports_multiple_clip_depths()?);
+
 				let mut effect_properties = effect.properties()?;
 				effect_properties.set_image_effect_plugin_grouping("Ofx-rs")?;
 
 				effect_properties.set_label("Ofx-rs simple_plugin sample")?;
 				effect_properties.set_short_label("Ofx-rs simple_plugin")?;
 				effect_properties.set_long_label("Ofx-rs simple_plugin in examples")?;
-
-				// TODO: implement host interface
-				// effect_properties.set::<image_effect::SupportsMultipleClipDepths, _>(true)?;
 
 				effect_properties.set_supported_pixel_depths(&[
 					BitDepth::Byte,
