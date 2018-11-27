@@ -42,9 +42,9 @@ impl Execute for SimplePlugin {
 					ImageEffectContext::General,
 				])?;
 
-				Ok(eOfxStatus_OK)
+				OK
 			}
-			_ => Ok(eOfxStatus_OK),
+			_ => OK,
 		}
 	}
 }
