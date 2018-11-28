@@ -5,7 +5,7 @@ pub trait IdentifiedEnum: Sized {
 	fn to_bytes(&self) -> &'static [u8];
 	fn from_bytes(ofx_name: &[u8]) -> Option<Self>;
 	fn from_cstring(ofx_value: &CStr) -> Option<Self> {
-		Self::from_bytes(ofx_value.to_bytes())
+		Self::from_bytes(ofx_value.to_bytes_with_nul())
 	}
 }
 
@@ -87,6 +87,7 @@ mod tests {
 		assert!(ImageEffectContext::General.to_bytes() == kOfxImageEffectContextGeneral);
 	}
 
+	#[test]
 	fn from_enum_names() {
 		assert!(
 			ImageEffectContext::from_bytes(kOfxImageEffectContextFilter)
@@ -96,6 +97,13 @@ mod tests {
 			ImageEffectContext::from_bytes(kOfxImageEffectContextGeneral)
 				== Some(ImageEffectContext::General)
 		);
+		assert!(
+			ImageEffectContext::from_bytes(b"OfxImageEffectContextGeneral\0")
+				== Some(ImageEffectContext::General)
+		);
+		let str_value =
+			unsafe { CStr::from_bytes_with_nul_unchecked(b"OfxImageEffectContextGeneral\0") };
+		assert!(ImageEffectContext::from_cstring(&str_value) == Some(ImageEffectContext::General));
 	}
 
 }
