@@ -2,6 +2,7 @@ use ofx_sys::*;
 use property::*;
 use result::*;
 use std::ffi::{CStr, CString};
+use std::fmt;
 use std::marker::PhantomData;
 use types::*;
 
@@ -25,13 +26,13 @@ impl PropertySetHandle {
 	}
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct GenericPluginHandle {
 	inner: VoidPtr,
 	property: &'static OfxPropertySuiteV1,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct HostHandle {
 	inner: OfxPropertySetHandle,
 	property: &'static OfxPropertySuiteV1,
@@ -46,11 +47,29 @@ impl HostHandle {
 	}
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ImageEffectHandle {
 	inner: OfxImageEffectHandle,
 	property: &'static OfxPropertySuiteV1,
 	image_effect: &'static OfxImageEffectSuiteV1,
+}
+
+impl fmt::Debug for ImageEffectHandle {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "ImageEffectHandle {{...}}")
+	}
+}
+
+impl fmt::Debug for GenericPluginHandle {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "GenericPluginHandle {{...}}")
+	}
+}
+
+impl fmt::Debug for HostHandle {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "HostHandle {{...}}")
+	}
 }
 
 impl ImageEffectHandle {
@@ -77,7 +96,7 @@ macro_rules! properties_newtype {
 	($name:ident) => {
 		#[derive(Clone)]
 		pub struct $name(PropertySetHandle);
-		
+
 		impl $name {
 			pub fn new(host: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
 				$name(PropertySetHandle::new(host, property))
@@ -99,8 +118,7 @@ properties_newtype!(HostProperties);
 properties_newtype!(ImageEffectProperties);
 properties_newtype!(DescribeInContextInArgs);
 
-impl DescribeInContextInArgs {
-}
+impl DescribeInContextInArgs {}
 
 impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 	fn properties(&self) -> Result<ImageEffectProperties> {

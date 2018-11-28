@@ -22,10 +22,12 @@ pub enum Error {
 	PluginNotReady,
 	HostNotReady,
 	EnumNotFound,
+	Unimplemented,
 	UnknownError,
 }
 
 pub const OK: Result<Int> = Ok(eOfxStatus_OK);
+pub const UNIMPLEMENTED: Result<Int> = Err(Error::Unimplemented);
 
 impl From<OfxStatus> for Error {
 	fn from(status: OfxStatus) -> Error {

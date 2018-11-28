@@ -17,3 +17,5 @@ path="src/lib.rs"
 lazy_static = "1.1"
 libc = "0.2"
 ofx = { path = "../../ofx" }
+log="*"
+log4rs = "*"

@@ -124,6 +124,8 @@ where
 					Box::new(ConsoleAppender::builder().build()),
 				))
 				.logger(Logger::builder().build("ofx".to_string(), log::LevelFilter::Debug))
+				// TODO: logging needs setting up properly, this is for debugging only
+				.logger(Logger::builder().build("simple_plugin".to_string(), log::LevelFilter::Debug))
 				.build(
 					Root::builder()
 						.appender("stdout".to_string())
