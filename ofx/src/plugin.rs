@@ -4,6 +4,7 @@ use action::*;
 use enums::*;
 use handle::*;
 use ofx_sys::*;
+use property::*;
 use result::*;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -143,10 +144,12 @@ impl MapAction for PluginDescriptor {
 			info!("Image effect action match {:?}", action);
 			match action {
 				ImageEffectAction::DescribeInContext => {
-					//let context = DescribeInContextInArgs(in_args).get_context().unwrap();
+					let context = self
+						.new_typed_properties(DescribeInContextInArgs::new, in_args)
+						.get_context()?;
 					Ok(Action::DescribeInContext(
 						self.new_image_effect(handle),
-						ImageEffectContext::General,
+						context,
 					))
 				}
 				_ => Err(Error::InvalidAction),
@@ -317,6 +320,14 @@ impl PluginDescriptor {
 		let property_suite = self.suites.as_ref().map(|s| s.property).unwrap();
 		let image_effect_suite = self.suites.as_ref().map(|s| s.image_effect).unwrap();
 		ImageEffectHandle::new(handle, property_suite, image_effect_suite)
+	}
+
+	fn new_typed_properties<T, F>(&self, constructor: F, handle: OfxPropertySetHandle) -> T
+	where
+		F: Fn(OfxPropertySetHandle, &'static OfxPropertySuiteV1) -> T,
+	{
+		let property_suite = self.suites.as_ref().map(|s| s.property).unwrap();
+		constructor(handle, property_suite)
 	}
 
 	fn load(&mut self) -> Result<Int> {

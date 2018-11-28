@@ -21,6 +21,8 @@ impl SimplePlugin {
 impl Execute for SimplePlugin {
 	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
+			Action::DescribeInContext(effect, context) => OK,
+
 			Action::Describe(effect) => {
 				self.host_supports_multiple_clip_depths =
 					Some(context.get_host().get_supports_multiple_clip_depths()?);

@@ -77,6 +77,12 @@ macro_rules! properties_newtype {
 	($name:ident) => {
 		#[derive(Clone)]
 		pub struct $name(PropertySetHandle);
+		
+		impl $name {
+			pub fn new(host: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
+				$name(PropertySetHandle::new(host, property))
+			}
+		}
 
 		impl<'a> AsProperties for $name {
 			fn handle(&self) -> OfxPropertySetHandle {
@@ -92,6 +98,9 @@ macro_rules! properties_newtype {
 properties_newtype!(HostProperties);
 properties_newtype!(ImageEffectProperties);
 properties_newtype!(DescribeInContextInArgs);
+
+impl DescribeInContextInArgs {
+}
 
 impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 	fn properties(&self) -> Result<ImageEffectProperties> {
@@ -123,7 +132,6 @@ impl<'a> AsProperties for HostHandle {
 mod tests {
 	use super::*;
 	use property::*;
-	use PhantomData;
 	// do not run, just compile!
 
 	fn prop_host() {
@@ -131,6 +139,5 @@ mod tests {
 
 		handle.get::<Type>();
 		handle.get::<IsBackground>();
-		//handle.set::<Type>(""); type is read only
 	}
 }

@@ -98,6 +98,7 @@ impl ValueType for String {}
 impl ValueType for &str {}
 impl ValueType for &[u8] {}
 impl ValueType for CharPtr {}
+impl ValueType for CString {}
 
 type StaticName = &'static [u8];
 pub trait Named {
@@ -182,10 +183,10 @@ pub mod image_effect_plugin {
 
 pub mod image_effect {
 	use super::*;
-	define_property!(read_only ImageEffectPropContext as Context: String);
+	define_property!(read_only ImageEffectPropContext as Context: CString);
 	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool, Bool);
-	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: String, &'static [u8]);
-	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: String, &'static [u8]);
+	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString, &'static [u8]);
+	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString, &'static [u8]);
 }
 
 pub trait Getter<R, P>
@@ -274,6 +275,32 @@ where
 			None => Err(Error::PluginNotReady),
 			Some(ofx_sys::eOfxStatus_OK) => Ok(c_double_out),
 			Some(other) => Err(Error::from(other)),
+		}
+	}
+}
+
+impl<R, P> Getter<R, P> for CString
+where
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
+		let c_name = P::name().c_str()?;
+		unsafe {
+			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
+			let ofx_status = (*readable.suite()).propGetString.map(|getter| {
+				getter(
+					readable.handle(),
+					c_name,
+					index as Int,
+					&mut c_ptr_out as *mut _,
+				) as i32
+			});
+			match ofx_status {
+				None => Err(Error::PluginNotReady),
+				Some(ofx_sys::eOfxStatus_OK) => Ok(CStr::from_ptr(c_ptr_out).to_owned()),
+				Some(other) => Err(Error::from(other)),
+			}
 		}
 	}
 }
@@ -390,9 +417,10 @@ macro_rules! can_set_property {
 }
 
 macro_rules! can_get_property {
-	($function_name: ident, $property_name:path, enum $enum_value_type:ty) => {
-		fn $function_name(&self) -> Result<<$property_name as Get>::ReturnType> {
-			self.get::<$property_name>()
+	($function_name: ident, $property_name:path, enum $enum_value_type:ident) => {
+		fn $function_name(&self) -> Result<$enum_value_type> {
+			let str_value = self.get::<$property_name>()?;
+			$enum_value_type::from_cstring(&str_value).ok_or(Error::EnumNotFound)
 		}
 	};
 
@@ -407,6 +435,17 @@ pub trait CanSetLabel: Writable {
 	can_set_property!(set_label, Label, &'static str);
 	can_set_property!(set_short_label, ShortLabel, &'static str);
 	can_set_property!(set_long_label, LongLabel, &'static str);
+	fn set_labels(
+		&mut self,
+		label: &'static str,
+		short: &'static str,
+		long: &'static str,
+	) -> Result<()> {
+		self.set_label(label)?;
+		self.set_short_label(short)?;
+		self.set_long_label(long)?;
+		Ok(())
+	}
 }
 
 pub trait CanGetLabel: Readable {
@@ -430,7 +469,7 @@ pub trait CanSetSupportedPixelDepths: Writable {
 }
 
 pub trait CanGetContext: Readable {
-	can_get_property!(get_context, image_effect::Context, enum Context);
+	can_get_property!(get_context, image_effect::Context, enum ImageEffectContext);
 }
 
 pub trait CanSetSupportedContexts: Writable {

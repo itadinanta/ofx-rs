@@ -1,8 +1,12 @@
 use ofx_sys::*;
+use std::ffi::CStr;
 
 pub trait IdentifiedEnum: Sized {
 	fn to_bytes(&self) -> &'static [u8];
-	fn from_bytes(ofx_name: &'static [u8]) -> Option<Self>;
+	fn from_bytes(ofx_name: &[u8]) -> Option<Self>;
+	fn from_cstring(ofx_value: &CStr) -> Option<Self> {
+		Self::from_bytes(ofx_value.to_bytes())
+	}
 }
 
 // TODO allow mixing
@@ -37,7 +41,7 @@ macro_rules! identified_enum {
 		$($key:ident),
 		*
 	}) => {
-		#[derive(Copy, Clone, Debug)]
+		#[derive(Copy, Clone, Debug, PartialEq)]
 		$visibility enum $name {
 			$($key),
 			*
@@ -51,7 +55,7 @@ macro_rules! identified_enum {
 				}
 			}
 
-			fn from_bytes(ofx_name: &'static [u8]) -> Option<Self> {
+			fn from_bytes(ofx_name: &[u8]) -> Option<Self> {
 				$(if ofx_name == concat_idents!(kOfx, $name, $key) { Some($name::$key) } else)
 				*
 				{ None }
@@ -82,4 +86,16 @@ mod tests {
 		assert!(ImageEffectContext::Filter.to_bytes() == kOfxImageEffectContextFilter);
 		assert!(ImageEffectContext::General.to_bytes() == kOfxImageEffectContextGeneral);
 	}
+
+	fn from_enum_names() {
+		assert!(
+			ImageEffectContext::from_bytes(kOfxImageEffectContextFilter)
+				== Some(ImageEffectContext::Filter)
+		);
+		assert!(
+			ImageEffectContext::from_bytes(kOfxImageEffectContextGeneral)
+				== Some(ImageEffectContext::General)
+		);
+	}
+
 }
