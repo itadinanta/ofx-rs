@@ -54,6 +54,17 @@ pub struct ImageEffectHandle {
 	image_effect: &'static OfxImageEffectSuiteV1,
 }
 
+#[derive(Clone, Copy)]
+pub struct ImageClipHandle {
+	inner: OfxImageClipHandle,
+}
+
+#[derive(Clone, Copy)]
+pub struct ParamHandle {
+	inner: OfxParamHandle,
+	parameter: &'static OfxParameterSuiteV1,
+}
+
 impl fmt::Debug for ImageEffectHandle {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "ImageEffectHandle {{...}}")

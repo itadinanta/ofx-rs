@@ -18,6 +18,23 @@ impl SimplePlugin {
 	}
 }
 
+struct MyInstanceData {
+	is_general_effect: bool,
+
+	source_clip: ImageClipHandle,
+	mask_clip: ImageClipHandle,
+	output_clip: ImageClipHandle,
+
+	scale_param: ParamHandle,
+
+	per_component_scale_param: ParamHandle,
+
+	scale_r_param: ParamHandle,
+	scale_g_param: ParamHandle,
+	scale_b_param: ParamHandle,
+	scale_a_param: ParamHandle,
+}
+
 impl Execute for SimplePlugin {
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
@@ -38,7 +55,7 @@ impl Execute for SimplePlugin {
 					mask.set_optional(true)?;
 				}
 
-				UNIMPLEMENTED
+				OK
 			}
 
 			Action::Describe(effect) => {
