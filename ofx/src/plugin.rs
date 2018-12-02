@@ -160,6 +160,12 @@ impl MapAction for PluginDescriptor {
 				GlobalAction::Load => Ok(Action::Load),
 				GlobalAction::Unload => Ok(Action::Unload),
 				GlobalAction::Describe => Ok(Action::Describe(self.new_image_effect(handle))),
+				GlobalAction::CreateInstance => {
+					Ok(Action::CreateInstance(self.new_image_effect(handle)))
+				}
+				GlobalAction::DestroyInstance => {
+					Ok(Action::DestroyInstance(self.new_image_effect(handle)))
+				}
 				_ => Err(Error::InvalidAction),
 			}
 		} else {

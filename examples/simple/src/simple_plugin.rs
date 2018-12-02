@@ -38,6 +38,16 @@ struct MyInstanceData {
 impl Execute for SimplePlugin {
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
+			Action::CreateInstance(effect) => {
+			
+				UNIMPLEMENTED
+			}
+
+			Action::DestroyInstance(effect) => {
+			
+				UNIMPLEMENTED
+			}
+			
 			Action::DescribeInContext(effect, context) => {
 				info!("DescribeInContext {:?} {:?}", effect, context);
 

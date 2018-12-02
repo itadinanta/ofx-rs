@@ -65,9 +65,34 @@ pub struct ParamHandle {
 	parameter: &'static OfxParameterSuiteV1,
 }
 
+#[derive(Clone, Copy)]
+pub struct ParamSetHandle {
+	inner: OfxParamSetHandle,
+	parameter: &'static OfxParameterSuiteV1,
+}
+
+// TODO: custom_derive?
 impl fmt::Debug for ImageEffectHandle {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "ImageEffectHandle {{...}}")
+	}
+}
+
+impl fmt::Debug for ImageClipHandle {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "ImageClipHandle {{...}}")
+	}
+}
+
+impl fmt::Debug for ParamHandle {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "ParamHandle {{...}}")
+	}
+}
+
+impl fmt::Debug for ParamSetHandle {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "ParamSetHandle {{...}}")
 	}
 }
 

@@ -4,12 +4,12 @@ use std::fmt;
 use std::fmt::Display;
 use std::marker::PhantomData;
 
-use handle::*;
 use enums::*;
+use handle::*;
 use ofx_sys::*;
+use plugin::PluginContext;
 use result::*;
 use types::*;
-use plugin::PluginContext;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum GlobalAction {
@@ -55,6 +55,8 @@ pub enum Action {
 	Unload,
 	Describe(ImageEffectHandle),
 	DescribeInContext(ImageEffectHandle, ImageEffectContext),
+	CreateInstance(ImageEffectHandle),
+	DestroyInstance(ImageEffectHandle),
 	GenericGlobal(GlobalAction, GenericPluginHandle),
 	GenericImageEffect(ImageEffectAction, ImageEffectHandle),
 }
