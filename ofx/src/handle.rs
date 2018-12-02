@@ -1,3 +1,4 @@
+use enums::*;
 use ofx_sys::*;
 use property::*;
 use result::*;
@@ -52,6 +53,7 @@ pub struct ImageEffectHandle {
 	inner: OfxImageEffectHandle,
 	property: &'static OfxPropertySuiteV1,
 	image_effect: &'static OfxImageEffectSuiteV1,
+	parameter: &'static OfxParameterSuiteV1,
 }
 
 #[derive(Clone, Copy)]
@@ -62,12 +64,14 @@ pub struct ImageClipHandle {
 #[derive(Clone, Copy)]
 pub struct ParamHandle {
 	inner: OfxParamHandle,
+	property: &'static OfxPropertySuiteV1,
 	parameter: &'static OfxParameterSuiteV1,
 }
 
 #[derive(Clone, Copy)]
 pub struct ParamSetHandle {
 	inner: OfxParamSetHandle,
+	property: &'static OfxPropertySuiteV1,
 	parameter: &'static OfxParameterSuiteV1,
 }
 
@@ -113,11 +117,13 @@ impl ImageEffectHandle {
 		ptr: VoidPtr,
 		property: &'static OfxPropertySuiteV1,
 		image_effect: &'static OfxImageEffectSuiteV1,
+		parameter: &'static OfxParameterSuiteV1,
 	) -> Self {
 		ImageEffectHandle {
 			inner: unsafe { ptr as OfxImageEffectHandle },
 			property,
 			image_effect,
+			parameter,
 		}
 	}
 }
@@ -153,6 +159,7 @@ macro_rules! properties_newtype {
 properties_newtype!(HostProperties);
 properties_newtype!(ImageEffectProperties);
 properties_newtype!(ClipProperties);
+properties_newtype!(ParamProperties);
 properties_newtype!(DescribeInContextInArgs);
 
 impl DescribeInContextInArgs {}
@@ -196,6 +203,25 @@ impl ImageEffectHandle {
 		)))
 	}
 
+	pub fn parameter_set(&self) -> Result<ParamSetHandle> {
+		let parameters_set_handle = unsafe {
+			let mut parameters_set_handle = std::mem::uninitialized();
+
+			self.image_effect
+				.getParamSet
+				.ok_or(Error::SuiteNotInitialized)?(
+				self.inner, &mut parameters_set_handle as *mut _
+			);
+
+			parameters_set_handle
+		};
+		Ok(ParamSetHandle::new(
+			parameters_set_handle,
+			self.parameter,
+			self.property,
+		))
+	}
+
 	pub fn new_output_clip(&self) -> Result<ClipProperties> {
 		self.clip_properties_by_name(ofx_sys::kOfxImageEffectOutputClipName)
 	}
@@ -207,6 +233,41 @@ impl ImageEffectHandle {
 	pub fn new_input_clip(&self, name: &str) -> Result<ClipProperties> {
 		let str_buf = CString::new(name)?.into_bytes_with_nul();
 		self.clip_properties_by_name(&str_buf)
+	}
+}
+
+impl ParamSetHandle {
+	pub fn new(
+		inner: OfxParamSetHandle,
+		parameter: &'static OfxParameterSuiteV1,
+		property: &'static OfxPropertySuiteV1,
+	) -> Self {
+		ParamSetHandle {
+			inner,
+			parameter,
+			property,
+		}
+	}
+
+	pub fn param_define(&self, param_type: ParamType, name: &str) -> Result<ParamProperties> {
+		let name_buf = CString::new(name)?.into_bytes_with_nul();
+		let property_set_handle = unsafe {
+			let mut property_set_handle = std::mem::uninitialized();
+			self.parameter
+				.paramDefine
+				.ok_or(Error::SuiteNotInitialized)?(
+				self.inner,
+				param_type.as_ptr() as *const _,
+				name_buf.as_ptr() as *const _,
+				&mut property_set_handle as *mut _,
+			);
+
+			property_set_handle
+		};
+		Ok(ParamProperties(PropertySetHandle::new(
+			property_set_handle,
+			self.property,
+		)))
 	}
 }
 

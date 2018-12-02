@@ -38,16 +38,10 @@ struct MyInstanceData {
 impl Execute for SimplePlugin {
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
-			Action::CreateInstance(effect) => {
-			
-				UNIMPLEMENTED
-			}
+			Action::CreateInstance(effect) => UNIMPLEMENTED,
 
-			Action::DestroyInstance(effect) => {
-			
-				UNIMPLEMENTED
-			}
-			
+			Action::DestroyInstance(effect) => UNIMPLEMENTED,
+
 			Action::DescribeInContext(effect, context) => {
 				info!("DescribeInContext {:?} {:?}", effect, context);
 
@@ -64,6 +58,29 @@ impl Execute for SimplePlugin {
 					mask.set_supported_components(&[ImageComponent::Alpha])?;
 					mask.set_optional(true)?;
 				}
+
+				fn define_scale_param(
+					param_set: &ParamSetHandle,
+					name: &str,
+					label: &str,
+					script_name: &str,
+					hint: &str,
+					parent: Option<&str>,
+				) {
+					let param_props = param_set.param_define(ParamType::Double, name);
+
+					if let Some(parent) = parent {}
+				}
+
+				let param_set = effect.parameter_set()?;
+				define_scale_param(
+					&param_set,
+					"scale",
+					"scale",
+					"scale",
+					"Scales all component in the image",
+					None,
+				);
 
 				OK
 			}

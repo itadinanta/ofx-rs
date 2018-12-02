@@ -7,6 +7,9 @@ pub trait IdentifiedEnum: Sized {
 	fn from_cstring(ofx_value: &CStr) -> Option<Self> {
 		Self::from_bytes(ofx_value.to_bytes_with_nul())
 	}
+	fn as_ptr(&self) -> *const u8 {
+		self.to_bytes().as_ptr()
+	}
 }
 
 // TODO allow mixing
@@ -83,6 +86,72 @@ identified_enum! {
 	pub enum ImageComponent {
 		RGBA,
 		Alpha
+	}
+}
+
+identified_enum! {
+	pub enum ParamType {
+		Integer,
+		Double,
+		Boolean,
+		Choice,
+		RGBA,
+		RGB,
+		Integer2D,
+		Double2D,
+		Double3D,
+		Integer3D,
+		String,
+		Custom,
+		Group,
+		Page,
+		PushButton
+	}
+}
+
+identified_enum! {
+	pub enum ParamDoubleType {
+		Plain,
+		Angle,
+		Scale,
+		Time,
+		AbsoluteTime,
+		X,
+		XAbsolute,
+		Y,
+		YAbsolute,
+		XY,
+		XYAbsolute
+	}
+}
+
+identified_enum! {
+	pub enum ImageField {
+		None,
+		Lower,
+		Upper,
+		Both,
+		Single,
+		Doubled
+	}
+}
+
+identified_enum! {
+	pub enum Image {
+		Opaque,
+		PreMultiplied,
+		UnPreMultiplied
+	}
+}
+
+identified_enum! {
+	pub enum ParamString {
+		IsSingleLine,
+		IsMultiLine,
+		IsFilePath,
+		IsDirectoryPath,
+		IsLabel,
+		IsRichTextFormat
 	}
 }
 
