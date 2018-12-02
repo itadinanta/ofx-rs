@@ -68,6 +68,18 @@ macro_rules! identified_enum {
 }
 
 identified_enum! {
+	pub enum Type {
+		ImageEffectHost,
+		ImageEffect,
+		ImageEffectInstance,
+		Parameter,
+		ParameterInstance,
+		Clip,
+		Image
+	}
+}
+
+identified_enum! {
 	pub enum ImageEffectContext {
 		Filter,
 		General
@@ -85,6 +97,7 @@ identified_enum! {
 identified_enum! {
 	pub enum ImageComponent {
 		RGBA,
+		RGB,
 		Alpha
 	}
 }
