@@ -19,6 +19,7 @@ mod action;
 mod handle;
 mod plugin;
 mod property;
+#[macro_use]
 mod result;
 mod types;
 mod enums;

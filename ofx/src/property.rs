@@ -3,6 +3,8 @@
 use enums::*;
 use handle::*;
 use ofx_sys::*;
+#[macro_use]
+use result;
 use result::*;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
@@ -161,34 +163,6 @@ macro_rules! define_property {
 	};
 }
 
-define_property!(read_only PropAPIVersion as APIVersion: String);
-define_property!(read_only PropType as Type: String);
-define_property!(read_only PropName as Name: String);
-
-define_property!(read_write PropLabel as Label: String, &'static str);
-define_property!(read_write PropShortLabel as ShortLabel: String, &'static str);
-define_property!(read_write PropLongLabel as LongLabel: String, &'static str);
-define_property!(read_write PropPluginDescription as PluginDescription: String, &'static str);
-
-define_property!(read_only PropVersion as Version: String);
-define_property!(read_only PropVersionLabel as VersionLabel: String);
-
-define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool);
-
-pub mod image_effect_plugin {
-	use super::*;
-	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String, &'static str);
-	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool, Bool);
-}
-
-pub mod image_effect {
-	use super::*;
-	define_property!(read_only ImageEffectPropContext as Context: CString);
-	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool, Bool);
-	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString, &'static [u8]);
-	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString, &'static [u8]);
-}
-
 pub trait Getter<R, P>
 where
 	Self: ValueType + Sized,
@@ -201,6 +175,18 @@ where
 	}
 }
 
+macro_rules! to_result {
+	{$ofx_status:expr => $result:expr} => {
+		match $ofx_status {
+			ofx_sys::eOfxStatus_OK => Ok($result),
+			other => Err(Error::from(other)),
+			}
+	};
+	($ofx_status:expr) => {
+		to_result!($ofx_status => ())
+	};
+}
+
 impl<R, P> Getter<R, P> for Int
 where
 	R: Readable + AsProperties,
@@ -209,21 +195,17 @@ where
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
-		let ofx_status = unsafe {
-			(*readable.suite()).propGetInt.map(|getter| {
-				getter(
-					readable.handle(),
-					c_name,
-					index as Int,
-					&mut c_int_out as *mut _,
-				)
-			})
+		let ofx_success = unsafe {
+			(*readable.suite())
+				.propGetInt
+				.ok_or(Error::SuiteNotInitialized)?(
+				readable.handle(),
+				c_name,
+				index as Int,
+				&mut c_int_out as *mut _,
+			)
 		};
-		match ofx_status {
-			Some(ofx_sys::eOfxStatus_OK) => Ok(c_int_out),
-			None => Err(Error::PluginNotReady),
-			Some(other) => Err(Error::from(other)),
-		}
+		to_result! { ofx_success => c_int_out }
 	}
 }
 
@@ -235,21 +217,17 @@ where
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
-		let ofx_status = unsafe {
-			(*readable.suite()).propGetInt.map(|getter| {
-				getter(
-					readable.handle(),
-					c_name,
-					index as Int,
-					&mut c_int_out as *mut _,
-				)
-			})
+		let ofx_success = unsafe {
+			(*readable.suite())
+				.propGetInt
+				.ok_or(Error::SuiteNotInitialized)?(
+				readable.handle(),
+				c_name,
+				index as Int,
+				&mut c_int_out as *mut _,
+			)
 		};
-		match ofx_status {
-			None => Err(Error::PluginNotReady),
-			Some(ofx_sys::eOfxStatus_OK) => Ok(c_int_out != 0),
-			Some(other) => Err(Error::from(other)),
-		}
+		to_result! { ofx_success => c_int_out != 0 }
 	}
 }
 
@@ -261,21 +239,17 @@ where
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_double_out: Double = 0.0;
-		let ofx_status = unsafe {
-			(*readable.suite()).propGetDouble.map(|getter| {
-				getter(
-					readable.handle(),
-					c_name,
-					index as Int,
-					&mut c_double_out as *mut _,
-				)
-			})
+		let ofx_success = unsafe {
+			(*readable.suite())
+				.propGetDouble
+				.ok_or(Error::SuiteNotInitialized)?(
+				readable.handle(),
+				c_name,
+				index as Int,
+				&mut c_double_out as *mut _,
+			)
 		};
-		match ofx_status {
-			None => Err(Error::PluginNotReady),
-			Some(ofx_sys::eOfxStatus_OK) => Ok(c_double_out),
-			Some(other) => Err(Error::from(other)),
-		}
+		to_result! { ofx_success => c_double_out }
 	}
 }
 
@@ -288,19 +262,15 @@ where
 		let c_name = P::name().c_str()?;
 		unsafe {
 			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
-			let ofx_status = (*readable.suite()).propGetString.map(|getter| {
-				getter(
-					readable.handle(),
-					c_name,
-					index as Int,
-					&mut c_ptr_out as *mut _,
-				) as i32
-			});
-			match ofx_status {
-				None => Err(Error::PluginNotReady),
-				Some(ofx_sys::eOfxStatus_OK) => Ok(CStr::from_ptr(c_ptr_out).to_owned()),
-				Some(other) => Err(Error::from(other)),
-			}
+			let ofx_success = (*readable.suite())
+				.propGetString
+				.ok_or(Error::SuiteNotInitialized)?(
+				readable.handle(),
+				c_name,
+				index as Int,
+				&mut c_ptr_out as *mut _,
+			);
+			to_result! { ofx_success => CStr::from_ptr(c_ptr_out).to_owned() }
 		}
 	}
 }
@@ -314,19 +284,15 @@ where
 		let c_name = P::name().c_str()?;
 		unsafe {
 			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
-			let ofx_status = (*readable.suite()).propGetString.map(|getter| {
-				getter(
-					readable.handle(),
-					c_name,
-					index as Int,
-					&mut c_ptr_out as *mut _,
-				) as i32
-			});
-			match ofx_status {
-				None => Err(Error::PluginNotReady),
-				Some(ofx_sys::eOfxStatus_OK) => Ok(CStr::from_ptr(c_ptr_out).to_str()?.to_owned()),
-				Some(other) => Err(Error::from(other)),
-			}
+			let ofx_success = (*readable.suite())
+				.propGetString
+				.ok_or(Error::SuiteNotInitialized)?(
+				readable.handle(),
+				c_name,
+				index as Int,
+				&mut c_ptr_out as *mut _,
+			);
+			to_result! { ofx_success => CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }
 		}
 	}
 }
@@ -375,16 +341,32 @@ where
 		let c_name = P::name().c_str()?;
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
-		let ofx_status = unsafe {
+		to_result! { unsafe {
 			(*writable.suite())
 				.propSetString
-				.map(|setter| setter(writable.handle(), c_name, index as Int, c_ptr_in) as i32)
-		};
-		match ofx_status {
-			Some(ofx_sys::eOfxStatus_OK) => Ok(()),
-			None => Err(Error::PluginNotReady),
-			Some(other) => Err(Error::from(other)),
-		}
+				.ok_or(Error::SuiteNotInitialized)?(writable.handle(), c_name, index as Int, c_ptr_in)
+		}}
+	}
+}
+
+impl<W, P> Setter<W, P> for Bool
+where
+	Self: ValueType + Sized,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>
+	where
+		W: AsProperties,
+		P: Named,
+	{
+		let c_name = P::name().c_str()?;
+		let int_value_in = if value { 1 } else { 0 };
+		to_result! {unsafe {
+			(*writable.suite())
+				.propSetInt
+				.ok_or(Error::SuiteNotInitialized)?(writable.handle(), c_name, index as Int, int_value_in)
+		}}
 	}
 }
 
@@ -429,6 +411,64 @@ macro_rules! can_get_property {
 			self.get::<$property_name>()
 		}
 	}
+}
+
+mod tests {
+	use super::*;
+
+	struct Dummy {}
+	impl Reader<Type> for Dummy {
+		fn get(&self) -> Result<String> {
+			Ok(String::from("bah"))
+		}
+	}
+
+	impl Reader<IsBackground> for Dummy {
+		fn get(&self) -> Result<Bool> {
+			Ok(false)
+		}
+	}
+
+	#[test]
+	fn prop_dummy() {
+		let d = Dummy {};
+		let sv = <Dummy as Reader<IsBackground>>::get(&d);
+	}
+
+}
+
+define_property!(read_only PropAPIVersion as APIVersion: String);
+define_property!(read_only PropType as Type: String);
+define_property!(read_only PropName as Name: String);
+
+define_property!(read_write PropLabel as Label: String, &'static str);
+define_property!(read_write PropShortLabel as ShortLabel: String, &'static str);
+define_property!(read_write PropLongLabel as LongLabel: String, &'static str);
+define_property!(read_write PropPluginDescription as PluginDescription: String, &'static str);
+
+define_property!(read_only PropVersion as Version: String);
+define_property!(read_only PropVersionLabel as VersionLabel: String);
+
+define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool);
+
+pub mod image_effect_plugin {
+	use super::*;
+	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String, &'static str);
+	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool, Bool);
+}
+
+pub mod image_effect {
+	use super::*;
+	define_property!(read_only ImageEffectPropContext as Context: CString);
+	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool, Bool);
+	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString, &'static [u8]);
+	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString, &'static [u8]);
+	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString, &'static [u8]);
+}
+
+pub mod image_clip {
+	use super::*;
+	define_property!(read_write ImageClipPropOptional as Optional: bool, bool);
 }
 
 pub trait CanSetLabel: Writable {
@@ -487,6 +527,18 @@ pub trait CanGetSupportsMultipleClipDepths: Readable {
 	);
 }
 
+pub trait CanSetSupportedComponents: Writable {
+	can_set_property!(
+		set_supported_components,
+		image_effect::SupportedComponents,
+		&[enum ImageComponent]
+	);
+}
+
+pub trait CanSetOptional: Writable {
+	can_set_property!(set_optional, image_clip::Optional, bool);
+}
+
 impl CanGetSupportsMultipleClipDepths for HostHandle {}
 impl CanSetLabel for ImageEffectProperties {}
 impl CanGetLabel for ImageEffectProperties {}
@@ -496,26 +548,5 @@ impl CanSetSupportedContexts for ImageEffectProperties {}
 
 impl CanGetContext for DescribeInContextInArgs {}
 
-mod tests {
-	use super::*;
-
-	struct Dummy {}
-	impl Reader<Type> for Dummy {
-		fn get(&self) -> Result<String> {
-			Ok(String::from("bah"))
-		}
-	}
-
-	impl Reader<IsBackground> for Dummy {
-		fn get(&self) -> Result<Bool> {
-			Ok(false)
-		}
-	}
-
-	#[test]
-	fn prop_dummy() {
-		let d = Dummy {};
-		let sv = <Dummy as Reader<IsBackground>>::get(&d);
-	}
-
-}
+impl CanSetSupportedComponents for ClipProperties {}
+impl CanSetOptional for ClipProperties {}

@@ -22,6 +22,7 @@ pub enum Error {
 	PluginNotReady,
 	HostNotReady,
 	EnumNotFound,
+	SuiteNotInitialized,
 	Unimplemented,
 	UnknownError,
 }

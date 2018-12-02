@@ -116,6 +116,7 @@ macro_rules! properties_newtype {
 
 properties_newtype!(HostProperties);
 properties_newtype!(ImageEffectProperties);
+properties_newtype!(ClipProperties);
 properties_newtype!(DescribeInContextInArgs);
 
 impl DescribeInContextInArgs {}
@@ -125,9 +126,9 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 		let property_set_handle = unsafe {
 			let mut property_set_handle = std::mem::uninitialized();
 
-			(self.image_effect.getPropertySet)
-				.map(|getter| getter(self.inner, &mut property_set_handle as *mut _))
-				.ok_or(0)?;
+			self.image_effect
+				.getPropertySet
+				.ok_or(Error::SuiteNotInitialized)?(self.inner, &mut property_set_handle as *mut _);
 
 			property_set_handle
 		};
@@ -135,6 +136,41 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 			property_set_handle,
 			self.property,
 		)))
+	}
+}
+
+impl ImageEffectHandle {
+	fn clip_properties_by_name(&self, clip_name: &[u8]) -> Result<ClipProperties> {
+		let property_set_handle = unsafe {
+			let mut property_set_handle = std::mem::uninitialized();
+
+			self.image_effect
+				.clipDefine
+				.ok_or(Error::SuiteNotInitialized)?(
+				self.inner,
+				clip_name.as_ptr() as *const i8,
+				&mut property_set_handle as *mut _,
+			);
+
+			property_set_handle
+		};
+		Ok(ClipProperties(PropertySetHandle::new(
+			property_set_handle,
+			self.property,
+		)))
+	}
+
+	pub fn new_output_clip(&self) -> Result<ClipProperties> {
+		self.clip_properties_by_name(ofx_sys::kOfxImageEffectOutputClipName)
+	}
+
+	pub fn new_simple_input_clip(&self) -> Result<ClipProperties> {
+		self.clip_properties_by_name(ofx_sys::kOfxImageEffectOutputClipName)
+	}
+
+	pub fn new_input_clip(&self, name: &str) -> Result<ClipProperties> {
+		let str_buf = CString::new(name)?.into_bytes_with_nul();
+		self.clip_properties_by_name(&str_buf)
 	}
 }
 

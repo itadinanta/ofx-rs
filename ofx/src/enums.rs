@@ -79,6 +79,13 @@ identified_enum! {
 	}
 }
 
+identified_enum! {
+	pub enum ImageComponent {
+		RGBA,
+		Alpha
+	}
+}
+
 mod tests {
 	use super::*;
 	#[test]

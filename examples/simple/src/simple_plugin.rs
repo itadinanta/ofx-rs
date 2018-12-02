@@ -19,10 +19,24 @@ impl SimplePlugin {
 }
 
 impl Execute for SimplePlugin {
-	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
+	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
 			Action::DescribeInContext(effect, context) => {
 				info!("DescribeInContext {:?} {:?}", effect, context);
+
+				let mut output_clip = effect.new_output_clip()?;
+				output_clip
+					.set_supported_components(&[ImageComponent::RGBA, ImageComponent::Alpha])?;
+
+				let mut input_clip = effect.new_simple_input_clip()?;
+				input_clip
+					.set_supported_components(&[ImageComponent::RGBA, ImageComponent::Alpha])?;
+
+				if context == ImageEffectContext::General {
+					let mut mask = effect.new_input_clip("Mask")?;
+					mask.set_supported_components(&[ImageComponent::Alpha])?;
+					mask.set_optional(true)?;
+				}
 
 				UNIMPLEMENTED
 			}
@@ -30,8 +44,11 @@ impl Execute for SimplePlugin {
 			Action::Describe(effect) => {
 				info!("Describe {:?}", effect);
 
-				self.host_supports_multiple_clip_depths =
-					Some(context.get_host().get_supports_multiple_clip_depths()?);
+				self.host_supports_multiple_clip_depths = Some(
+					plugin_context
+						.get_host()
+						.get_supports_multiple_clip_depths()?,
+				);
 
 				let mut effect_properties = effect.properties()?;
 				effect_properties.set_image_effect_plugin_grouping("Ofx-rs")?;
