@@ -18,6 +18,7 @@ pub enum Error {
 	InvalidHandle,
 	InvalidValue,
 	InvalidSuite,
+	InvalidIndex,
 	PluginNotReady,
 	PropertyIndexOutOfBounds,
 	HostNotReady,
@@ -34,11 +35,23 @@ impl From<OfxStatus> for Error {
 	fn from(status: OfxStatus) -> Error {
 		match status {
 			ofx_sys::eOfxStatus_ErrBadHandle => Error::InvalidHandle,
-			ofx_sys::eOfxStatus_ErrBadIndex => Error::UnknownError,
-			ofx_sys::eOfxStatus_ErrValue => Error::UnknownError,
+			ofx_sys::eOfxStatus_ErrBadIndex => Error::InvalidIndex,
+			ofx_sys::eOfxStatus_ErrValue => Error::InvalidValue,
 			_ => Error::UnknownError,
 		}
 	}
+}
+
+macro_rules! to_result {
+	{$ofx_status:expr => $result:expr} => {
+		match $ofx_status {
+			ofx_sys::eOfxStatus_OK => Ok($result),
+			other => Err(Error::from(other)),
+		}
+	};
+	($ofx_status:expr) => {
+		to_result!($ofx_status => ())
+	};
 }
 
 impl From<std::ffi::NulError> for Error {

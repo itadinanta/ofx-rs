@@ -15,24 +15,25 @@ use std::fmt;
 use std::fmt::Display;
 use std::marker::PhantomData;
 
+#[macro_use]
+mod result;
+
 mod action;
+mod enums;
 mod handle;
 mod plugin;
 mod property;
-#[macro_use]
-mod result;
 mod types;
-mod enums;
 #[macro_use]
 mod registry;
 
 pub use action::*;
+pub use enums::*;
 pub use handle::*;
 pub use plugin::*;
 pub use property::*;
 pub use result::*;
 pub use types::*;
-pub use enums::*;
 
 pub use ofx_sys::*;
 use registry::*;

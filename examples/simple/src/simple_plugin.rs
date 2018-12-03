@@ -38,7 +38,17 @@ struct MyInstanceData {
 impl Execute for SimplePlugin {
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
-			Action::CreateInstance(effect) => UNIMPLEMENTED,
+			Action::CreateInstance(effect) => {
+				let mut effect_props = effect.properties()?;
+				let mut param_set = effect.parameter_set()?;
+
+				let context = effect_props.get_context()?;
+				let is_general_effect = context == ImageEffectContext::General;
+
+				let scale_param = param_set.parameter("scaleComponents")?;
+
+				UNIMPLEMENTED
+			}
 
 			Action::DestroyInstance(effect) => UNIMPLEMENTED,
 
@@ -60,7 +70,7 @@ impl Execute for SimplePlugin {
 				}
 
 				fn define_scale_param(
-					param_set: &ParamSetHandle,
+					param_set: &mut ParamSetHandle,
 					name: &str,
 					label: &'static str,
 					script_name: &'static str,
@@ -85,9 +95,9 @@ impl Execute for SimplePlugin {
 					Ok(())
 				}
 
-				let param_set = effect.parameter_set()?;
+				let mut param_set = effect.parameter_set()?;
 				define_scale_param(
-					&param_set,
+					&mut param_set,
 					"scale",
 					"scale",
 					"scale",
@@ -106,7 +116,7 @@ impl Execute for SimplePlugin {
 				param_props.set_label("Components")?;
 
 				define_scale_param(
-					&param_set,
+					&mut param_set,
 					"scaleR",
 					"red",
 					"scaleR",
@@ -114,7 +124,7 @@ impl Execute for SimplePlugin {
 					Some("componentScales"),
 				)?;
 				define_scale_param(
-					&param_set,
+					&mut param_set,
 					"scaleG",
 					"green",
 					"scaleG",
@@ -122,7 +132,7 @@ impl Execute for SimplePlugin {
 					Some("componentScales"),
 				)?;
 				define_scale_param(
-					&param_set,
+					&mut param_set,
 					"scaleB",
 					"blue",
 					"scaleB",
@@ -130,7 +140,7 @@ impl Execute for SimplePlugin {
 					Some("componentScales"),
 				)?;
 				define_scale_param(
-					&param_set,
+					&mut param_set,
 					"scaleA",
 					"alpha",
 					"scaleA",

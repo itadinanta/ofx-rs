@@ -128,6 +128,20 @@ impl ImageEffectHandle {
 	}
 }
 
+impl ParamHandle {
+	pub fn new(
+		inner: OfxParamHandle,
+		property: &'static OfxPropertySuiteV1,
+		parameter: &'static OfxParameterSuiteV1,
+	) -> Self {
+		ParamHandle {
+			inner,
+			property,
+			parameter,
+		}
+	}
+}
+
 #[derive(Clone, Copy)]
 pub struct ImageEffectInstanceHandle {
 	inner: OfxImageEffectHandle,
@@ -183,9 +197,13 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 		let property_set_handle = unsafe {
 			let mut property_set_handle = std::mem::uninitialized();
 
-			self.image_effect
+			to_result!(self
+				.image_effect
 				.getPropertySet
-				.ok_or(Error::SuiteNotInitialized)?(self.inner, &mut property_set_handle as *mut _);
+				.ok_or(Error::SuiteNotInitialized)?(
+				self.inner,
+				&mut property_set_handle as *mut _,
+			))?;
 
 			property_set_handle
 		};
@@ -201,13 +219,14 @@ impl ImageEffectHandle {
 		let property_set_handle = unsafe {
 			let mut property_set_handle = std::mem::uninitialized();
 
-			self.image_effect
+			to_result!(self
+				.image_effect
 				.clipDefine
 				.ok_or(Error::SuiteNotInitialized)?(
 				self.inner,
 				clip_name.as_ptr() as *const i8,
 				&mut property_set_handle as *mut _,
-			);
+			))?;
 
 			property_set_handle
 		};
@@ -221,11 +240,13 @@ impl ImageEffectHandle {
 		let parameters_set_handle = unsafe {
 			let mut parameters_set_handle = std::mem::uninitialized();
 
-			self.image_effect
+			to_result!(self
+				.image_effect
 				.getParamSet
 				.ok_or(Error::SuiteNotInitialized)?(
-				self.inner, &mut parameters_set_handle as *mut _
-			);
+				self.inner,
+				&mut parameters_set_handle as *mut _
+			))?;
 
 			parameters_set_handle
 		};
@@ -263,21 +284,22 @@ impl ParamSetHandle {
 		}
 	}
 
-	fn param_define<T>(&self, param_type: ParamType, name: &str) -> Result<T>
+	fn param_define<T>(&mut self, param_type: ParamType, name: &str) -> Result<T>
 	where
 		T: IsPropertiesNewType,
 	{
 		let name_buf = CString::new(name)?.into_bytes_with_nul();
 		let property_set_handle = unsafe {
 			let mut property_set_handle = std::mem::uninitialized();
-			self.parameter
+			to_result!(self
+				.parameter
 				.paramDefine
 				.ok_or(Error::SuiteNotInitialized)?(
 				self.inner,
 				param_type.as_ptr() as *const _,
 				name_buf.as_ptr() as *const _,
 				&mut property_set_handle as *mut _,
-			);
+			))?;
 
 			property_set_handle
 		};
@@ -287,15 +309,42 @@ impl ParamSetHandle {
 		)))
 	}
 
-	pub fn param_define_double(&self, name: &str) -> Result<ParamDouble> {
+	pub fn parameter(&self, name: &str) -> Result<ParamHandle> {
+		let name_buf = CString::new(name)?.into_bytes_with_nul();
+		let param_handle = unsafe {
+			let mut param_handle = std::mem::uninitialized();
+			to_result!(self
+				.parameter
+				.paramGetHandle
+				.ok_or(Error::SuiteNotInitialized)?(
+				self.inner,
+				name_buf.as_ptr() as *const _,
+				&mut param_handle as *mut _,
+				std::ptr::null::<*mut *mut OfxPropertySetHandle>() as *mut _,
+			))?;
+
+			param_handle
+		};
+		Ok(ParamHandle::new(
+			param_handle,
+			self.property,
+			self.parameter,
+		))
+	}
+
+	pub fn param_define_double(&mut self, name: &str) -> Result<ParamDouble> {
 		self.param_define(ParamType::Double, name)
 	}
 
-	pub fn param_define_boolean(&self, name: &str) -> Result<ParamBoolean> {
+	pub fn param_define_int(&mut self, name: &str) -> Result<ParamInt> {
+		self.param_define(ParamType::Integer, name)
+	}
+
+	pub fn param_define_boolean(&mut self, name: &str) -> Result<ParamBoolean> {
 		self.param_define(ParamType::Boolean, name)
 	}
 
-	pub fn param_define_page(&self, name: &str) -> Result<ParamPage> {
+	pub fn param_define_page(&mut self, name: &str) -> Result<ParamPage> {
 		self.param_define(ParamType::Page, name)
 	}
 }
@@ -311,13 +360,14 @@ impl<'a> AsProperties for HostHandle {
 
 mod tests {
 	use super::*;
+	use property;
 	use property::*;
-	// do not run, just compile!
 
+	// do not run, just compile!
 	fn prop_host() {
 		let mut handle = ImageEffectProperties(PropertySetHandle::empty());
 
-		handle.get::<Type>();
-		handle.get::<IsBackground>();
+		handle.get::<property::Type>();
+		handle.get::<property::IsBackground>();
 	}
 }

@@ -3,7 +3,6 @@
 use enums::*;
 use handle::*;
 use ofx_sys::*;
-#[macro_use]
 use result;
 use result::*;
 use std::ffi::{CStr, CString};
@@ -173,18 +172,6 @@ where
 	fn get(readable: &R) -> Result<Self> {
 		Self::get_at(readable, 0)
 	}
-}
-
-macro_rules! to_result {
-	{$ofx_status:expr => $result:expr} => {
-		match $ofx_status {
-			ofx_sys::eOfxStatus_OK => Ok($result),
-			other => Err(Error::from(other)),
-			}
-	};
-	($ofx_status:expr) => {
-		to_result!($ofx_status => ())
-	};
 }
 
 impl<R, P> Getter<R, P> for Int
@@ -453,13 +440,13 @@ mod tests {
 	use super::*;
 
 	struct Dummy {}
-	impl Reader<Type> for Dummy {
+	impl Reader<super::Type> for Dummy {
 		fn get(&self) -> Result<String> {
 			Ok(String::from("bah"))
 		}
 	}
 
-	impl Reader<IsBackground> for Dummy {
+	impl Reader<super::IsBackground> for Dummy {
 		fn get(&self) -> Result<Bool> {
 			Ok(false)
 		}
@@ -637,6 +624,7 @@ impl CanGetSupportsMultipleClipDepths for HostHandle {}
 impl CanSetLabel for ImageEffectProperties {}
 impl CanSetLabels for ImageEffectProperties {}
 impl CanGetLabel for ImageEffectProperties {}
+impl CanGetContext for ImageEffectProperties {}
 impl CanSetGrouping for ImageEffectProperties {}
 impl CanSetSupportedPixelDepths for ImageEffectProperties {}
 impl CanSetSupportedContexts for ImageEffectProperties {}
