@@ -270,8 +270,8 @@ impl PluginDescriptor {
 		global_add!(SyncPrivateData);
 		global_add!(CreateInstance);
 		global_add!(DestroyInstance);
-		global_add!(InstanceChanged);
 		global_add!(BeginInstanceChanged);
+		global_add!(InstanceChanged);
 		global_add!(EndInstanceChanged);
 		global_add!(BeginInstanceEdit);
 		global_add!(EndInstanceEdit);
@@ -299,8 +299,8 @@ impl PluginDescriptor {
 		image_effect_add!(GetFramesNeeded);
 		image_effect_add!(GetClipPreferences);
 		image_effect_add!(IsIdentity);
-		image_effect_add!(Render);
 		image_effect_add!(BeginSequenceRender);
+		image_effect_add!(Render);
 		image_effect_add!(EndSequenceRender);
 		image_effect_add!(DescribeInContext);
 		image_effect_add!(GetInverseDistortion);

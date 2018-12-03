@@ -134,10 +134,20 @@ pub struct ImageEffectInstanceHandle {
 	property: &'static OfxPropertySuiteV1,
 }
 
+trait IsPropertiesNewType {
+	fn new(inner: PropertySetHandle) -> Self;
+}
+
 macro_rules! properties_newtype {
 	($name:ident) => {
 		#[derive(Clone)]
 		pub struct $name(PropertySetHandle);
+
+		impl IsPropertiesNewType for $name {
+			fn new(inner: PropertySetHandle) -> Self {
+				$name(inner)
+			}
+		}
 
 		impl $name {
 			pub fn new(host: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
@@ -159,8 +169,12 @@ macro_rules! properties_newtype {
 properties_newtype!(HostProperties);
 properties_newtype!(ImageEffectProperties);
 properties_newtype!(ClipProperties);
-properties_newtype!(ParamProperties);
 properties_newtype!(DescribeInContextInArgs);
+
+properties_newtype!(ParamDouble);
+properties_newtype!(ParamInt);
+properties_newtype!(ParamBoolean);
+properties_newtype!(ParamPage);
 
 impl DescribeInContextInArgs {}
 
@@ -249,7 +263,10 @@ impl ParamSetHandle {
 		}
 	}
 
-	pub fn param_define(&self, param_type: ParamType, name: &str) -> Result<ParamProperties> {
+	fn param_define<T>(&self, param_type: ParamType, name: &str) -> Result<T>
+	where
+		T: IsPropertiesNewType,
+	{
 		let name_buf = CString::new(name)?.into_bytes_with_nul();
 		let property_set_handle = unsafe {
 			let mut property_set_handle = std::mem::uninitialized();
@@ -264,10 +281,22 @@ impl ParamSetHandle {
 
 			property_set_handle
 		};
-		Ok(ParamProperties(PropertySetHandle::new(
+		Ok(T::new(PropertySetHandle::new(
 			property_set_handle,
 			self.property,
 		)))
+	}
+
+	pub fn param_define_double(&self, name: &str) -> Result<ParamDouble> {
+		self.param_define(ParamType::Double, name)
+	}
+
+	pub fn param_define_boolean(&self, name: &str) -> Result<ParamBoolean> {
+		self.param_define(ParamType::Boolean, name)
+	}
+
+	pub fn param_define_page(&self, name: &str) -> Result<ParamPage> {
+		self.param_define(ParamType::Page, name)
 	}
 }
 

@@ -59,7 +59,8 @@ macro_rules! identified_enum {
 			}
 
 			fn from_bytes(ofx_name: &[u8]) -> Option<Self> {
-				$(if ofx_name == concat_idents!(kOfx, $name, $key) { Some($name::$key) } else)
+				// TODO: use PHF or some sort of hashing
+				$(if ofx_name == &concat_idents!(kOfx, $name, $key)[..] { Some($name::$key) } else)
 				*
 				{ None }
 			}
@@ -167,6 +168,15 @@ identified_enum! {
 		IsRichTextFormat
 	}
 }
+
+identified_enum! {
+	pub enum ParamInvalidate {
+		All,
+		ValueChangeToEnd
+		//ValueChangeToEnd
+	}
+}
+
 
 mod tests {
 	use super::*;

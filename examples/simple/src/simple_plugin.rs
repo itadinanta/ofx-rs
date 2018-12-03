@@ -62,14 +62,26 @@ impl Execute for SimplePlugin {
 				fn define_scale_param(
 					param_set: &ParamSetHandle,
 					name: &str,
-					label: &str,
-					script_name: &str,
-					hint: &str,
-					parent: Option<&str>,
-				) {
-					let param_props = param_set.param_define(ParamType::Double, name);
+					label: &'static str,
+					script_name: &'static str,
+					hint: &'static str,
+					parent: Option<&'static str>,
+				) -> Result<()> {
+					let mut param_props = param_set.param_define_double(name)?;
 
-					if let Some(parent) = parent {}
+					param_props.set_double_type(ParamDoubleType::Scale)?;
+					param_props.set_default(1.0)?;
+					param_props.set_display_min(1.0)?;
+					param_props.set_display_min(1.0)?;
+					param_props.set_display_max(100.0)?;
+					param_props.set_hint(hint)?;
+					param_props.set_script_name(script_name)?;
+
+					if let Some(parent) = parent {
+						param_props.set_parent(parent)?;
+					}
+
+					Ok(())
 				}
 
 				let param_set = effect.parameter_set()?;
@@ -80,7 +92,60 @@ impl Execute for SimplePlugin {
 					"scale",
 					"Scales all component in the image",
 					None,
-				);
+				)?;
+
+				let mut param_props = param_set.param_define_boolean("scaleComponents")?;
+				param_props.set_default(false)?;
+				param_props.set_hint("Enables scale on individual components")?;
+				param_props.set_script_name("scaleComponents")?;
+				param_props.set_label("Scale Individual Components")?;
+
+				let mut param_props = param_set.param_define_boolean("componentScales")?;
+				param_props.set_hint("Scales on the individual component")?;
+				param_props.set_label("Components")?;
+
+				define_scale_param(
+					&param_set,
+					"scaleR",
+					"red",
+					"scaleR",
+					"Scales the red component of the image",
+					Some("componentScales"),
+				)?;
+				define_scale_param(
+					&param_set,
+					"scaleG",
+					"green",
+					"scaleG",
+					"Scales the green component of the image",
+					Some("componentScales"),
+				)?;
+				define_scale_param(
+					&param_set,
+					"scaleB",
+					"blue",
+					"scaleB",
+					"Scales the blue component of the image",
+					Some("componentScales"),
+				)?;
+				define_scale_param(
+					&param_set,
+					"scaleA",
+					"alpha",
+					"scaleA",
+					"Scales the alpha component of the image",
+					Some("componentScales"),
+				)?;
+
+				let mut param_props = param_set.param_define_page("Main")?;
+				param_props.set_children(&[
+					"scale",
+					"scaleComponents",
+					"scaleR",
+					"scaleG",
+					"scaleB",
+					"scaleA",
+				])?;
 
 				OK
 			}

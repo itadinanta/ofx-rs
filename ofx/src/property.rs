@@ -370,6 +370,26 @@ where
 	}
 }
 
+impl<W, P> Setter<W, P> for Double
+where
+	Self: ValueType + Sized,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>
+	where
+		W: AsProperties,
+		P: Named,
+	{
+		let c_name = P::name().c_str()?;
+		to_result! {unsafe {
+			(*writable.suite())
+				.propSetDouble
+				.ok_or(Error::SuiteNotInitialized)?(writable.handle(), c_name, index as Int, value)
+		}}
+	}
+}
+
 trait Reader<R>
 where
 	R: Named + Get,
@@ -379,7 +399,7 @@ where
 
 macro_rules! can_set_property {
 	($function_name: ident, $property_name:path) => {
-		can_set_property($function_name, $property_name, <$property_name as Set>::ValueType);
+		can_set_property!($function_name, $property_name, <$property_name as Set>::ValueType);
 	};
 
 	($function_name: ident, $property_name:path, &[enum $enum_value_type:ty]) => {
@@ -391,11 +411,27 @@ macro_rules! can_set_property {
 		}
 	};
 
+	($function_name: ident, $property_name:path, &[$value_type:ty]) => {
+		fn $function_name(&mut self, values: &[$value_type]) -> Result<()> {
+			for (index, value) in values.iter().enumerate() {
+				self.set_at::<$property_name>(index, value)?;
+			}
+			Ok(())
+		}
+	};
+
+	($function_name: ident, $property_name:path, enum $enum_value_type:ty) => {
+		fn $function_name(&mut self, value: $enum_value_type) -> Result<()> {
+			self.set::<$property_name>(value.to_bytes())
+		}
+	};
+
 	($function_name: ident, $property_name:path, $value_type:ty) => {
 		fn $function_name<S>(&mut self, value: S) -> Result<()> where S: Into<$value_type> {
 			self.set::<$property_name>(value.into())
 		}
 	};
+
 }
 
 macro_rules! can_get_property {
@@ -471,8 +507,33 @@ pub mod image_clip {
 	define_property!(read_write ImageClipPropOptional as Optional: bool, bool);
 }
 
+pub mod param {
+	use super::*;
+	define_property!(read_write ParamPropHint as Hint: String, &'static str);
+	define_property!(read_write ParamPropParent as Parent: String, &'static str);
+	define_property!(read_write ParamPropScriptName as ScriptName: String, &'static str);
+	pub mod double {
+		use super::super::*;
+		define_property!(read_write ParamPropDoubleType as DoubleType: CString,  &'static [u8]);
+		define_property!(read_write ParamPropDefault as Default: f64, f64);
+		define_property!(read_write ParamPropDisplayMax as DisplayMax: f64, f64);
+		define_property!(read_write ParamPropDisplayMin as DisplayMin: f64, f64);
+	}
+	pub mod boolean {
+		use super::super::*;
+		define_property!(read_write ParamPropDefault as Default: bool, bool);
+	}
+	pub mod page {
+		use super::super::*;
+		define_property!(read_write ParamPropPageChild as Child: String, &'static str);
+	}
+}
+
 pub trait CanSetLabel: Writable {
 	can_set_property!(set_label, Label, &'static str);
+}
+
+pub trait CanSetLabels: Writable + CanSetLabel {
 	can_set_property!(set_short_label, ShortLabel, &'static str);
 	can_set_property!(set_long_label, LongLabel, &'static str);
 	fn set_labels(
@@ -539,8 +600,42 @@ pub trait CanSetOptional: Writable {
 	can_set_property!(set_optional, image_clip::Optional, bool);
 }
 
+pub trait CanSetHint: Writable {
+	can_set_property!(set_hint, param::Hint, &'static str);
+}
+
+pub trait CanSetParent: Writable {
+	can_set_property!(set_parent, param::Parent, &'static str);
+}
+
+pub trait CanSetScriptName: Writable {
+	can_set_property!(set_script_name, param::Parent, &'static str);
+}
+
+pub trait CanSetChildren: Writable {
+	can_set_property!(set_children, param::page::Child, &[&'static str]);
+}
+
+pub trait CanSetDoubleParams: Writable {
+	can_set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
+	can_set_property!(set_default, param::double::Default, f64);
+	can_set_property!(set_display_max, param::double::DisplayMax, f64);
+	can_set_property!(set_display_min, param::double::DisplayMin, f64);
+}
+
+pub trait CanSetBooleanParams: Writable {
+	can_set_property!(set_default, param::boolean::Default, bool);
+}
+
+pub trait BaseParam: CanSetLabel + CanSetHint + CanSetParent + CanSetScriptName {}
+impl<T> CanSetLabel for T where T: BaseParam {}
+impl<T> CanSetHint for T where T: BaseParam {}
+impl<T> CanSetParent for T where T: BaseParam {}
+impl<T> CanSetScriptName for T where T: BaseParam {}
+
 impl CanGetSupportsMultipleClipDepths for HostHandle {}
 impl CanSetLabel for ImageEffectProperties {}
+impl CanSetLabels for ImageEffectProperties {}
 impl CanGetLabel for ImageEffectProperties {}
 impl CanSetGrouping for ImageEffectProperties {}
 impl CanSetSupportedPixelDepths for ImageEffectProperties {}
@@ -550,3 +645,12 @@ impl CanGetContext for DescribeInContextInArgs {}
 
 impl CanSetSupportedComponents for ClipProperties {}
 impl CanSetOptional for ClipProperties {}
+
+impl BaseParam for ParamDouble {}
+impl BaseParam for ParamBoolean {}
+impl BaseParam for ParamPage {}
+
+impl CanSetDoubleParams for ParamDouble {}
+impl CanSetBooleanParams for ParamBoolean {}
+
+impl CanSetChildren for ParamPage {}
