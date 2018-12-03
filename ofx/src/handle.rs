@@ -7,7 +7,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use types::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PropertySetHandle {
 	inner: OfxPropertySetHandle,
 	property: &'static OfxPropertySuiteV1,
@@ -27,13 +27,13 @@ impl PropertySetHandle {
 	}
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct GenericPluginHandle {
 	inner: VoidPtr,
 	property: &'static OfxPropertySuiteV1,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct HostHandle {
 	inner: OfxPropertySetHandle,
 	property: &'static OfxPropertySuiteV1,

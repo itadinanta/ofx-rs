@@ -5,6 +5,7 @@ use result::*;
 use std::collections::HashMap;
 use types::*;
 
+#[derive(Default)]
 pub struct Registry {
 	plugins: Vec<PluginDescriptor>,
 	plugin_modules: HashMap<String, usize>,
@@ -12,10 +13,7 @@ pub struct Registry {
 
 impl Registry {
 	pub fn new() -> Registry {
-		Registry {
-			plugin_modules: HashMap::new(),
-			plugins: Vec::new(),
-		}
+		Self::default()
 	}
 
 	pub fn add(
@@ -76,10 +74,15 @@ impl Registry {
 	}
 }
 
-pub fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
+pub unsafe fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
 	unsafe {
 		get_registry_mut()
-			.dispatch(plugin_module, RawMessage::SetHost { host: *host })
+			.dispatch(
+				plugin_module,
+				RawMessage::SetHost {
+					host: *host,
+				},
+			)
 			.ok();
 	}
 }
@@ -125,7 +128,9 @@ where
 				))
 				.logger(Logger::builder().build("ofx".to_string(), log::LevelFilter::Debug))
 				// TODO: logging needs setting up properly, this is for debugging only
-				.logger(Logger::builder().build("simple_plugin".to_string(), log::LevelFilter::Debug))
+				.logger(
+					Logger::builder().build("simple_plugin".to_string(), log::LevelFilter::Debug),
+				)
 				.build(
 					Root::builder()
 						.appender("stdout".to_string())
@@ -175,7 +180,7 @@ macro_rules! plugin_module {
 		}
 
 		pub extern "C" fn set_host(host: *mut ofx::OfxHost) {
-			ofx::set_host_for_plugin(module_name(), host)
+			unsafe { ofx::set_host_for_plugin(module_name(), host) }
 		}
 
 		pub extern "C" fn main_entry(

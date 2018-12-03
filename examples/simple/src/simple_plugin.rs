@@ -70,6 +70,7 @@ impl Execute for SimplePlugin {
 					let mut param_props = param_set.param_define_double(name)?;
 
 					param_props.set_double_type(ParamDoubleType::Scale)?;
+					param_props.set_label(label)?;
 					param_props.set_default(1.0)?;
 					param_props.set_display_min(1.0)?;
 					param_props.set_display_min(1.0)?;

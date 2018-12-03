@@ -132,7 +132,7 @@ impl Display for PluginDescriptor {
 }
 
 impl MapAction for PluginDescriptor {
-	fn map_action<'a>(
+	fn map_action(
 		&self,
 		action: CharPtr,
 		handle: VoidPtr,
@@ -179,7 +179,7 @@ impl Dispatch for PluginDescriptor {
 	fn dispatch(&mut self, message: RawMessage) -> Result<Int> {
 		match message {
 			RawMessage::SetHost { host } => {
-				self.host = Some(host.clone());
+				self.host = Some(host);
 				OK
 			}
 			RawMessage::MainEntry {
@@ -198,7 +198,7 @@ impl Dispatch for PluginDescriptor {
 					Err(e) => Err(e),
 				}?;
 
-				if let Some(host) = self.host.clone() {
+				if let Some(host) = self.host {
 					if let Some(suites) = self.suites.clone() {
 						let plugin_context = PluginContext {
 							host: HostHandle::new(host.host, &*suites.property),
@@ -367,7 +367,7 @@ impl PluginDescriptor {
 						.as_ptr(),
 						$suite_version,
 						);
-					if suiteptr == std::ptr::null() {
+					if suiteptr.is_null() {
 						error!("Failed to load {}", stringify!($suite_name));
 						None
 					} else {
