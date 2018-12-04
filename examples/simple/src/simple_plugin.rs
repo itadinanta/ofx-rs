@@ -22,7 +22,7 @@ struct MyInstanceData {
 	is_general_effect: bool,
 
 	source_clip: ImageClipHandle,
-	mask_clip: ImageClipHandle,
+	mask_clip: Option<ImageClipHandle>,
 	output_clip: ImageClipHandle,
 
 	scale_param: ParamHandle,
@@ -45,12 +45,46 @@ impl Execute for SimplePlugin {
 				let context = effect_props.get_context()?;
 				let is_general_effect = context == ImageEffectContext::General;
 
-				let scale_param = param_set.parameter("scaleComponents")?;
+				let per_component_scale_param = param_set.parameter("scale")?;
 
-				UNIMPLEMENTED
+				let source_clip = effect.get_simple_input_clip()?;
+				let output_clip = effect.get_output_clip()?;
+				let mask_clip = if is_general_effect {
+					Some(effect.get_clip("Mask")?)
+				} else {
+					None
+				};
+
+				let scale_param = param_set.parameter("scale")?;
+				let scale_r_param = param_set.parameter("scaleR")?;
+				let scale_g_param = param_set.parameter("scaleG")?;
+				let scale_b_param = param_set.parameter("scaleB")?;
+				let scale_a_param = param_set.parameter("scaleA")?;
+
+				let my_instance_data = Box::new(MyInstanceData {
+					is_general_effect,
+					source_clip,
+					mask_clip,
+					output_clip,
+					per_component_scale_param,
+					scale_param,
+					scale_r_param,
+					scale_g_param,
+					scale_b_param,
+					scale_a_param,
+				});
+
+				effect_props.set_instance_data(my_instance_data);
+
+				OK
 			}
 
-			Action::DestroyInstance(effect) => UNIMPLEMENTED,
+			Action::DestroyInstance(effect) => {
+				let mut effect_props = effect.properties()?;
+				effect_props.drop_instance_data()?;
+
+				OK
+			}
 
 			Action::DescribeInContext(effect, context) => {
 				info!("DescribeInContext {:?} {:?}", effect, context);
