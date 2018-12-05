@@ -11,6 +11,8 @@ use std::ffi::{CStr, CString};
 use std::fmt;
 use std::fmt::Display;
 use types::*;
+use suites::*;
+use std::rc::Rc;
 
 pub struct ApiVersion(pub Int);
 pub struct PluginVersion(pub UnsignedInt, pub UnsignedInt);
@@ -56,22 +58,6 @@ where
 		let key = cstr.into_string().ok()?;
 		self.map.get(&key).cloned()
 	}
-}
-
-#[derive(Clone)]
-pub struct Suites {
-	image_effect: &'static OfxImageEffectSuiteV1,
-	property: &'static OfxPropertySuiteV1,
-	parameter: &'static OfxParameterSuiteV1,
-	memory: &'static OfxMemorySuiteV1,
-	multi_thread: &'static OfxMultiThreadSuiteV1,
-	message: &'static OfxMessageSuiteV1,
-	message_v2: Option<&'static OfxMessageSuiteV2>,
-	progress: &'static OfxProgressSuiteV1,
-	progress_v2: Option<&'static OfxProgressSuiteV2>,
-	time_line: &'static OfxTimeLineSuiteV1,
-	parametric_parameter: Option<&'static OfxParametricParameterSuiteV1>,
-	image_effect_opengl_render: Option<&'static OfxImageEffectOpenGLRenderSuiteV1>,
 }
 
 #[derive(Debug)]
@@ -193,15 +179,15 @@ impl Dispatch for PluginDescriptor {
 				match mapped_action {
 					Ok(Action::Load) => self.load(),
 					Ok(Action::Unload) => self.unload(),
-					Ok(Action::Describe(handle)) => self.describe(handle),
-					_ => Ok(0),
+					Ok(Action::Describe(ref handle)) => self.describe(handle.clone()),
+					Ok(_) => Ok(0),
 					Err(e) => Err(e),
 				}?;
 
 				if let Some(host) = self.host {
 					if let Some(suites) = self.suites.clone() {
 						let plugin_context = PluginContext {
-							host: HostHandle::new(host.host, &*suites.property),
+							host: HostHandle::new(host.host, suites.property()),
 							suites: suites.clone(),
 						};
 						self.execute(&plugin_context, &mut mapped_action?)
@@ -327,9 +313,10 @@ impl PluginDescriptor {
 	}
 
 	fn new_image_effect(&self, handle: VoidPtr) -> Result<ImageEffectHandle> {
-		let property_suite = self.suites()?.property;
-		let image_effect_suite = self.suites()?.image_effect;
-		let parameter_suite = self.suites()?.parameter;
+		let suites = self.suites()?;
+		let property_suite = suites.property();
+		let image_effect_suite = suites.image_effect();
+		let parameter_suite = suites.parameter();
 		Ok(ImageEffectHandle::new(
 			handle,
 			property_suite,
@@ -340,9 +327,9 @@ impl PluginDescriptor {
 
 	fn new_typed_properties<T, F>(&self, constructor: F, handle: OfxPropertySetHandle) -> Result<T>
 	where
-		F: Fn(OfxPropertySetHandle, &'static OfxPropertySuiteV1) -> T,
+		F: Fn(OfxPropertySetHandle, Rc<OfxPropertySuiteV1>) -> T,
 	{
-		let property_suite = self.suites()?.property;
+		let property_suite = self.suites()?.property();
 		Ok(constructor(handle, property_suite))
 	}
 
@@ -377,7 +364,7 @@ impl PluginDescriptor {
 							suiteptr
 						);
 						unsafe {
-							Some(&*unsafe {
+							Some(*unsafe {
 								suiteptr
 									as *const concat_idents!(
 										Ofx,
@@ -392,21 +379,21 @@ impl PluginDescriptor {
 			};
 		};
 
-		let suites = Suites {
-			image_effect: fetch_suite!(ImageEffect, V1).ok_or(Error::InvalidSuite)?,
-			property: fetch_suite!(Property, V1).ok_or(Error::InvalidSuite)?,
-			parameter: fetch_suite!(Parameter, V1).ok_or(Error::InvalidSuite)?,
-			memory: fetch_suite!(Memory, V1).ok_or(Error::InvalidSuite)?,
-			multi_thread: fetch_suite!(MultiThread, V1).ok_or(Error::InvalidSuite)?,
-			message: fetch_suite!(Message, V1).ok_or(Error::InvalidSuite)?,
-			message_v2: fetch_suite!(Message, V2),
-			progress: fetch_suite!(Progress, V1).ok_or(Error::InvalidSuite)?,
-			progress_v2: fetch_suite!(Progress, V2),
+		let suites = Suites::new(
+			fetch_suite!(ImageEffect, V1).ok_or(Error::InvalidSuite)?,
+			fetch_suite!(Property, V1).ok_or(Error::InvalidSuite)?,
+			fetch_suite!(Parameter, V1).ok_or(Error::InvalidSuite)?,
+			fetch_suite!(Memory, V1).ok_or(Error::InvalidSuite)?,
+			fetch_suite!(MultiThread, V1).ok_or(Error::InvalidSuite)?,
+			fetch_suite!(Message, V1).ok_or(Error::InvalidSuite)?,
+			fetch_suite!(Message, V2),
+			fetch_suite!(Progress, V1).ok_or(Error::InvalidSuite)?,
+			fetch_suite!(Progress, V2),
 
-			time_line: fetch_suite!(TimeLine, V1).ok_or(Error::InvalidSuite)?,
-			parametric_parameter: fetch_suite!(ParametricParameter, V1),
-			image_effect_opengl_render: fetch_suite!(ImageEffectOpenGLRender, V1),
-		};
+			fetch_suite!(TimeLine, V1).ok_or(Error::InvalidSuite)?,
+			fetch_suite!(ParametricParameter, V1),
+			fetch_suite!(ImageEffectOpenGLRender, V1),
+		);
 		self.suites = Some(suites);
 		info!("Loaded plugin");
 		OK

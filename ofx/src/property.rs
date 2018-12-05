@@ -11,7 +11,7 @@ use types::*;
 
 pub trait AsProperties {
 	fn handle(&self) -> OfxPropertySetHandle;
-	fn suite(&self) -> *const OfxPropertySuiteV1;
+	unsafe fn suite(&self) -> *const OfxPropertySuiteV1;
 }
 
 pub trait HasProperties<T>

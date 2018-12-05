@@ -38,7 +38,7 @@ struct MyInstanceData {
 impl Execute for SimplePlugin {
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
-			Action::CreateInstance(effect) => {
+			Action::CreateInstance(ref mut effect) => {
 				let mut effect_props = effect.properties()?;
 				let mut param_set = effect.parameter_set()?;
 
@@ -61,7 +61,7 @@ impl Execute for SimplePlugin {
 				let scale_b_param = param_set.parameter("scaleB")?;
 				let scale_a_param = param_set.parameter("scaleA")?;
 
-				let my_instance_data = Box::new(MyInstanceData {
+				effect.set_instance_data(MyInstanceData {
 					is_general_effect,
 					source_clip,
 					mask_clip,
@@ -72,21 +72,18 @@ impl Execute for SimplePlugin {
 					scale_g_param,
 					scale_b_param,
 					scale_a_param,
-				});
-
-				//effect_props.set_instance_data(my_instance_data)?;
+				})?;
 
 				UNIMPLEMENTED
 			}
 
-			Action::DestroyInstance(effect) => {
-				let mut effect_props = effect.properties()?;
-				//effect_props.drop_instance_data()?;
+			Action::DestroyInstance(ref mut effect) => {
+				effect.drop_instance_data()?;
 
 				OK
 			}
 
-			Action::DescribeInContext(effect, context) => {
+			Action::DescribeInContext(ref mut effect, context) => {
 				info!("DescribeInContext {:?} {:?}", effect, context);
 
 				let mut output_clip = effect.new_output_clip()?;
@@ -195,7 +192,7 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::Describe(effect) => {
+			Action::Describe(ref mut effect) => {
 				info!("Describe {:?}", effect);
 
 				self.host_supports_multiple_clip_depths = Some(

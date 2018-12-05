@@ -2,19 +2,21 @@ use enums::*;
 use ofx_sys::*;
 use property::*;
 use result::*;
+use std::borrow::Borrow;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::marker::PhantomData;
+use std::rc::Rc;
 use types::*;
 
 #[derive(Debug, Clone)]
 pub struct PropertySetHandle {
 	inner: OfxPropertySetHandle,
-	property: &'static OfxPropertySuiteV1,
+	property: Rc<OfxPropertySuiteV1>,
 }
 
 impl PropertySetHandle {
-	pub(crate) fn new(inner: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
+	pub(crate) fn new(inner: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> Self {
 		PropertySetHandle { inner, property }
 	}
 
@@ -22,7 +24,7 @@ impl PropertySetHandle {
 		panic!("Do not use, only for type validation testing");
 		PropertySetHandle {
 			inner: std::ptr::null::<OfxPropertySetStruct>() as *mut _,
-			property: unsafe { &*std::ptr::null() },
+			property: unsafe { Rc::new(*std::ptr::null()) },
 		}
 	}
 }
@@ -36,11 +38,11 @@ pub struct GenericPluginHandle {
 #[derive(Clone)]
 pub struct HostHandle {
 	inner: OfxPropertySetHandle,
-	property: &'static OfxPropertySuiteV1,
+	property: Rc<OfxPropertySuiteV1>,
 }
 
 impl HostHandle {
-	pub fn new(host: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
+	pub fn new(host: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> Self {
 		HostHandle {
 			inner: host,
 			property,
@@ -48,12 +50,12 @@ impl HostHandle {
 	}
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ImageEffectHandle {
 	inner: OfxImageEffectHandle,
-	property: &'static OfxPropertySuiteV1,
-	image_effect: &'static OfxImageEffectSuiteV1,
-	parameter: &'static OfxParameterSuiteV1,
+	property: Rc<OfxPropertySuiteV1>,
+	image_effect: Rc<OfxImageEffectSuiteV1>,
+	parameter: Rc<OfxParameterSuiteV1>,
 }
 
 #[derive(Clone, Copy)]
@@ -61,18 +63,18 @@ pub struct ImageClipHandle {
 	inner: OfxImageClipHandle,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ParamHandle {
 	inner: OfxParamHandle,
-	property: &'static OfxPropertySuiteV1,
-	parameter: &'static OfxParameterSuiteV1,
+	property: Rc<OfxPropertySuiteV1>,
+	parameter: Rc<OfxParameterSuiteV1>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ParamSetHandle {
 	inner: OfxParamSetHandle,
-	property: &'static OfxPropertySuiteV1,
-	parameter: &'static OfxParameterSuiteV1,
+	property: Rc<OfxPropertySuiteV1>,
+	parameter: Rc<OfxParameterSuiteV1>,
 }
 
 // TODO: custom_derive?
@@ -115,9 +117,9 @@ impl fmt::Debug for HostHandle {
 impl ImageEffectHandle {
 	pub fn new(
 		ptr: VoidPtr,
-		property: &'static OfxPropertySuiteV1,
-		image_effect: &'static OfxImageEffectSuiteV1,
-		parameter: &'static OfxParameterSuiteV1,
+		property: Rc<OfxPropertySuiteV1>,
+		image_effect: Rc<OfxImageEffectSuiteV1>,
+		parameter: Rc<OfxParameterSuiteV1>,
 	) -> Self {
 		ImageEffectHandle {
 			inner: unsafe { ptr as OfxImageEffectHandle },
@@ -131,8 +133,8 @@ impl ImageEffectHandle {
 impl ParamHandle {
 	pub fn new(
 		inner: OfxParamHandle,
-		property: &'static OfxPropertySuiteV1,
-		parameter: &'static OfxParameterSuiteV1,
+		property: Rc<OfxPropertySuiteV1>,
+		parameter: Rc<OfxParameterSuiteV1>,
 	) -> Self {
 		ParamHandle {
 			inner,
@@ -170,7 +172,7 @@ macro_rules! properties_newtype {
 		}
 
 		impl $name {
-			pub fn new(host: OfxPropertySetHandle, property: &'static OfxPropertySuiteV1) -> Self {
+			pub fn new(host: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> Self {
 				$name(PropertySetHandle::new(host, property))
 			}
 		}
@@ -179,8 +181,8 @@ macro_rules! properties_newtype {
 			fn handle(&self) -> OfxPropertySetHandle {
 				self.0.inner
 			}
-			fn suite(&self) -> *const OfxPropertySuiteV1 {
-				self.0.property
+			unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
+				self.0.property.borrow() as *const _
 			}
 		}
 	};
@@ -215,7 +217,7 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 		};
 		Ok(ImageEffectProperties(PropertySetHandle::new(
 			property_set_handle,
-			self.property,
+			self.property.clone(),
 		)))
 	}
 }
@@ -238,7 +240,7 @@ impl ImageEffectHandle {
 		};
 		Ok(ClipProperties(PropertySetHandle::new(
 			property_set_handle,
-			self.property,
+			self.property.clone(),
 		)))
 	}
 
@@ -274,8 +276,8 @@ impl ImageEffectHandle {
 		};
 		Ok(ParamSetHandle::new(
 			parameters_set_handle,
-			self.parameter,
-			self.property,
+			self.parameter.clone(),
+			self.property.clone(),
 		))
 	}
 
@@ -309,33 +311,76 @@ impl ImageEffectHandle {
 		Err(Error::Unimplemented)
 	}
 
-	pub fn set_instance_data<T>(&mut self, instance_data: Box<T>) -> Result<()>
+	pub fn set_instance_data<T>(&mut self, data: T) -> Result<()>
 	where
 		T: Sized,
 	{
-		Err(Error::Unimplemented)
+		let mut effect_props = self.properties()?;
+		let data_box = Box::new(data);
+		let mutator = self
+			.property
+			.propSetPointer
+			.ok_or(Error::SuiteNotInitialized)?;
+		let data_ptr = Box::into_raw(data_box);
+		unsafe {
+			let status = to_result!(mutator(
+				effect_props.0.inner,
+				kOfxPropInstanceData.as_ptr() as *const i8,
+				0,
+				data_ptr as *mut _,
+			));
+			if status.is_err() {
+				Box::from_raw(data_ptr);
+			}
+			status
+		}
 	}
 
-	pub fn get_instance_data<T>(&mut self) -> Result<Box<T>>
-	where
-		T: Sized,
-	{
-		Err(Error::Unimplemented)
+	unsafe fn get_instance_data_ptr(&mut self) -> Result<VoidPtrMut> {
+		let mut effect_props = self.properties()?;
+		let accessor = self
+			.property
+			.propGetPointer
+			.ok_or(Error::SuiteNotInitialized)?;
+		unsafe {
+			let mut data_ptr = std::mem::uninitialized();
+
+			to_result! { accessor(
+				effect_props.0.inner,
+				kOfxPropInstanceData.as_ptr() as *const i8,
+				0,
+				&mut data_ptr,
+			) => data_ptr }
+		}
 	}
 
-	pub fn drop_instance_data<T>(&mut self) -> Result<()>
+	pub fn get_instance_data<T>(&mut self) -> Result<&mut T>
 	where
 		T: Sized,
 	{
-		Err(Error::Unimplemented)
+		unsafe {
+			let mut ptr = self.get_instance_data_ptr()?;
+			let mut reference = ptr as *mut T;
+			Ok(&mut *reference)
+		}
+	}
+
+	pub fn drop_instance_data(&mut self) -> Result<()> {
+		unsafe {
+			let mut ptr = self.get_instance_data_ptr()?;
+			if !ptr.is_null() {
+				Box::from_raw(ptr);
+			}
+		}
+		Ok(())
 	}
 }
 
 impl ParamSetHandle {
 	pub fn new(
 		inner: OfxParamSetHandle,
-		parameter: &'static OfxParameterSuiteV1,
-		property: &'static OfxPropertySuiteV1,
+		parameter: Rc<OfxParameterSuiteV1>,
+		property: Rc<OfxPropertySuiteV1>,
 	) -> Self {
 		ParamSetHandle {
 			inner,
@@ -365,7 +410,7 @@ impl ParamSetHandle {
 		};
 		Ok(T::new(PropertySetHandle::new(
 			property_set_handle,
-			self.property,
+			self.property.clone(),
 		)))
 	}
 
@@ -387,8 +432,8 @@ impl ParamSetHandle {
 		};
 		Ok(ParamHandle::new(
 			param_handle,
-			self.property,
-			self.parameter,
+			self.property.clone(),
+			self.parameter.clone(),
 		))
 	}
 
@@ -413,8 +458,8 @@ impl<'a> AsProperties for HostHandle {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner
 	}
-	fn suite(&self) -> *const OfxPropertySuiteV1 {
-		self.property
+	unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
+		self.property.borrow() as *const _
 	}
 }
 

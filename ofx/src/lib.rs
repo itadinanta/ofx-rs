@@ -18,6 +18,8 @@ use std::marker::PhantomData;
 #[macro_use]
 mod result;
 
+#[macro_use]
+mod suites;
 mod action;
 mod enums;
 mod handle;
