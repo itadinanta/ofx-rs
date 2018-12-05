@@ -54,6 +54,13 @@ macro_rules! to_result {
 	};
 }
 
+macro_rules! suite_call {
+	($function:ident in $suite:expr) => {
+		unsafe { ($suite).$function.ok_or(Error::SuiteNotInitialized)? }
+	};
+}
+
+
 impl From<std::ffi::NulError> for Error {
 	fn from(_src: std::ffi::NulError) -> Error {
 		Error::InvalidNameEncoding

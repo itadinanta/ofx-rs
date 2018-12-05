@@ -74,14 +74,14 @@ impl Execute for SimplePlugin {
 					scale_a_param,
 				});
 
-				effect_props.set_instance_data(my_instance_data);
+				//effect_props.set_instance_data(my_instance_data)?;
 
-				OK
+				UNIMPLEMENTED
 			}
 
 			Action::DestroyInstance(effect) => {
 				let mut effect_props = effect.properties()?;
-				effect_props.drop_instance_data()?;
+				//effect_props.drop_instance_data()?;
 
 				OK
 			}
@@ -98,7 +98,7 @@ impl Execute for SimplePlugin {
 					.set_supported_components(&[ImageComponent::RGBA, ImageComponent::Alpha])?;
 
 				if context == ImageEffectContext::General {
-					let mut mask = effect.new_input_clip("Mask")?;
+					let mut mask = effect.new_clip("Mask")?;
 					mask.set_supported_components(&[ImageComponent::Alpha])?;
 					mask.set_optional(true)?;
 				}

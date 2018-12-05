@@ -142,6 +142,12 @@ impl ParamHandle {
 	}
 }
 
+impl ImageClipHandle {
+	pub fn new(inner: OfxImageClipHandle) -> Self {
+		ImageClipHandle { inner }
+	}
+}
+
 #[derive(Clone, Copy)]
 pub struct ImageEffectInstanceHandle {
 	inner: OfxImageEffectHandle,
@@ -215,7 +221,7 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 }
 
 impl ImageEffectHandle {
-	fn clip_properties_by_name(&self, clip_name: &[u8]) -> Result<ClipProperties> {
+	fn clip_define(&self, clip_name: &[u8]) -> Result<ClipProperties> {
 		let property_set_handle = unsafe {
 			let mut property_set_handle = std::mem::uninitialized();
 
@@ -236,14 +242,30 @@ impl ImageEffectHandle {
 		)))
 	}
 
+	fn clip_get_handle(&self, clip_name: &[u8]) -> Result<ImageClipHandle> {
+		let clip_handle = unsafe {
+			let mut clip_handle = std::mem::uninitialized();
+
+			to_result!(self
+				.image_effect
+				.clipGetHandle
+				.ok_or(Error::SuiteNotInitialized)?(
+				self.inner,
+				clip_name.as_ptr() as *const i8,
+				&mut clip_handle as *mut _,
+				std::ptr::null::<*mut OfxImageClipHandle>() as *mut _,
+			))?;
+
+			clip_handle
+		};
+		Ok(ImageClipHandle::new(clip_handle))
+	}
+
 	pub fn parameter_set(&self) -> Result<ParamSetHandle> {
 		let parameters_set_handle = unsafe {
 			let mut parameters_set_handle = std::mem::uninitialized();
 
-			to_result!(self
-				.image_effect
-				.getParamSet
-				.ok_or(Error::SuiteNotInitialized)?(
+			to_result!(suite_call!(getParamSet in self.image_effect)(
 				self.inner,
 				&mut parameters_set_handle as *mut _
 			))?;
@@ -257,17 +279,55 @@ impl ImageEffectHandle {
 		))
 	}
 
+	pub fn get_output_clip(&self) -> Result<ImageClipHandle> {
+		self.clip_get_handle(ofx_sys::kOfxImageEffectOutputClipName)
+	}
+
+	pub fn get_simple_input_clip(&self) -> Result<ImageClipHandle> {
+		self.clip_get_handle(ofx_sys::kOfxImageEffectOutputClipName)
+	}
+
+	pub fn get_clip(&self, name: &str) -> Result<ImageClipHandle> {
+		let str_buf = CString::new(name)?.into_bytes_with_nul();
+		self.clip_get_handle(&str_buf)
+	}
+
 	pub fn new_output_clip(&self) -> Result<ClipProperties> {
-		self.clip_properties_by_name(ofx_sys::kOfxImageEffectOutputClipName)
+		self.clip_define(ofx_sys::kOfxImageEffectOutputClipName)
 	}
 
 	pub fn new_simple_input_clip(&self) -> Result<ClipProperties> {
-		self.clip_properties_by_name(ofx_sys::kOfxImageEffectOutputClipName)
+		self.clip_define(ofx_sys::kOfxImageEffectOutputClipName)
 	}
 
-	pub fn new_input_clip(&self, name: &str) -> Result<ClipProperties> {
+	pub fn new_clip(&self, name: &str) -> Result<ClipProperties> {
 		let str_buf = CString::new(name)?.into_bytes_with_nul();
-		self.clip_properties_by_name(&str_buf)
+		self.clip_define(&str_buf)
+	}
+
+	unsafe fn get_pointer(&self) -> Result<*mut [u8]> {
+		Err(Error::Unimplemented)
+	}
+
+	pub fn set_instance_data<T>(&mut self, instance_data: Box<T>) -> Result<()>
+	where
+		T: Sized,
+	{
+		Err(Error::Unimplemented)
+	}
+
+	pub fn get_instance_data<T>(&mut self) -> Result<Box<T>>
+	where
+		T: Sized,
+	{
+		Err(Error::Unimplemented)
+	}
+
+	pub fn drop_instance_data<T>(&mut self) -> Result<()>
+	where
+		T: Sized,
+	{
+		Err(Error::Unimplemented)
 	}
 }
 

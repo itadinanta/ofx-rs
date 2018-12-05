@@ -99,6 +99,7 @@ impl ValueType for String {}
 impl ValueType for &str {}
 impl ValueType for &[u8] {}
 impl ValueType for CharPtr {}
+impl ValueType for VoidPtr {}
 impl ValueType for CString {}
 
 type StaticName = &'static [u8];
@@ -182,17 +183,12 @@ where
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
-		let ofx_success = unsafe {
-			(*readable.suite())
-				.propGetInt
-				.ok_or(Error::SuiteNotInitialized)?(
-				readable.handle(),
-				c_name,
-				index as Int,
-				&mut c_int_out as *mut _,
-			)
-		};
-		to_result! { ofx_success => c_int_out }
+		to_result! { unsafe { suite_call!(propGetInt in *readable.suite())(
+			readable.handle(),
+			c_name,
+			index as Int,
+			&mut c_int_out as *mut _,
+		)} => c_int_out }
 	}
 }
 
@@ -204,17 +200,29 @@ where
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
-		let ofx_success = unsafe {
-			(*readable.suite())
-				.propGetInt
-				.ok_or(Error::SuiteNotInitialized)?(
-				readable.handle(),
-				c_name,
-				index as Int,
-				&mut c_int_out as *mut _,
-			)
-		};
-		to_result! { ofx_success => c_int_out != 0 }
+		to_result! { unsafe { suite_call!(propGetInt in *readable.suite())(
+			readable.handle(),
+			c_name,
+			index as Int,
+			&mut c_int_out as *mut _,
+		)}  => c_int_out != 0 }
+	}
+}
+
+impl<R, P> Getter<R, P> for VoidPtr
+where
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
+		let c_name = P::name().c_str()?;
+		let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
+		to_result! { unsafe { suite_call!(propGetPointer in *readable.suite())(
+			readable.handle(),
+			c_name,
+			index as Int,
+			&mut c_ptr_out as *mut _,
+		)} => c_ptr_out }
 	}
 }
 
@@ -226,17 +234,12 @@ where
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_double_out: Double = 0.0;
-		let ofx_success = unsafe {
-			(*readable.suite())
-				.propGetDouble
-				.ok_or(Error::SuiteNotInitialized)?(
-				readable.handle(),
-				c_name,
-				index as Int,
-				&mut c_double_out as *mut _,
-			)
-		};
-		to_result! { ofx_success => c_double_out }
+		to_result! { unsafe { suite_call!(propGetDouble in *readable.suite())(
+			readable.handle(),
+			c_name,
+			index as Int,
+			&mut c_double_out as *mut _,
+		)} => c_double_out }
 	}
 }
 
@@ -249,15 +252,12 @@ where
 		let c_name = P::name().c_str()?;
 		unsafe {
 			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
-			let ofx_success = (*readable.suite())
-				.propGetString
-				.ok_or(Error::SuiteNotInitialized)?(
+			to_result! { unsafe { suite_call!(propGetString in *readable.suite())(
 				readable.handle(),
 				c_name,
 				index as Int,
 				&mut c_ptr_out as *mut _,
-			);
-			to_result! { ofx_success => CStr::from_ptr(c_ptr_out).to_owned() }
+			)} => CStr::from_ptr(c_ptr_out).to_owned() }
 		}
 	}
 }
@@ -271,15 +271,12 @@ where
 		let c_name = P::name().c_str()?;
 		unsafe {
 			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
-			let ofx_success = (*readable.suite())
-				.propGetString
-				.ok_or(Error::SuiteNotInitialized)?(
+			to_result! { unsafe { suite_call!(propGetString in *readable.suite())(
 				readable.handle(),
 				c_name,
 				index as Int,
 				&mut c_ptr_out as *mut _,
-			);
-			to_result! { ofx_success => CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }
+			)} => CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }
 		}
 	}
 }
@@ -328,11 +325,37 @@ where
 		let c_name = P::name().c_str()?;
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
-		to_result! { unsafe {
-			(*writable.suite())
-				.propSetString
-				.ok_or(Error::SuiteNotInitialized)?(writable.handle(), c_name, index as Int, c_ptr_in)
-		}}
+		to_result!(unsafe {
+			suite_call!(propSetString in *writable.suite())(
+				writable.handle(),
+				c_name,
+				index as Int,
+				c_ptr_in,
+			)
+		})
+	}
+}
+
+impl<W, P> Setter<W, P> for VoidPtr
+where
+	Self: ValueType + Sized,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>
+	where
+		W: AsProperties,
+		P: Named,
+	{
+		let c_name = P::name().c_str()?;
+		to_result!(unsafe {
+			suite_call!(propSetPointer in *writable.suite())(
+				writable.handle(),
+				c_name,
+				index as Int,
+				value as *mut _,
+			)
+		})
 	}
 }
 
@@ -349,11 +372,14 @@ where
 	{
 		let c_name = P::name().c_str()?;
 		let int_value_in = if value { 1 } else { 0 };
-		to_result! {unsafe {
-			(*writable.suite())
-				.propSetInt
-				.ok_or(Error::SuiteNotInitialized)?(writable.handle(), c_name, index as Int, int_value_in)
-		}}
+		to_result!(unsafe {
+			suite_call!(propSetInt in *writable.suite())(
+				writable.handle(),
+				c_name,
+				index as Int,
+				int_value_in,
+			)
+		})
 	}
 }
 
@@ -369,11 +395,14 @@ where
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
-		to_result! {unsafe {
-			(*writable.suite())
-				.propSetDouble
-				.ok_or(Error::SuiteNotInitialized)?(writable.handle(), c_name, index as Int, value)
-		}}
+		to_result!(unsafe {
+			suite_call!(propSetDouble in *writable.suite())(
+				writable.handle(),
+				c_name,
+				index as Int,
+				value,
+			)
+		})
 	}
 }
 
