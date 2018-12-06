@@ -10,9 +10,9 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::fmt::Display;
-use types::*;
-use suites::*;
 use std::rc::Rc;
+use suites::*;
+use types::*;
 
 pub struct ApiVersion(pub Int);
 pub struct PluginVersion(pub UnsignedInt, pub UnsignedInt);
@@ -161,6 +161,28 @@ impl MapAction for PluginDescriptor {
 	}
 }
 
+impl Filter for PluginDescriptor {
+	fn before_execute(&mut self, action: &Action) -> Result<Int> {
+		match action {
+			Action::Load => self.load(),
+			Action::Unload => self.unload(),
+			Action::Describe(ref handle) => self.describe(handle.clone()),
+			_ => OK,
+		}?;
+
+		OK
+	}
+
+	fn after_execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
+		match action {
+			Action::DestroyInstance(ref mut effect) => effect.drop_instance_data(),
+			_ => Ok(()),
+		}?;
+
+		OK
+	}
+}
+
 impl Dispatch for PluginDescriptor {
 	fn dispatch(&mut self, message: RawMessage) -> Result<Int> {
 		match message {
@@ -174,26 +196,20 @@ impl Dispatch for PluginDescriptor {
 				in_args,
 				out_args,
 			} => {
-				let mapped_action = self.map_action(action, handle, in_args, out_args);
-				info!("Mapped action found: {:?}", mapped_action);
-				match mapped_action {
-					Ok(Action::Load) => self.load(),
-					Ok(Action::Unload) => self.unload(),
-					Ok(Action::Describe(ref handle)) => self.describe(handle.clone()),
-					Ok(_) => Ok(0),
-					Err(e) => Err(e),
-				}?;
+				let mut mapped_action = self.map_action(action, handle, in_args, out_args)?;
 
-				if let Some(host) = self.host {
-					if let Some(suites) = self.suites.clone() {
-						let plugin_context = PluginContext {
-							host: HostHandle::new(host.host, suites.property()),
-							suites: suites.clone(),
-						};
-						self.execute(&plugin_context, &mut mapped_action?)
-					} else {
-						OK
-					}
+				debug!("Mapped action found: {:?}", mapped_action);
+				self.before_execute(&mapped_action)?;
+
+				if let (Some(host), Some(suites)) = (self.host, self.suites.clone()) {
+					let plugin_context = PluginContext {
+						host: HostHandle::new(host.host, suites.property()),
+						suites: suites,
+					};
+					let status = self.execute(&plugin_context, &mut mapped_action);
+					// TODO: do we call after even if execute fails?
+					self.after_execute(&plugin_context, &mut mapped_action)?;
+					status
 				} else {
 					OK
 				}
@@ -389,7 +405,6 @@ impl PluginDescriptor {
 			fetch_suite!(Message, V2),
 			fetch_suite!(Progress, V1).ok_or(Error::InvalidSuite)?,
 			fetch_suite!(Progress, V2),
-
 			fetch_suite!(TimeLine, V1).ok_or(Error::InvalidSuite)?,
 			fetch_suite!(ParametricParameter, V1),
 			fetch_suite!(ImageEffectOpenGLRender, V1),

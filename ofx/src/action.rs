@@ -67,6 +67,11 @@ pub trait Execute {
 	}
 }
 
+pub trait Filter {
+	fn before_execute(&mut self, action: &Action) -> Result<Int>;
+	fn after_execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int>;
+}
+
 pub trait MapAction {
 	fn map_action(
 		&self,
