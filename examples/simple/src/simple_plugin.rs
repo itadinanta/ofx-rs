@@ -42,8 +42,8 @@ impl Execute for SimplePlugin {
 				let mut effect_props = effect.properties()?;
 				let mut param_set = effect.parameter_set()?;
 
-				let context = effect_props.get_context()?;
-				let is_general_effect = context == ImageEffectContext::General;
+				let is_general_effect =
+					ImageEffectContext::General == effect_props.get_context()?;
 
 				let per_component_scale_param = param_set.parameter("scale")?;
 
@@ -73,6 +73,8 @@ impl Execute for SimplePlugin {
 					scale_b_param,
 					scale_a_param,
 				})?;
+
+				Self::set_per_component_scale_enabledness(effect);
 
 				UNIMPLEMENTED
 			}
@@ -222,5 +224,13 @@ impl Execute for SimplePlugin {
 			}
 			_ => OK,
 		}
+	}
+}
+
+impl SimplePlugin {
+	fn set_per_component_scale_enabledness(effect: &mut ImageEffectHandle) -> Result<()> {
+		let instance_data = effect.get_instance_data::<MyInstanceData>()?;
+		//instance_data.per_component_scale_param.get_value();
+		Ok(())
 	}
 }

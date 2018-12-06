@@ -20,6 +20,8 @@ mod result;
 
 #[macro_use]
 mod suites;
+#[macro_use]
+mod util;
 mod action;
 mod enums;
 mod handle;
@@ -28,7 +30,6 @@ mod property;
 mod types;
 #[macro_use]
 mod registry;
-
 pub use action::*;
 pub use enums::*;
 pub use handle::*;

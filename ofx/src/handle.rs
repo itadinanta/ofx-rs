@@ -58,14 +58,18 @@ pub struct ImageEffectHandle {
 	parameter: Rc<OfxParameterSuiteV1>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ImageClipHandle {
 	inner: OfxImageClipHandle,
+	inner_properties: OfxPropertySetHandle,
+	property: Rc<OfxPropertySuiteV1>,
+	image_effect: Rc<OfxImageEffectSuiteV1>,
 }
 
 #[derive(Clone)]
 pub struct ParamHandle {
 	inner: OfxParamHandle,
+	inner_properties: OfxPropertySetHandle,
 	property: Rc<OfxPropertySuiteV1>,
 	parameter: Rc<OfxParameterSuiteV1>,
 }
@@ -133,11 +137,13 @@ impl ImageEffectHandle {
 impl ParamHandle {
 	pub fn new(
 		inner: OfxParamHandle,
+		inner_properties: OfxPropertySetHandle,
 		property: Rc<OfxPropertySuiteV1>,
 		parameter: Rc<OfxParameterSuiteV1>,
 	) -> Self {
 		ParamHandle {
 			inner,
+			inner_properties,
 			property,
 			parameter,
 		}
@@ -145,8 +151,18 @@ impl ParamHandle {
 }
 
 impl ImageClipHandle {
-	pub fn new(inner: OfxImageClipHandle) -> Self {
-		ImageClipHandle { inner }
+	pub fn new(
+		inner: OfxImageClipHandle,
+		inner_properties: OfxPropertySetHandle,
+		property: Rc<OfxPropertySuiteV1>,
+		image_effect: Rc<OfxImageEffectSuiteV1>,
+	) -> Self {
+		ImageClipHandle {
+			inner,
+			inner_properties,
+			property,
+			image_effect,
+		}
 	}
 }
 
@@ -245,8 +261,9 @@ impl ImageEffectHandle {
 	}
 
 	fn clip_get_handle(&self, clip_name: &[u8]) -> Result<ImageClipHandle> {
-		let clip_handle = unsafe {
+		let (clip_handle, clip_properties) = unsafe {
 			let mut clip_handle = std::mem::uninitialized();
+			let mut clip_properties = std::mem::uninitialized();
 
 			to_result!(self
 				.image_effect
@@ -255,12 +272,17 @@ impl ImageEffectHandle {
 				self.inner,
 				clip_name.as_ptr() as *const i8,
 				&mut clip_handle as *mut _,
-				std::ptr::null::<*mut OfxImageClipHandle>() as *mut _,
+				&mut clip_properties as *mut _,
 			))?;
 
-			clip_handle
+			(clip_handle, clip_properties)
 		};
-		Ok(ImageClipHandle::new(clip_handle))
+		Ok(ImageClipHandle::new(
+			clip_handle,
+			clip_properties,
+			self.property.clone(),
+			self.image_effect.clone(),
+		))
 	}
 
 	pub fn parameter_set(&self) -> Result<ParamSetHandle> {
@@ -416,8 +438,9 @@ impl ParamSetHandle {
 
 	pub fn parameter(&self, name: &str) -> Result<ParamHandle> {
 		let name_buf = CString::new(name)?.into_bytes_with_nul();
-		let param_handle = unsafe {
+		let (param_handle, param_properties) = unsafe {
 			let mut param_handle = std::mem::uninitialized();
+			let mut param_properties = std::mem::uninitialized();
 			to_result!(self
 				.parameter
 				.paramGetHandle
@@ -425,13 +448,14 @@ impl ParamSetHandle {
 				self.inner,
 				name_buf.as_ptr() as *const _,
 				&mut param_handle as *mut _,
-				std::ptr::null::<*mut *mut OfxPropertySetHandle>() as *mut _,
+				&mut param_properties as *mut _,
 			))?;
 
-			param_handle
+			(param_handle, param_properties)
 		};
 		Ok(ParamHandle::new(
 			param_handle,
+			param_properties,
 			self.property.clone(),
 			self.parameter.clone(),
 		))
@@ -457,6 +481,24 @@ impl ParamSetHandle {
 impl<'a> AsProperties for HostHandle {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner
+	}
+	unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
+		self.property.borrow() as *const _
+	}
+}
+
+impl<'a> AsProperties for ImageClipHandle {
+	fn handle(&self) -> OfxPropertySetHandle {
+		self.inner_properties
+	}
+	unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
+		self.property.borrow() as *const _
+	}
+}
+
+impl<'a> AsProperties for ParamHandle {
+	fn handle(&self) -> OfxPropertySetHandle {
+		self.inner_properties
 	}
 	unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
 		self.property.borrow() as *const _

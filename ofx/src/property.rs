@@ -520,6 +520,7 @@ pub mod image_effect {
 
 pub mod image_clip {
 	use super::*;
+	define_property!(read_only ImageClipPropConnected as Connected: bool);
 	define_property!(read_write ImageClipPropOptional as Optional: bool, bool);
 }
 
@@ -616,6 +617,10 @@ pub trait CanSetOptional: Writable {
 	can_set_property!(set_optional, image_clip::Optional, bool);
 }
 
+pub trait CanGetConnected: Readable {
+	can_get_property!(get_connected, image_clip::Connected);
+}
+
 pub trait CanSetHint: Writable {
 	can_set_property!(set_hint, param::Hint, &'static str);
 }
@@ -660,8 +665,13 @@ impl CanSetSupportedContexts for ImageEffectProperties {}
 
 impl CanGetContext for DescribeInContextInArgs {}
 
-impl CanSetSupportedComponents for ClipProperties {}
-impl CanSetOptional for ClipProperties {}
+pub trait BaseClip: CanSetSupportedComponents + CanSetOptional + CanGetConnected {}
+impl<T> CanGetConnected for T where T: BaseClip {}
+impl<T> CanSetSupportedComponents for T where T: BaseClip {}
+impl<T> CanSetOptional for T where T: BaseClip {}
+impl BaseClip for ClipProperties {}
+
+impl CanGetConnected for ImageClipHandle {}
 
 impl BaseParam for ParamDouble {}
 impl BaseParam for ParamBoolean {}
