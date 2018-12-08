@@ -11,7 +11,7 @@ use types::*;
 
 pub trait AsProperties {
 	fn handle(&self) -> OfxPropertySetHandle;
-	unsafe fn suite(&self) -> *const OfxPropertySuiteV1;
+	fn suite(&self) -> *const OfxPropertySuiteV1;
 }
 
 pub trait HasProperties<T>
@@ -184,11 +184,8 @@ where
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
 		to_result! {suite_call!(propGetInt in *readable.suite(),
-			readable.handle(),
-			c_name,
-			index as Int,
-			&mut c_int_out as *mut _
-		) => c_int_out }
+			readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
+		=> c_int_out }
 	}
 }
 
@@ -200,12 +197,9 @@ where
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
 		let mut c_int_out: Int = 0;
-		to_result! {suite_call!(propGetInt in *readable.suite(),
-			readable.handle(),
-			c_name,
-			index as Int,
-			&mut c_int_out as *mut _
-		)  => c_int_out != 0 }
+		to_result! { suite_call!(propGetInt in *readable.suite(),
+			readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
+		=> c_int_out != 0 }
 	}
 }
 
@@ -218,11 +212,8 @@ where
 		let c_name = P::name().c_str()?;
 		let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
 		to_result! { suite_call!(propGetPointer in *readable.suite(),
-			readable.handle(),
-			c_name,
-			index as Int,
-			&mut c_ptr_out as *mut _
-		) => c_ptr_out }
+			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+		=> c_ptr_out }
 	}
 }
 
@@ -266,8 +257,7 @@ where
 		let mut c_ptr_out: CharPtr = std::ptr::null();
 		to_result! { suite_call!(propGetString in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
-			=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }
-		}
+		=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }}
 	}
 }
 

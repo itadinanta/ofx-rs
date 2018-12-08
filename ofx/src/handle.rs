@@ -197,7 +197,7 @@ macro_rules! properties_newtype {
 			fn handle(&self) -> OfxPropertySetHandle {
 				self.0.inner
 			}
-			unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
+			fn suite(&self) -> *const OfxPropertySuiteV1 {
 				self.0.property.borrow() as *const _
 			}
 		}
@@ -218,16 +218,11 @@ impl DescribeInContextInArgs {}
 
 impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 	fn properties(&self) -> Result<ImageEffectProperties> {
-		let property_set_handle = unsafe {
-			let mut property_set_handle = std::mem::uninitialized();
+		let property_set_handle = {
+			let mut property_set_handle = std::ptr::null_mut();
 
-			to_result!(self
-				.image_effect
-				.getPropertySet
-				.ok_or(Error::SuiteNotInitialized)?(
-				self.inner,
-				&mut property_set_handle as *mut _,
-			))?;
+			to_result!(suite_call!(getPropertySet in self.image_effect,
+				self.inner, &mut property_set_handle as *mut _))?;
 
 			property_set_handle
 		};
@@ -240,17 +235,11 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 
 impl ImageEffectHandle {
 	fn clip_define(&self, clip_name: &[u8]) -> Result<ClipProperties> {
-		let property_set_handle = unsafe {
-			let mut property_set_handle = std::mem::uninitialized();
+		let property_set_handle = {
+			let mut property_set_handle = std::ptr::null_mut();
 
-			to_result!(self
-				.image_effect
-				.clipDefine
-				.ok_or(Error::SuiteNotInitialized)?(
-				self.inner,
-				clip_name.as_ptr() as *const i8,
-				&mut property_set_handle as *mut _,
-			))?;
+			to_result!(suite_call!(clipDefine in self.image_effect,
+				self.inner, clip_name.as_ptr() as *const i8, &mut property_set_handle as *mut _))?;
 
 			property_set_handle
 		};
@@ -261,19 +250,12 @@ impl ImageEffectHandle {
 	}
 
 	fn clip_get_handle(&self, clip_name: &[u8]) -> Result<ImageClipHandle> {
-		let (clip_handle, clip_properties) = unsafe {
-			let mut clip_handle = std::mem::uninitialized();
-			let mut clip_properties = std::mem::uninitialized();
+		let (clip_handle, clip_properties) = {
+			let mut clip_handle = std::ptr::null_mut();
+			let mut clip_properties = std::ptr::null_mut();
 
-			to_result!(self
-				.image_effect
-				.clipGetHandle
-				.ok_or(Error::SuiteNotInitialized)?(
-				self.inner,
-				clip_name.as_ptr() as *const i8,
-				&mut clip_handle as *mut _,
-				&mut clip_properties as *mut _,
-			))?;
+			to_result!(suite_call!(clipGetHandle in self.image_effect,
+				self.inner, clip_name.as_ptr() as *const i8, &mut clip_handle as *mut _, &mut clip_properties as *mut _))?;
 
 			(clip_handle, clip_properties)
 		};
@@ -286,13 +268,11 @@ impl ImageEffectHandle {
 	}
 
 	pub fn parameter_set(&self) -> Result<ParamSetHandle> {
-		let parameters_set_handle = unsafe {
-			let mut parameters_set_handle = std::mem::uninitialized();
+		let parameters_set_handle = {
+			let mut parameters_set_handle = std::ptr::null_mut();
 
 			to_result!(suite_call!(getParamSet in self.image_effect,
-				self.inner,
-				&mut parameters_set_handle as *mut _
-			))?;
+				self.inner, &mut parameters_set_handle as *mut _))?;
 
 			parameters_set_handle
 		};
@@ -339,41 +319,30 @@ impl ImageEffectHandle {
 	{
 		let mut effect_props = self.properties()?;
 		let data_box = Box::new(data);
-		let mutator = self
-			.property
-			.propSetPointer
-			.ok_or(Error::SuiteNotInitialized)?;
 		let data_ptr = Box::into_raw(data_box);
-		unsafe {
-			let status = to_result!(mutator(
-				effect_props.0.inner,
-				kOfxPropInstanceData.as_ptr() as *const i8,
-				0,
-				data_ptr as *mut _,
-			));
-			if status.is_err() {
+		let status = to_result!(suite_call!(propSetPointer in self.property,
+			effect_props.0.inner,
+			kOfxPropInstanceData.as_ptr() as *const i8,
+			0,
+			data_ptr as *mut _
+		));
+		if status.is_err() {
+			unsafe {
 				Box::from_raw(data_ptr);
 			}
-			status
 		}
+		status
 	}
 
-	unsafe fn get_instance_data_ptr(&mut self) -> Result<VoidPtrMut> {
+	fn get_instance_data_ptr(&mut self) -> Result<VoidPtrMut> {
 		let mut effect_props = self.properties()?;
-		let accessor = self
-			.property
-			.propGetPointer
-			.ok_or(Error::SuiteNotInitialized)?;
-		unsafe {
-			let mut data_ptr = std::mem::uninitialized();
-
-			to_result! { accessor(
-				effect_props.0.inner,
-				kOfxPropInstanceData.as_ptr() as *const i8,
-				0,
-				&mut data_ptr,
-			) => data_ptr }
-		}
+		let mut data_ptr = std::ptr::null_mut();
+		to_result! { suite_call!(propGetPointer in self.property,
+			effect_props.0.inner,
+			kOfxPropInstanceData.as_ptr() as *const i8,
+			0,
+			&mut data_ptr
+		) => data_ptr }
 	}
 
 	pub fn get_instance_data<T>(&mut self) -> Result<&mut T>
@@ -416,17 +385,10 @@ impl ParamSetHandle {
 		T: IsPropertiesNewType,
 	{
 		let name_buf = CString::new(name)?.into_bytes_with_nul();
-		let property_set_handle = unsafe {
-			let mut property_set_handle = std::mem::uninitialized();
-			to_result!(self
-				.parameter
-				.paramDefine
-				.ok_or(Error::SuiteNotInitialized)?(
-				self.inner,
-				param_type.as_ptr() as *const _,
-				name_buf.as_ptr() as *const _,
-				&mut property_set_handle as *mut _,
-			))?;
+		let property_set_handle = {
+			let mut property_set_handle = std::ptr::null_mut();
+			to_result!(suite_call!(paramDefine in self.parameter,
+				self.inner, param_type.as_ptr() as *const _, name_buf.as_ptr() as *const _, &mut property_set_handle as *mut _))?;
 
 			property_set_handle
 		};
@@ -438,21 +400,15 @@ impl ParamSetHandle {
 
 	pub fn parameter(&self, name: &str) -> Result<ParamHandle> {
 		let name_buf = CString::new(name)?.into_bytes_with_nul();
-		let (param_handle, param_properties) = unsafe {
-			let mut param_handle = std::mem::uninitialized();
-			let mut param_properties = std::mem::uninitialized();
-			to_result!(self
-				.parameter
-				.paramGetHandle
-				.ok_or(Error::SuiteNotInitialized)?(
-				self.inner,
-				name_buf.as_ptr() as *const _,
-				&mut param_handle as *mut _,
-				&mut param_properties as *mut _,
-			))?;
+		let (param_handle, param_properties) = {
+			let mut param_handle = std::ptr::null_mut();
+			let mut param_properties = std::ptr::null_mut();
+			to_result!(suite_call!(paramGetHandle in self.parameter,
+				self.inner, name_buf.as_ptr() as *const _, &mut param_handle as *mut _, &mut param_properties as *mut _))?;
 
 			(param_handle, param_properties)
 		};
+		assert!(!param_handle.is_null() && !param_properties.is_null());
 		Ok(ParamHandle::new(
 			param_handle,
 			param_properties,
@@ -478,29 +434,29 @@ impl ParamSetHandle {
 	}
 }
 
-impl<'a> AsProperties for HostHandle {
+impl AsProperties for HostHandle {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner
 	}
-	unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
+	fn suite(&self) -> *const OfxPropertySuiteV1 {
 		self.property.borrow() as *const _
 	}
 }
 
-impl<'a> AsProperties for ImageClipHandle {
+impl AsProperties for ImageClipHandle {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner_properties
 	}
-	unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
+	fn suite(&self) -> *const OfxPropertySuiteV1 {
 		self.property.borrow() as *const _
 	}
 }
 
-impl<'a> AsProperties for ParamHandle {
+impl AsProperties for ParamHandle {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner_properties
 	}
-	unsafe fn suite(&self) -> *const OfxPropertySuiteV1 {
+	fn suite(&self) -> *const OfxPropertySuiteV1 {
 		self.property.borrow() as *const _
 	}
 }
