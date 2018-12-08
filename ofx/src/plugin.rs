@@ -134,7 +134,7 @@ impl MapAction for PluginDescriptor {
 						.new_typed_properties(DescribeInContextInArgs::new, in_args)?
 						.get_context()?;
 					Ok(Action::DescribeInContext(
-						self.new_image_effect(handle)?,
+						self.new_image_effect_raw(handle)?,
 						context,
 					))
 				}
@@ -145,12 +145,12 @@ impl MapAction for PluginDescriptor {
 			match action {
 				GlobalAction::Load => Ok(Action::Load),
 				GlobalAction::Unload => Ok(Action::Unload),
-				GlobalAction::Describe => Ok(Action::Describe(self.new_image_effect(handle)?)),
+				GlobalAction::Describe => Ok(Action::Describe(self.new_image_effect_raw(handle)?)),
 				GlobalAction::CreateInstance => {
-					Ok(Action::CreateInstance(self.new_image_effect(handle)?))
+					Ok(Action::CreateInstance(self.new_image_effect_raw(handle)?))
 				}
 				GlobalAction::DestroyInstance => {
-					Ok(Action::DestroyInstance(self.new_image_effect(handle)?))
+					Ok(Action::DestroyInstance(self.new_image_effect_raw(handle)?))
 				}
 				_ => Err(Error::InvalidAction),
 			}
@@ -265,23 +265,6 @@ impl PluginDescriptor {
 				global_action_index.insert(concat_idents!(kOfxAction, $id), GlobalAction::$id)
 			};
 		}
-		global_add!(Load);
-		global_add!(Describe);
-		global_add!(Unload);
-		global_add!(PurgeCaches);
-		global_add!(SyncPrivateData);
-		global_add!(CreateInstance);
-		global_add!(DestroyInstance);
-		global_add!(BeginInstanceChanged);
-		global_add!(InstanceChanged);
-		global_add!(EndInstanceChanged);
-		global_add!(BeginInstanceEdit);
-		global_add!(EndInstanceEdit);
-		//global_add!(DescribeInteract);
-		//global_add!(CreateInstanceInteract);
-		//global_add!(DestroyInstanceInteract);
-		global_add!(Dialog);
-		info!("{:?}", global_action_index);
 		macro_rules! image_effect_add {
 			($id:ident) => {
 				debug!(
@@ -295,6 +278,21 @@ impl PluginDescriptor {
 					)
 			};
 		}
+
+		global_add!(Load);
+		global_add!(Describe);
+		global_add!(Unload);
+		global_add!(PurgeCaches);
+		global_add!(SyncPrivateData);
+		global_add!(CreateInstance);
+		global_add!(DestroyInstance);
+		global_add!(BeginInstanceChanged);
+		global_add!(InstanceChanged);
+		global_add!(EndInstanceChanged);
+		global_add!(BeginInstanceEdit);
+		global_add!(EndInstanceEdit);
+		global_add!(Dialog);
+
 		image_effect_add!(GetRegionOfDefinition);
 		image_effect_add!(GetRegionsOfInterest);
 		image_effect_add!(GetTimeDomain);
@@ -328,7 +326,11 @@ impl PluginDescriptor {
 		self.suites.as_ref().ok_or(Error::SuiteNotInitialized)
 	}
 
-	fn new_image_effect(&self, handle: VoidPtr) -> Result<ImageEffectHandle> {
+	fn new_image_effect_raw(&self, ptr: VoidPtr) -> Result<ImageEffectHandle> {
+		self.new_image_effect(unsafe { ptr as OfxImageEffectHandle })
+	}
+
+	fn new_image_effect(&self, handle: OfxImageEffectHandle) -> Result<ImageEffectHandle> {
 		let suites = self.suites()?;
 		let property_suite = suites.property();
 		let image_effect_suite = suites.image_effect();
@@ -395,7 +397,7 @@ impl PluginDescriptor {
 			};
 		};
 
-		let suites = Suites::new(
+		self.suites = Some(Suites::new(
 			fetch_suite!(ImageEffect, V1).ok_or(Error::InvalidSuite)?,
 			fetch_suite!(Property, V1).ok_or(Error::InvalidSuite)?,
 			fetch_suite!(Parameter, V1).ok_or(Error::InvalidSuite)?,
@@ -408,8 +410,7 @@ impl PluginDescriptor {
 			fetch_suite!(TimeLine, V1).ok_or(Error::InvalidSuite)?,
 			fetch_suite!(ParametricParameter, V1),
 			fetch_suite!(ImageEffectOpenGLRender, V1),
-		);
-		self.suites = Some(suites);
+		));
 		info!("Loaded plugin");
 		OK
 	}

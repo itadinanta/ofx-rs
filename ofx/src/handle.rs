@@ -120,13 +120,13 @@ impl fmt::Debug for HostHandle {
 
 impl ImageEffectHandle {
 	pub fn new(
-		ptr: VoidPtr,
+		inner: OfxImageEffectHandle,
 		property: Rc<OfxPropertySuiteV1>,
 		image_effect: Rc<OfxImageEffectSuiteV1>,
 		parameter: Rc<OfxParameterSuiteV1>,
 	) -> Self {
 		ImageEffectHandle {
-			inner: unsafe { ptr as OfxImageEffectHandle },
+			inner,
 			property,
 			image_effect,
 			parameter,
@@ -408,7 +408,10 @@ impl ParamSetHandle {
 
 			(param_handle, param_properties)
 		};
-		assert!(!param_handle.is_null() && !param_properties.is_null());
+		assert!(
+			!OfxParamHandle::is_null(param_handle)
+				&& !OfxPropertySetHandle::is_null(param_properties)
+		);
 		Ok(ParamHandle::new(
 			param_handle,
 			param_properties,
