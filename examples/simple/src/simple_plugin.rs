@@ -228,9 +228,24 @@ impl Execute for SimplePlugin {
 }
 
 impl SimplePlugin {
-	fn set_per_component_scale_enabledness(effect: &mut ImageEffectHandle) -> Result<()> {
+	fn set_param_enabledness(
+		effect: &mut ImageEffectHandle,
+		name: &str,
+		enabled: bool,
+	) -> Result<()> {
 		let instance_data = effect.get_instance_data::<MyInstanceData>()?;
 		//instance_data.per_component_scale_param.get_value();
+		Ok(())
+	}
+
+	fn set_per_component_scale_enabledness(effect: &mut ImageEffectHandle) -> Result<()> {
+		let source_clip = effect.get_simple_input_clip()?.clone();
+		let mut instance_data = effect.get_instance_data::<MyInstanceData>()?;
+		//instance_data.per_component_scale_param;
+		let is_connected = source_clip.get_connected()?;
+		//source_clip.get_components();
+		//instance_data.per_component_scale_param.get_value();
+		//Self::set_param_enabledness(effect, "scaleR", per_component_scale);
 		Ok(())
 	}
 }

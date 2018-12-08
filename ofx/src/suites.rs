@@ -20,8 +20,8 @@ pub struct Suites {
 }
 
 macro_rules! suite_call {
-	($function:ident in $suite:expr) => {
-		unsafe { ($suite).$function.ok_or(Error::SuiteNotInitialized)? }
+	($function:ident in $suite:expr, $($arg:expr),*) => {
+		unsafe { ($suite).$function.ok_or(Error::SuiteNotInitialized)?($($arg),*) }
 	};
 }
 

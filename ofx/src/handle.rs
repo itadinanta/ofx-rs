@@ -289,7 +289,7 @@ impl ImageEffectHandle {
 		let parameters_set_handle = unsafe {
 			let mut parameters_set_handle = std::mem::uninitialized();
 
-			to_result!(suite_call!(getParamSet in self.image_effect)(
+			to_result!(suite_call!(getParamSet in self.image_effect,
 				self.inner,
 				&mut parameters_set_handle as *mut _
 			))?;
