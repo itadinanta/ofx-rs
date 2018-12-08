@@ -25,14 +25,14 @@ struct MyInstanceData {
 	mask_clip: Option<ImageClipHandle>,
 	output_clip: ImageClipHandle,
 
-	scale_param: ParamHandle,
+	scale_param: ParamHandle<Double>,
 
-	per_component_scale_param: ParamHandle,
+	per_component_scale_param: ParamHandle<Bool>,
 
-	scale_r_param: ParamHandle,
-	scale_g_param: ParamHandle,
-	scale_b_param: ParamHandle,
-	scale_a_param: ParamHandle,
+	scale_r_param: ParamHandle<Double>,
+	scale_g_param: ParamHandle<Double>,
+	scale_b_param: ParamHandle<Double>,
+	scale_a_param: ParamHandle<Double>,
 }
 
 impl Execute for SimplePlugin {
@@ -228,12 +228,14 @@ impl Execute for SimplePlugin {
 }
 
 impl SimplePlugin {
-	fn set_param_enabledness(
+	fn set_param_enabledness<T>(
 		effect: &mut ImageEffectHandle,
 		name: &str,
 		enabled: bool,
-	) -> Result<()> {
-		let instance_data = effect.get_instance_data::<MyInstanceData>()?;
+	) -> Result<()> where T: ParamHandleValue{
+		let mut parameter = effect.parameter_set()?.parameter::<T>(name)?;
+		parameter.set_enabled(enabled)?;
+		//let instance_data = effect.get_instance_data::<MyInstanceData>()?;
 		//instance_data.per_component_scale_param.get_value();
 		Ok(())
 	}

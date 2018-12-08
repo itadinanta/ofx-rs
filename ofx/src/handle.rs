@@ -66,12 +66,21 @@ pub struct ImageClipHandle {
 	image_effect: Rc<OfxImageEffectSuiteV1>,
 }
 
+pub trait ParamHandleValue: Default + Clone {}
+impl ParamHandleValue for Int {}
+impl ParamHandleValue for Bool {}
+impl ParamHandleValue for Double {}
+
 #[derive(Clone)]
-pub struct ParamHandle {
+pub struct ParamHandle<T>
+where
+	T: ParamHandleValue,
+{
 	inner: OfxParamHandle,
 	inner_properties: OfxPropertySetHandle,
 	property: Rc<OfxPropertySuiteV1>,
 	parameter: Rc<OfxParameterSuiteV1>,
+	_type: PhantomData<T>,
 }
 
 #[derive(Clone)]
@@ -94,7 +103,10 @@ impl fmt::Debug for ImageClipHandle {
 	}
 }
 
-impl fmt::Debug for ParamHandle {
+impl<T> fmt::Debug for ParamHandle<T>
+where
+	T: ParamHandleValue,
+{
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "ParamHandle {{...}}")
 	}
@@ -134,7 +146,10 @@ impl ImageEffectHandle {
 	}
 }
 
-impl ParamHandle {
+impl<T> ParamHandle<T>
+where
+	T: ParamHandleValue + Default,
+{
 	pub fn new(
 		inner: OfxParamHandle,
 		inner_properties: OfxPropertySetHandle,
@@ -146,7 +161,22 @@ impl ParamHandle {
 			inner_properties,
 			property,
 			parameter,
+			_type: PhantomData,
 		}
+	}
+
+	pub fn get_value(&self) -> Result<T> {
+		let mut value: T = T::default();
+		to_result!(suite_call!(paramGetValue in self.parameter,
+			self.inner, &mut value as *mut _))?;
+		Ok(value)
+	}
+
+	pub fn get_value_at_time(&self, time: OfxTime) -> Result<T> {
+		let mut value: T = T::default();
+		to_result!(suite_call!(paramGetValueAtTime in self.parameter,
+			self.inner, time, &mut value as *mut _))?;
+		Ok(value)
 	}
 }
 
@@ -209,10 +239,10 @@ properties_newtype!(ImageEffectProperties);
 properties_newtype!(ClipProperties);
 properties_newtype!(DescribeInContextInArgs);
 
-properties_newtype!(ParamDouble);
-properties_newtype!(ParamInt);
-properties_newtype!(ParamBoolean);
-properties_newtype!(ParamPage);
+properties_newtype!(ParamDoubleProperties);
+properties_newtype!(ParamIntProperties);
+properties_newtype!(ParamBooleanProperties);
+properties_newtype!(ParamPageProperties);
 
 impl DescribeInContextInArgs {}
 
@@ -321,11 +351,7 @@ impl ImageEffectHandle {
 		let data_box = Box::new(data);
 		let data_ptr = Box::into_raw(data_box);
 		let status = to_result!(suite_call!(propSetPointer in self.property,
-			effect_props.0.inner,
-			kOfxPropInstanceData.as_ptr() as *const i8,
-			0,
-			data_ptr as *mut _
-		));
+			effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0, data_ptr as *mut _));
 		if status.is_err() {
 			unsafe {
 				Box::from_raw(data_ptr);
@@ -338,11 +364,8 @@ impl ImageEffectHandle {
 		let mut effect_props = self.properties()?;
 		let mut data_ptr = std::ptr::null_mut();
 		to_result! { suite_call!(propGetPointer in self.property,
-			effect_props.0.inner,
-			kOfxPropInstanceData.as_ptr() as *const i8,
-			0,
-			&mut data_ptr
-		) => data_ptr }
+		   effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0, &mut data_ptr)
+		=> data_ptr }
 	}
 
 	pub fn get_instance_data<T>(&mut self) -> Result<&mut T>
@@ -398,7 +421,10 @@ impl ParamSetHandle {
 		)))
 	}
 
-	pub fn parameter(&self, name: &str) -> Result<ParamHandle> {
+	pub fn parameter<T>(&self, name: &str) -> Result<ParamHandle<T>>
+	where
+		T: ParamHandleValue,
+	{
 		let name_buf = CString::new(name)?.into_bytes_with_nul();
 		let (param_handle, param_properties) = {
 			let mut param_handle = std::ptr::null_mut();
@@ -420,19 +446,19 @@ impl ParamSetHandle {
 		))
 	}
 
-	pub fn param_define_double(&mut self, name: &str) -> Result<ParamDouble> {
+	pub fn param_define_double(&mut self, name: &str) -> Result<ParamDoubleProperties> {
 		self.param_define(ParamType::Double, name)
 	}
 
-	pub fn param_define_int(&mut self, name: &str) -> Result<ParamInt> {
+	pub fn param_define_int(&mut self, name: &str) -> Result<ParamIntProperties> {
 		self.param_define(ParamType::Integer, name)
 	}
 
-	pub fn param_define_boolean(&mut self, name: &str) -> Result<ParamBoolean> {
+	pub fn param_define_boolean(&mut self, name: &str) -> Result<ParamBooleanProperties> {
 		self.param_define(ParamType::Boolean, name)
 	}
 
-	pub fn param_define_page(&mut self, name: &str) -> Result<ParamPage> {
+	pub fn param_define_page(&mut self, name: &str) -> Result<ParamPageProperties> {
 		self.param_define(ParamType::Page, name)
 	}
 }
@@ -455,7 +481,10 @@ impl AsProperties for ImageClipHandle {
 	}
 }
 
-impl AsProperties for ParamHandle {
+impl<T> AsProperties for ParamHandle<T>
+where
+	T: ParamHandleValue,
+{
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner_properties
 	}
