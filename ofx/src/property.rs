@@ -40,26 +40,26 @@ pub trait Readable: AsProperties + Sized + Clone {
 }
 
 pub trait Writable: AsProperties + Sized + Clone {
-	fn set<P>(&mut self, new_value: P::ValueType) -> Result<()>
+	fn set<P>(&mut self, new_value: &P::ValueType) -> Result<()>
 	where
 		P: Named + Set,
-		P::ValueType: ValueType + Sized + Setter<Self, P>,
+		P::ValueType: ValueType + Setter<Self, P>,
 	{
 		<P::ValueType as Setter<_, _>>::set(self, new_value)
 	}
 
-	fn set_at<P>(&mut self, index: usize, new_value: P::ValueType) -> Result<()>
+	fn set_at<P>(&mut self, index: usize, new_value: &P::ValueType) -> Result<()>
 	where
 		P: Named + Set,
-		P::ValueType: ValueType + Sized + Setter<Self, P>,
+		P::ValueType: ValueType + Setter<Self, P>,
 	{
 		<P::ValueType as Setter<Self, P>>::set_at(self, index, new_value)
 	}
 }
 
-impl<R> Readable for R where R: AsProperties + Sized + Clone {}
+impl<R> Readable for R where R: AsProperties + Clone {}
 
-impl<W> Writable for W where W: AsProperties + Sized + Clone {}
+impl<W> Writable for W where W: AsProperties + ?Sized + Clone {}
 
 pub trait StringId {
 	fn c_str(&self) -> Result<CharPtr>;
@@ -96,8 +96,8 @@ impl ValueType for Bool {}
 impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for String {}
-impl ValueType for &str {}
-impl ValueType for &[u8] {}
+impl ValueType for str {}
+impl ValueType for [u8] {}
 impl ValueType for CharPtr {}
 impl ValueType for VoidPtr {}
 impl ValueType for CString {}
@@ -112,55 +112,12 @@ pub trait Get: Named {
 }
 
 pub trait Set: Named {
-	type ValueType: ValueType;
+	type ValueType: ValueType + ?Sized;
 }
 
 pub trait Edit: Get + Set {
 	type ReturnType: ValueType;
-	type ValueType: ValueType;
-}
-
-trait CanGet<P>
-where
-	P: Get,
-{
-	fn get(&self) -> P;
-}
-
-trait CanSet<P>
-where
-	P: Edit,
-{
-	fn set(&mut self) -> P;
-}
-
-macro_rules! define_property {
-	(read_only $ofx_name:ident as $name:ident : $value_type:ty) => {
-		pub struct $name;
-		impl Get for $name {
-			type ReturnType = $value_type;
-		}
-		impl Named for $name {
-			fn name() -> &'static [u8] {
-				concat_idents!(kOfx, $ofx_name)
-			}
-		}
-	};
-
-	(read_write $ofx_name:ident as $name:ident : $return_type:ty, $value_type:ty) => {
-		pub struct $name;
-		impl Get for $name {
-			type ReturnType = $return_type;
-		}
-		impl Set for $name {
-			type ValueType = $value_type;
-		}
-		impl Named for $name {
-			fn name() -> &'static [u8] {
-				concat_idents!(kOfx, $ofx_name)
-			}
-		}
-	};
+	type ValueType: ValueType + ?Sized;
 }
 
 pub trait Getter<R, P>
@@ -263,28 +220,28 @@ where
 
 pub trait Setter<W, P>
 where
-	Self: ValueType + Sized,
+	Self: ValueType,
 	W: Writable + AsProperties,
-	P: Named + Set<ValueType = Self>,
+	P: Named + Set<ValueType = Self> + ?Sized,
 {
-	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>;
-	fn set(writable: &mut W, value: Self) -> Result<()> {
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>;
+	fn set(writable: &mut W, value: &Self) -> Result<()> {
 		Self::set_at(writable, 0, value)
 	}
 }
 
 pub trait CStrWithNul {
-	fn as_c_str(self) -> Result<CString>;
+	fn as_c_str(&self) -> Result<CString>;
 }
 
-impl CStrWithNul for &str {
-	fn as_c_str(self) -> Result<CString> {
+impl CStrWithNul for str {
+	fn as_c_str(&self) -> Result<CString> {
 		Ok(CString::new(self)?)
 	}
 }
 
-impl CStrWithNul for &'static [u8] {
-	fn as_c_str(self) -> Result<CString> {
+impl CStrWithNul for [u8] {
+	fn as_c_str(&self) -> Result<CString> {
 		let c_str_in = CStr::from_bytes_with_nul(self)?;
 		Ok(c_str_in.to_owned())
 	}
@@ -292,12 +249,50 @@ impl CStrWithNul for &'static [u8] {
 
 impl<W, P, A> Setter<W, P> for A
 where
-	Self: ValueType + Sized,
+	Self: ValueType,
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 	A: CStrWithNul,
 {
-	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
+	where
+		W: AsProperties,
+		P: Named,
+	{
+		let c_name = P::name().c_str()?;
+		let c_str_in = value.as_c_str()?;
+		let c_ptr_in = c_str_in.as_c_str().as_ptr();
+		to_result!(suite_call!(propSetString in *writable.suite(),
+			writable.handle(), c_name, index as Int, c_ptr_in))
+	}
+}
+
+impl<W, P> Setter<W, P> for str
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
+	where
+		W: AsProperties,
+		P: Named,
+	{
+		let c_name = P::name().c_str()?;
+		let c_str_in = value.as_c_str()?;
+		let c_ptr_in = c_str_in.as_c_str().as_ptr();
+		to_result!(suite_call!(propSetString in *writable.suite(),
+			writable.handle(), c_name, index as Int, c_ptr_in))
+	}
+}
+
+impl<W, P> Setter<W, P> for [u8]
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
 	where
 		W: AsProperties,
 		P: Named,
@@ -312,34 +307,34 @@ where
 
 impl<W, P> Setter<W, P> for VoidPtr
 where
-	Self: ValueType + Sized,
+	Self: ValueType,
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
 	where
 		W: AsProperties,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
 		to_result!(suite_call!(propSetPointer in *writable.suite(),
-			writable.handle(), c_name, index as Int, value as *mut _))
+			writable.handle(), c_name, index as Int, *value as *mut _))
 	}
 }
 
 impl<W, P> Setter<W, P> for Bool
 where
-	Self: ValueType + Sized,
+	Self: ValueType,
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
 	where
 		W: AsProperties,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
-		let int_value_in = if value { 1 } else { 0 };
+		let int_value_in = if *value { 1 } else { 0 };
 		to_result!(suite_call!(propSetInt in *writable.suite(),
 			writable.handle(), c_name, index as Int, int_value_in))
 	}
@@ -347,18 +342,18 @@ where
 
 impl<W, P> Setter<W, P> for Double
 where
-	Self: ValueType + Sized,
+	Self: ValueType,
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: Self) -> Result<()>
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
 	where
 		W: AsProperties,
 		P: Named,
 	{
 		let c_name = P::name().c_str()?;
 		to_result!(suite_call!(propSetDouble in *writable.suite(),
-			writable.handle(), c_name, index as Int, value))
+			writable.handle(), c_name, index as Int, *value))
 	}
 }
 
@@ -367,6 +362,39 @@ where
 	R: Named + Get,
 {
 	fn get(&self) -> Result<R::ReturnType>;
+}
+
+macro_rules! define_property {
+	(read_only $ofx_name:ident as $name:ident : $value_type:ty) => {
+		pub struct $name;
+		impl Get for $name {
+			type ReturnType = $value_type;
+		}
+		impl Named for $name {
+			fn name() -> &'static [u8] {
+				concat_idents!(kOfx, $ofx_name)
+			}
+		}
+	};
+
+	(read_write $ofx_name:ident as $name:ident : $return_type:ty | $value_type:ty) => {
+		pub struct $name;
+		impl Get for $name {
+			type ReturnType = $return_type;
+		}
+		impl Set for $name {
+			type ValueType = $value_type;
+		}
+		impl Named for $name {
+			fn name() -> &'static [u8] {
+				concat_idents!(kOfx, $ofx_name)
+			}
+		}
+	};
+
+	(read_write $ofx_name:ident as $name:ident : $return_type:ty) => {
+		define_property!(read_write $ofx_name as $name: $return_type | $return_type);
+	};
 }
 
 macro_rules! can_set_property {
@@ -398,8 +426,20 @@ macro_rules! can_set_property {
 		}
 	};
 
+	($function_name: ident, $property_name:path, &$value_type:ty) => {
+		fn $function_name<'a>(&mut self, value: &'a $value_type) -> Result<()>{
+			self.set::<$property_name>(value)
+		}
+	};
+
 	($function_name: ident, $property_name:path, $value_type:ty) => {
-		fn $function_name<S>(&mut self, value: S) -> Result<()> where S: Into<$value_type> {
+		fn $function_name(&mut self, value: $value_type) -> Result<()>{
+			self.set::<$property_name>(&value)
+		}
+	};
+
+	($function_name: ident, $property_name:path, into &$value_type:ty) => {
+		fn $function_name<'a, S>(&mut self, value: &'a S) -> Result<()> where S: Into<&'a $value_type> {
 			self.set::<$property_name>(value.into())
 		}
 	};
@@ -449,10 +489,10 @@ define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
 define_property!(read_only PropName as Name: String);
 
-define_property!(read_write PropLabel as Label: String, &'static str);
-define_property!(read_write PropShortLabel as ShortLabel: String, &'static str);
-define_property!(read_write PropLongLabel as LongLabel: String, &'static str);
-define_property!(read_write PropPluginDescription as PluginDescription: String, &'static str);
+define_property!(read_write PropLabel as Label: String | str);
+define_property!(read_write PropShortLabel as ShortLabel: String | str);
+define_property!(read_write PropLongLabel as LongLabel: String | str);
+define_property!(read_write PropPluginDescription as PluginDescription: String | str);
 
 define_property!(read_only PropVersion as Version: String);
 define_property!(read_only PropVersionLabel as VersionLabel: String);
@@ -461,60 +501,57 @@ define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool
 
 pub mod image_effect_plugin {
 	use super::*;
-	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String, &'static str);
-	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool, Bool);
+	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String | str);
+	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool);
 }
 
 pub mod image_effect {
 	use super::*;
 	define_property!(read_only ImageEffectPropContext as Context: CString);
-	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool, Bool);
-	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString, &'static [u8]);
-	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString, &'static [u8]);
-	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString, &'static [u8]);
+	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
+	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString | [u8]);
+	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString | [u8]);
+	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString | [u8]);
 }
 
 pub mod image_clip {
 	use super::*;
-	define_property!(read_only ImageClipPropConnected as Connected: bool);
-	define_property!(read_write ImageClipPropOptional as Optional: bool, bool);
+	define_property!(read_only ImageClipPropConnected as Connected: Bool);
+	define_property!(read_write ImageClipPropOptional as Optional: Bool);
 }
 
 pub mod param {
+
 	use super::*;
-	define_property!(read_write ParamPropHint as Hint: String, &'static str);
-	define_property!(read_write ParamPropParent as Parent: String, &'static str);
-	define_property!(read_write ParamPropScriptName as ScriptName: String, &'static str);
+	define_property!(read_write ParamPropEnabled as Enabled: Bool);
+	define_property!(read_write ParamPropHint as Hint: String | str);
+	define_property!(read_write ParamPropParent as Parent: String | str);
+	define_property!(read_write ParamPropScriptName as ScriptName: String | str);
 	pub mod double {
 		use super::super::*;
-		define_property!(read_write ParamPropDoubleType as DoubleType: CString,  &'static [u8]);
-		define_property!(read_write ParamPropDefault as Default: f64, f64);
-		define_property!(read_write ParamPropDisplayMax as DisplayMax: f64, f64);
-		define_property!(read_write ParamPropDisplayMin as DisplayMin: f64, f64);
+		define_property!(read_write ParamPropDoubleType as DoubleType: CString | [u8]);
+		define_property!(read_write ParamPropDefault as Default: Double);
+		define_property!(read_write ParamPropDisplayMax as DisplayMax: Double);
+		define_property!(read_write ParamPropDisplayMin as DisplayMin: Double);
 	}
 	pub mod boolean {
 		use super::super::*;
-		define_property!(read_write ParamPropDefault as Default: bool, bool);
+		define_property!(read_write ParamPropDefault as Default: Bool);
 	}
 	pub mod page {
 		use super::super::*;
-		define_property!(read_write ParamPropPageChild as Child: String, &'static str);
+		define_property!(read_write ParamPropPageChild as Child: String | str);
 	}
 }
 
 pub trait CanSetLabel: Writable {
-	can_set_property!(set_label, Label, &'static str);
+	can_set_property!(set_label, Label, &str);
 }
 
 pub trait CanSetLabels: Writable + CanSetLabel {
-	can_set_property!(set_short_label, ShortLabel, &'static str);
-	can_set_property!(set_long_label, LongLabel, &'static str);
-	fn set_labels(
-		&mut self,
-		label: &'static str,
-		short: &'static str,
-		long: &'static str,
-	) -> Result<()> {
+	can_set_property!(set_short_label, ShortLabel, &str);
+	can_set_property!(set_long_label, LongLabel, &str);
+	fn set_labels(&mut self, label: &str, short: &str, long: &str) -> Result<()> {
 		self.set_label(label)?;
 		self.set_short_label(short)?;
 		self.set_long_label(long)?;
@@ -530,7 +567,7 @@ pub trait CanSetGrouping: Writable {
 	can_set_property!(
 		set_image_effect_plugin_grouping,
 		image_effect_plugin::Grouping,
-		&'static str
+		&str
 	);
 }
 
@@ -570,7 +607,11 @@ pub trait CanSetSupportedComponents: Writable {
 }
 
 pub trait CanSetOptional: Writable {
-	can_set_property!(set_optional, image_clip::Optional, bool);
+	can_set_property!(set_optional, image_clip::Optional);
+}
+
+pub trait CanSetEnabled: Writable {
+	can_set_property!(set_enabled, param::Enabled);
 }
 
 pub trait CanGetConnected: Readable {
@@ -578,37 +619,41 @@ pub trait CanGetConnected: Readable {
 }
 
 pub trait CanSetHint: Writable {
-	can_set_property!(set_hint, param::Hint, &'static str);
+	can_set_property!(set_hint, param::Hint, &str);
 }
 
 pub trait CanSetParent: Writable {
-	can_set_property!(set_parent, param::Parent, &'static str);
+	can_set_property!(set_parent, param::Parent, &str);
 }
 
 pub trait CanSetScriptName: Writable {
-	can_set_property!(set_script_name, param::Parent, &'static str);
+	can_set_property!(set_script_name, param::Parent, &str);
 }
 
 pub trait CanSetChildren: Writable {
-	can_set_property!(set_children, param::page::Child, &[&'static str]);
+	can_set_property!(set_children, param::page::Child, &[&str]);
 }
 
 pub trait CanSetDoubleParams: Writable {
 	can_set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
-	can_set_property!(set_default, param::double::Default, f64);
-	can_set_property!(set_display_max, param::double::DisplayMax, f64);
-	can_set_property!(set_display_min, param::double::DisplayMin, f64);
+	can_set_property!(set_default, param::double::Default);
+	can_set_property!(set_display_max, param::double::DisplayMax);
+	can_set_property!(set_display_min, param::double::DisplayMin);
 }
 
 pub trait CanSetBooleanParams: Writable {
-	can_set_property!(set_default, param::boolean::Default, bool);
+	can_set_property!(set_default, param::boolean::Default);
 }
 
-pub trait BaseParam: CanSetLabel + CanSetHint + CanSetParent + CanSetScriptName {}
+pub trait BaseParam:
+	CanSetLabel + CanSetHint + CanSetParent + CanSetScriptName + CanSetEnabled
+{
+}
 impl<T> CanSetLabel for T where T: BaseParam {}
 impl<T> CanSetHint for T where T: BaseParam {}
 impl<T> CanSetParent for T where T: BaseParam {}
 impl<T> CanSetScriptName for T where T: BaseParam {}
+impl<T> CanSetEnabled for T where T: BaseParam {}
 
 impl CanGetSupportsMultipleClipDepths for HostHandle {}
 impl CanSetLabel for ImageEffectProperties {}
@@ -629,11 +674,12 @@ impl BaseClip for ClipProperties {}
 
 impl CanGetConnected for ImageClipHandle {}
 
-impl BaseParam for ParamDouble {}
-impl BaseParam for ParamBoolean {}
-impl BaseParam for ParamPage {}
+impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
+impl BaseParam for ParamDoubleProperties {}
+impl BaseParam for ParamBooleanProperties {}
+impl BaseParam for ParamPageProperties {}
 
-impl CanSetDoubleParams for ParamDouble {}
-impl CanSetBooleanParams for ParamBoolean {}
+impl CanSetDoubleParams for ParamDoubleProperties {}
+impl CanSetBooleanParams for ParamBooleanProperties {}
 
-impl CanSetChildren for ParamPage {}
+impl CanSetChildren for ParamPageProperties {}
