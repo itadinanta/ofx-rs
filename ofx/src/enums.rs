@@ -177,7 +177,6 @@ identified_enum! {
 	}
 }
 
-
 mod tests {
 	use super::*;
 	#[test]

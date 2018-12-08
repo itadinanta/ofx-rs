@@ -54,8 +54,6 @@ macro_rules! to_result {
 	};
 }
 
-
-
 impl From<std::ffi::NulError> for Error {
 	fn from(_src: std::ffi::NulError) -> Error {
 		Error::InvalidNameEncoding

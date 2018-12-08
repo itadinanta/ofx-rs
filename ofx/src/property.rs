@@ -235,11 +235,9 @@ where
 		let c_name = P::name().c_str()?;
 		let mut c_double_out: Double = 0.0;
 		to_result! { suite_call!(propGetDouble in *readable.suite(),
-			readable.handle(),
-			c_name,
-			index as Int,
-			&mut c_double_out as *mut _
-		) => c_double_out }
+			readable.handle(), c_name, index as Int, &mut c_double_out as *mut _)
+			=> c_double_out
+		}
 	}
 }
 
@@ -250,14 +248,10 @@ where
 {
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
-		unsafe {
-			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
-			to_result! { suite_call!(propGetString in *readable.suite(),
-				readable.handle(),
-				c_name,
-				index as Int,
-				&mut c_ptr_out as *mut _
-			) => CStr::from_ptr(c_ptr_out).to_owned() }
+		let mut c_ptr_out: CharPtr = std::ptr::null();
+		to_result! { suite_call!(propGetString in *readable.suite(),
+			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+			=> unsafe { CStr::from_ptr(c_ptr_out).to_owned() }
 		}
 	}
 }
@@ -269,14 +263,10 @@ where
 {
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
 		let c_name = P::name().c_str()?;
-		unsafe {
-			let mut c_ptr_out: CharPtr = std::mem::uninitialized();
-			to_result! { suite_call!(propGetString in *readable.suite(),
-				readable.handle(),
-				c_name,
-				index as Int,
-				&mut c_ptr_out as *mut _
-			) => CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }
+		let mut c_ptr_out: CharPtr = std::ptr::null();
+		to_result! { suite_call!(propGetString in *readable.suite(),
+			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+			=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }
 		}
 	}
 }
@@ -326,12 +316,7 @@ where
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
 		to_result!(suite_call!(propSetString in *writable.suite(),
-				writable.handle(),
-				c_name,
-				index as Int,
-				c_ptr_in
-			)
-		)
+			writable.handle(), c_name, index as Int, c_ptr_in))
 	}
 }
 
@@ -348,12 +333,7 @@ where
 	{
 		let c_name = P::name().c_str()?;
 		to_result!(suite_call!(propSetPointer in *writable.suite(),
-				writable.handle(),
-				c_name,
-				index as Int,
-				value as *mut _
-			)
-		)
+			writable.handle(), c_name, index as Int, value as *mut _))
 	}
 }
 
@@ -371,12 +351,7 @@ where
 		let c_name = P::name().c_str()?;
 		let int_value_in = if value { 1 } else { 0 };
 		to_result!(suite_call!(propSetInt in *writable.suite(),
-				writable.handle(),
-				c_name,
-				index as Int,
-				int_value_in
-			)
-		)
+			writable.handle(), c_name, index as Int, int_value_in))
 	}
 }
 
@@ -393,11 +368,7 @@ where
 	{
 		let c_name = P::name().c_str()?;
 		to_result!(suite_call!(propSetDouble in *writable.suite(),
-				writable.handle(),
-				c_name,
-				index as Int,
-				value
-		))
+			writable.handle(), c_name, index as Int, value))
 	}
 }
 
