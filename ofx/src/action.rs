@@ -56,6 +56,13 @@ pub enum Action {
 	Describe(ImageEffectHandle),
 	DescribeInContext(ImageEffectHandle, ImageEffectContext),
 	CreateInstance(ImageEffectHandle),
+	GetRegionOfDefinition(
+		ImageEffectHandle,
+		GetRegionOfDefinitionInArgs,
+		GetRegionOfDefinitionOutArgs,
+	),
+	GetClipPreferences(ImageEffectHandle, GetClipPreferencesOutArgs),
+	IsIdentity(ImageEffectHandle, IsIdentityInArgs, IsIdentityOutArgs),
 	DestroyInstance(ImageEffectHandle),
 	GenericGlobal(GlobalAction, GenericPluginHandle),
 	GenericImageEffect(ImageEffectAction, ImageEffectHandle),

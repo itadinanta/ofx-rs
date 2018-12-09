@@ -138,6 +138,26 @@ impl MapAction for PluginDescriptor {
 						context,
 					))
 				}
+				ImageEffectAction::GetRegionOfDefinition => {
+					let in_args =
+						self.new_typed_properties(GetRegionOfDefinitionInArgs::new, in_args)?;
+					let out_args =
+						self.new_typed_properties(GetRegionOfDefinitionOutArgs::new, out_args)?;
+					Ok(Action::GetRegionOfDefinition(
+						self.new_image_effect_raw(handle)?,
+						in_args,
+						out_args,
+					))
+				}
+				ImageEffectAction::GetClipPreferences => {
+					let out_args =
+						self.new_typed_properties(GetClipPreferencesOutArgs::new, out_args)?;
+					Ok(Action::GetClipPreferences(
+						self.new_image_effect_raw(handle)?,
+						out_args,
+					))
+				}
+
 				_ => Err(Error::InvalidAction),
 			}
 		} else if let Some(action) = self.global_action_index.find(name) {

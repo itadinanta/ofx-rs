@@ -6,6 +6,7 @@ use types::*;
 pub use ofx_sys::eOfxStatus_ErrBadHandle;
 pub use ofx_sys::eOfxStatus_ErrBadIndex;
 pub use ofx_sys::eOfxStatus_ErrValue;
+pub use ofx_sys::eOfxStatus_ReplyDefault;
 pub use ofx_sys::eOfxStatus_OK;
 
 #[derive(Debug, Clone, Copy)]
@@ -29,6 +30,7 @@ pub enum Error {
 }
 
 pub const OK: Result<Int> = Ok(eOfxStatus_OK);
+pub const REPLY_DEFAULT: Result<Int> = Ok(eOfxStatus_ReplyDefault);
 pub const UNIMPLEMENTED: Result<Int> = Err(Error::Unimplemented);
 
 impl From<OfxStatus> for Error {

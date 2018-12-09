@@ -36,8 +36,42 @@ struct MyInstanceData {
 }
 
 impl Execute for SimplePlugin {
+	#[allow(clippy::float_cmp)]
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		match *action {
+			Action::IsIdentity(ref mut effect, ref in_args, ref mut out_args) => {
+				let time = in_args.get_time()?;
+				let render_window = in_args.get_render_window()?;
+				let instance_data = effect.get_instance_data::<MyInstanceData>()?;
+
+				let scale_value = instance_data.scale_param.get_value_at_time(time)?;
+
+				let clip_pixels_are_rgba = false;
+
+				let (sr, sg, sb, sa) = if clip_pixels_are_rgba {
+					(
+						instance_data.scale_r_param.get_value_at_time(time)?,
+						instance_data.scale_g_param.get_value_at_time(time)?,
+						instance_data.scale_b_param.get_value_at_time(time)?,
+						instance_data.scale_a_param.get_value_at_time(time)?,
+					)
+				} else {
+					(1., 1., 1., 1.)
+				};
+				if scale_value == 1. && sr == 1. && sg == 1. && sb == 1. && sa == 1. {
+					out_args.set_name_raw(kOfxImageEffectSimpleSourceClipName)?;
+					OK
+				} else {
+					REPLY_DEFAULT
+				}
+			}
+
+			Action::GetRegionOfDefinition(ref mut _effect, ref _in_args, ref mut _out_args) => {
+				REPLY_DEFAULT
+			}
+
+			Action::GetClipPreferences(ref mut _effect, ref mut _out_args) => REPLY_DEFAULT,
+
 			Action::CreateInstance(ref mut effect) => {
 				let mut effect_props = effect.properties()?;
 				let mut param_set = effect.parameter_set()?;
@@ -74,16 +108,12 @@ impl Execute for SimplePlugin {
 					scale_a_param,
 				})?;
 
-				Self::set_per_component_scale_enabledness(effect);
-
-				UNIMPLEMENTED
-			}
-
-			Action::DestroyInstance(ref mut effect) => {
-				effect.drop_instance_data()?;
+				Self::set_per_component_scale_enabledness(effect)?;
 
 				OK
 			}
+
+			Action::DestroyInstance(ref mut _effect) => OK,
 
 			Action::DescribeInContext(ref mut effect, context) => {
 				info!("DescribeInContext {:?} {:?}", effect, context);
@@ -228,26 +258,40 @@ impl Execute for SimplePlugin {
 }
 
 impl SimplePlugin {
-	fn set_param_enabledness<T>(
-		effect: &mut ImageEffectHandle,
-		name: &str,
-		enabled: bool,
-	) -> Result<()> where T: ParamHandleValue{
-		let mut parameter = effect.parameter_set()?.parameter::<T>(name)?;
-		parameter.set_enabled(enabled)?;
-		//let instance_data = effect.get_instance_data::<MyInstanceData>()?;
-		//instance_data.per_component_scale_param.get_value();
-		Ok(())
-	}
-
 	fn set_per_component_scale_enabledness(effect: &mut ImageEffectHandle) -> Result<()> {
-		let source_clip = effect.get_simple_input_clip()?.clone();
-		let mut instance_data = effect.get_instance_data::<MyInstanceData>()?;
-		//instance_data.per_component_scale_param;
-		let is_connected = source_clip.get_connected()?;
-		//source_clip.get_components();
-		//instance_data.per_component_scale_param.get_value();
-		//Self::set_param_enabledness(effect, "scaleR", per_component_scale);
+		let per_component_scale = {
+			let per_component_scale_selected = effect
+				.get_instance_data::<MyInstanceData>()?
+				.per_component_scale_param
+				.get_value()?;
+			let input_clip = effect.get_simple_input_clip()?;
+			let is_rgb = input_clip.get_connected()?
+				&& input_clip.get_components()? != ImageComponent::Alpha;
+			per_component_scale_selected && is_rgb
+		};
+
+		let instance_data = effect.get_instance_data::<MyInstanceData>()?;
+		instance_data
+			.scale_r_param
+			.set_enabled(per_component_scale)?;
+		instance_data
+			.scale_g_param
+			.set_enabled(per_component_scale)?;
+		instance_data
+			.scale_b_param
+			.set_enabled(per_component_scale)?;
+		instance_data
+			.scale_a_param
+			.set_enabled(per_component_scale)?;
+
+		// 		does this work too?
+		//		for parameter in &["scaleR", "scaleG", "scaleB", "scaleA"] {
+		//			effect
+		//				.parameter_set()?
+		//				.parameter::<Double>(parameter)?
+		//				.set_enabled(per_component_scale)?;
+		//		}
+
 		Ok(())
 	}
 }

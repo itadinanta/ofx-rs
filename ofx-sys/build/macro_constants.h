@@ -1,6 +1,7 @@
 enum eOfxStatus {
 	Unused = -1,
 	OK = kOfxStatOK,
+	ReplyDefault = kOfxStatReplyDefault,
 	Failed = kOfxStatFailed,
 	ErrFatal = kOfxStatErrFatal,
 	ErrBadHandle = kOfxStatErrBadHandle,

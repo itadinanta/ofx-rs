@@ -25,7 +25,7 @@ pub trait Readable: AsProperties + Sized + Clone {
 	fn get<P>(&self) -> Result<P::ReturnType>
 	where
 		P: Named + Get,
-		P::ReturnType: Default + ValueType + Sized + Getter<Self, P>,
+		P::ReturnType: ValueType + Sized + Getter<Self, P>,
 	{
 		<P::ReturnType as Getter<Self, P>>::get(&self)
 	}
@@ -33,7 +33,7 @@ pub trait Readable: AsProperties + Sized + Clone {
 	fn get_at<P>(&mut self, index: usize) -> Result<P::ReturnType>
 	where
 		P: Named + Get,
-		P::ReturnType: Default + ValueType + Sized + Getter<Self, P>,
+		P::ReturnType: ValueType + Sized + Getter<Self, P>,
 	{
 		<P::ReturnType as Getter<Self, P>>::get_at(self, index)
 	}
@@ -95,6 +95,7 @@ pub trait ValueType {}
 impl ValueType for Bool {}
 impl ValueType for Int {}
 impl ValueType for Double {}
+impl ValueType for RectI {}
 impl ValueType for String {}
 impl ValueType for str {}
 impl ValueType for [u8] {}
@@ -184,8 +185,22 @@ where
 		let mut c_double_out: Double = 0.0;
 		to_result! { suite_call!(propGetDouble in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_double_out as *mut _)
-			=> c_double_out
-		}
+		=> c_double_out}
+	}
+}
+
+impl<R, P> Getter<R, P> for RectI
+where
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, _index: usize) -> Result<Self> {
+		let c_name = P::name().c_str()?;
+		let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
+		// Very, very, very unsafe!
+		to_result! { suite_call!(propGetIntN in *readable.suite(),
+			readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
+		=> c_struct_out}
 	}
 }
 
@@ -199,8 +214,7 @@ where
 		let mut c_ptr_out: CharPtr = std::ptr::null();
 		to_result! { suite_call!(propGetString in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
-			=> unsafe { CStr::from_ptr(c_ptr_out).to_owned() }
-		}
+		=> unsafe { CStr::from_ptr(c_ptr_out).to_owned() }}
 	}
 }
 
@@ -397,9 +411,9 @@ macro_rules! define_property {
 	};
 }
 
-macro_rules! can_set_property {
+macro_rules! set_property {
 	($function_name: ident, $property_name:path) => {
-		can_set_property!($function_name, $property_name, <$property_name as Set>::ValueType);
+		set_property!($function_name, $property_name, <$property_name as Set>::ValueType);
 	};
 
 	($function_name: ident, $property_name:path, &[enum $enum_value_type:ty]) => {
@@ -411,7 +425,7 @@ macro_rules! can_set_property {
 		}
 	};
 
-	($function_name: ident, $property_name:path, &[$value_type:ty]) => {
+	($function_name: ident, $property_name:path, &seq [$value_type:ty]) => {
 		fn $function_name(&mut self, values: &[$value_type]) -> Result<()> {
 			for (index, value) in values.iter().enumerate() {
 				self.set_at::<$property_name>(index, value)?;
@@ -446,7 +460,7 @@ macro_rules! can_set_property {
 
 }
 
-macro_rules! can_get_property {
+macro_rules! get_property {
 	($function_name: ident, $property_name:path, enum $enum_value_type:ident) => {
 		fn $function_name(&self) -> Result<$enum_value_type> {
 			let str_value = self.get::<$property_name>()?;
@@ -487,7 +501,8 @@ mod tests {
 
 define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
-define_property!(read_only PropName as Name: String);
+define_property!(read_write PropName as Name: String | str);
+define_property!(read_only PropTime as Time: Double);
 
 define_property!(read_write PropLabel as Label: String | str);
 define_property!(read_write PropShortLabel as ShortLabel: String | str);
@@ -508,10 +523,14 @@ pub mod image_effect_plugin {
 pub mod image_effect {
 	use super::*;
 	define_property!(read_only ImageEffectPropContext as Context: CString);
+
 	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
 	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString | [u8]);
 	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString | [u8]);
 	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString | [u8]);
+	define_property!(read_write ImageEffectPropRenderWindow as RenderWindow: OfxRectI);
+
+	define_property!(read_only ImageEffectPropComponents as Components: CString);
 }
 
 pub mod image_clip {
@@ -521,7 +540,6 @@ pub mod image_clip {
 }
 
 pub mod param {
-
 	use super::*;
 	define_property!(read_write ParamPropEnabled as Enabled: Bool);
 	define_property!(read_write ParamPropHint as Hint: String | str);
@@ -545,12 +563,12 @@ pub mod param {
 }
 
 pub trait CanSetLabel: Writable {
-	can_set_property!(set_label, Label, &str);
+	set_property!(set_label, Label, &str);
 }
 
 pub trait CanSetLabels: Writable + CanSetLabel {
-	can_set_property!(set_short_label, ShortLabel, &str);
-	can_set_property!(set_long_label, LongLabel, &str);
+	set_property!(set_short_label, ShortLabel, &str);
+	set_property!(set_long_label, LongLabel, &str);
 	fn set_labels(&mut self, label: &str, short: &str, long: &str) -> Result<()> {
 		self.set_label(label)?;
 		self.set_short_label(short)?;
@@ -560,11 +578,22 @@ pub trait CanSetLabels: Writable + CanSetLabel {
 }
 
 pub trait CanGetLabel: Readable {
-	can_get_property!(get_label, Label);
+	get_property!(get_label, Label);
+}
+
+pub trait CanGetName: Readable {
+	get_property!(get_name, Name);
+}
+
+pub trait CanSetName: Readable {
+	set_property!(set_name, Name, &str);
+	fn set_name_raw(&mut self, name_raw: &[u8]) -> Result<()> {
+		self.set_name(CStr::from_bytes_with_nul(name_raw)?.to_str()?)
+	}
 }
 
 pub trait CanSetGrouping: Writable {
-	can_set_property!(
+	set_property!(
 		set_image_effect_plugin_grouping,
 		image_effect_plugin::Grouping,
 		&str
@@ -572,7 +601,7 @@ pub trait CanSetGrouping: Writable {
 }
 
 pub trait CanSetSupportedPixelDepths: Writable {
-	can_set_property!(
+	set_property!(
 		set_supported_pixel_depths,
 		image_effect::SupportedPixelDepths,
 		&[enum BitDepth]
@@ -580,11 +609,11 @@ pub trait CanSetSupportedPixelDepths: Writable {
 }
 
 pub trait CanGetContext: Readable {
-	can_get_property!(get_context, image_effect::Context, enum ImageEffectContext);
+	get_property!(get_context, image_effect::Context, enum ImageEffectContext);
 }
 
 pub trait CanSetSupportedContexts: Writable {
-	can_set_property!(
+	set_property!(
 		set_supported_contexts,
 		image_effect::SupportedContexts,
 		&[enum ImageEffectContext]
@@ -592,14 +621,14 @@ pub trait CanSetSupportedContexts: Writable {
 }
 
 pub trait CanGetSupportsMultipleClipDepths: Readable {
-	can_get_property!(
+	get_property!(
 		get_supports_multiple_clip_depths,
 		image_effect::SupportsMultipleClipDepths
 	);
 }
 
 pub trait CanSetSupportedComponents: Writable {
-	can_set_property!(
+	set_property!(
 		set_supported_components,
 		image_effect::SupportedComponents,
 		&[enum ImageComponent]
@@ -607,46 +636,62 @@ pub trait CanSetSupportedComponents: Writable {
 }
 
 pub trait CanSetOptional: Writable {
-	can_set_property!(set_optional, image_clip::Optional);
+	set_property!(set_optional, image_clip::Optional);
 }
 
 pub trait CanSetEnabled: Writable {
-	can_set_property!(set_enabled, param::Enabled);
+	set_property!(set_enabled, param::Enabled);
+}
+
+pub trait CanGetEnabled: Readable {
+	get_property!(get_enabled, param::Enabled);
+}
+
+pub trait CanGetTime: Readable {
+	get_property!(get_time, Time);
 }
 
 pub trait CanGetConnected: Readable {
-	can_get_property!(get_connected, image_clip::Connected);
+	get_property!(get_connected, image_clip::Connected);
+}
+
+pub trait CanGetComponents: Readable {
+	get_property!(get_components, image_effect::Components, enum ImageComponent);
+}
+
+pub trait CanGetRenderWindow: Readable {
+	get_property!(get_render_window, image_effect::RenderWindow);
 }
 
 pub trait CanSetHint: Writable {
-	can_set_property!(set_hint, param::Hint, &str);
+	set_property!(set_hint, param::Hint, &str);
 }
 
 pub trait CanSetParent: Writable {
-	can_set_property!(set_parent, param::Parent, &str);
+	set_property!(set_parent, param::Parent, &str);
 }
 
 pub trait CanSetScriptName: Writable {
-	can_set_property!(set_script_name, param::Parent, &str);
+	set_property!(set_script_name, param::Parent, &str);
 }
 
 pub trait CanSetChildren: Writable {
-	can_set_property!(set_children, param::page::Child, &[&str]);
+	set_property!(set_children, param::page::Child, &seq[&str]);
 }
 
 pub trait CanSetDoubleParams: Writable {
-	can_set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
-	can_set_property!(set_default, param::double::Default);
-	can_set_property!(set_display_max, param::double::DisplayMax);
-	can_set_property!(set_display_min, param::double::DisplayMin);
+	set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
+	set_property!(set_default, param::double::Default);
+	set_property!(set_display_max, param::double::DisplayMax);
+	set_property!(set_display_min, param::double::DisplayMin);
 }
 
 pub trait CanSetBooleanParams: Writable {
-	can_set_property!(set_default, param::boolean::Default);
+	set_property!(set_default, param::boolean::Default);
 }
 
 pub trait BaseParam:
-	CanSetLabel + CanSetHint + CanSetParent + CanSetScriptName + CanSetEnabled
+	CanSetLabel + CanSetHint + CanSetParent + CanSetScriptName + CanSetEnabled + CanGetEnabled
 {
 }
 impl<T> CanSetLabel for T where T: BaseParam {}
@@ -654,6 +699,7 @@ impl<T> CanSetHint for T where T: BaseParam {}
 impl<T> CanSetParent for T where T: BaseParam {}
 impl<T> CanSetScriptName for T where T: BaseParam {}
 impl<T> CanSetEnabled for T where T: BaseParam {}
+impl<T> CanGetEnabled for T where T: BaseParam {}
 
 impl CanGetSupportsMultipleClipDepths for HostHandle {}
 impl CanSetLabel for ImageEffectProperties {}
@@ -665,6 +711,9 @@ impl CanSetSupportedPixelDepths for ImageEffectProperties {}
 impl CanSetSupportedContexts for ImageEffectProperties {}
 
 impl CanGetContext for DescribeInContextInArgs {}
+impl CanGetTime for IsIdentityInArgs {}
+impl CanSetName for IsIdentityOutArgs {}
+impl CanGetRenderWindow for IsIdentityInArgs {}
 
 pub trait BaseClip: CanSetSupportedComponents + CanSetOptional + CanGetConnected {}
 impl<T> CanGetConnected for T where T: BaseClip {}
@@ -673,6 +722,8 @@ impl<T> CanSetOptional for T where T: BaseClip {}
 impl BaseClip for ClipProperties {}
 
 impl CanGetConnected for ImageClipHandle {}
+impl CanGetComponents for ImageClipHandle {}
+impl CanGetComponents for ClipProperties {}
 
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
 impl BaseParam for ParamDoubleProperties {}

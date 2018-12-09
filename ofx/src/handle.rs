@@ -118,6 +118,36 @@ impl fmt::Debug for ParamSetHandle {
 	}
 }
 
+impl fmt::Debug for GetRegionOfDefinitionInArgs {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "GetRegionOfDefinitionInArgs {{...}}")
+	}
+}
+
+impl fmt::Debug for GetRegionOfDefinitionOutArgs {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "GetRegionOfDefinitionOutArgs {{...}}")
+	}
+}
+
+impl fmt::Debug for GetClipPreferencesOutArgs {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "GetClipPreferencesOutArgs {{...}}")
+	}
+}
+
+impl fmt::Debug for IsIdentityInArgs {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "IsIdentityInArgs {{...}}")
+	}
+}
+
+impl fmt::Debug for IsIdentityOutArgs {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "IsIdentityOutArgs {{...}}")
+	}
+}
+
 impl fmt::Debug for GenericPluginHandle {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "GenericPluginHandle {{...}}")
@@ -196,6 +226,15 @@ impl ImageClipHandle {
 	}
 }
 
+impl HasProperties<ClipProperties> for ImageClipHandle {
+	fn properties(&self) -> Result<ClipProperties> {
+		Ok(ClipProperties::new(
+			self.inner_properties,
+			self.property.clone(),
+		))
+	}
+}
+
 #[derive(Clone, Copy)]
 pub struct ImageEffectInstanceHandle {
 	inner: OfxImageEffectHandle,
@@ -237,7 +276,13 @@ macro_rules! properties_newtype {
 properties_newtype!(HostProperties);
 properties_newtype!(ImageEffectProperties);
 properties_newtype!(ClipProperties);
+
 properties_newtype!(DescribeInContextInArgs);
+properties_newtype!(GetRegionOfDefinitionInArgs);
+properties_newtype!(GetRegionOfDefinitionOutArgs);
+properties_newtype!(GetClipPreferencesOutArgs);
+properties_newtype!(IsIdentityInArgs);
+properties_newtype!(IsIdentityOutArgs);
 
 properties_newtype!(ParamDoubleProperties);
 properties_newtype!(ParamIntProperties);
