@@ -130,6 +130,18 @@ impl fmt::Debug for GetRegionOfDefinitionOutArgs {
 	}
 }
 
+impl fmt::Debug for GetRegionsOfInterestInArgs {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "GetRegionsOfInterestInArgs {{...}}")
+	}
+}
+
+impl fmt::Debug for GetRegionsOfInterestOutArgs {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "GetRegionsOfInterestOutArgs {{...}}")
+	}
+}
+
 impl fmt::Debug for GetClipPreferencesOutArgs {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "GetClipPreferencesOutArgs {{...}}")
@@ -280,6 +292,8 @@ properties_newtype!(ClipProperties);
 properties_newtype!(DescribeInContextInArgs);
 properties_newtype!(GetRegionOfDefinitionInArgs);
 properties_newtype!(GetRegionOfDefinitionOutArgs);
+properties_newtype!(GetRegionsOfInterestInArgs);
+properties_newtype!(GetRegionsOfInterestOutArgs);
 properties_newtype!(GetClipPreferencesOutArgs);
 properties_newtype!(IsIdentityInArgs);
 properties_newtype!(IsIdentityOutArgs);

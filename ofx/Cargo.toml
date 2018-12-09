@@ -17,6 +17,7 @@ path="src/lib.rs"
 [dependencies]
 libc = "0.2"
 lazy_static = "1.1"
+boolinator = "2.4"
 log="*"
 log4rs = "*"
 ofx_sys = { path = "../ofx-sys" }

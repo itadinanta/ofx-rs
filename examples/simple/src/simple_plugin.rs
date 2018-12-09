@@ -1,3 +1,4 @@
+use boolinator::*;
 use ofx::*;
 
 plugin_module!(
@@ -66,8 +67,32 @@ impl Execute for SimplePlugin {
 				}
 			}
 
-			Action::GetRegionOfDefinition(ref mut _effect, ref _in_args, ref mut _out_args) => {
-				REPLY_DEFAULT
+			Action::GetRegionOfDefinition(ref mut effect, ref in_args, ref mut out_args) => {
+				let time = in_args.get_time()?;
+				let rod = effect
+					.get_instance_data::<MyInstanceData>()?
+					.source_clip
+					.get_region_of_definition(time)?;
+
+				out_args.set_region_of_definition(rod)?;
+
+				OK
+			}
+
+			Action::GetRegionsOfInterest(ref mut effect, ref in_args, ref mut out_args) => {
+				let roi = in_args.get_region_of_interest()?;
+
+				out_args.set_raw("OfxImageClipPropRoI_Source", roi)?;
+
+				if effect
+					.get_instance_data::<MyInstanceData>()?
+					.is_general_effect
+					&& effect.get_clip("Mask")?.get_connected()?
+				{
+					out_args.set_raw("OfxImageClipPropRoI_Source", roi)?;
+				}
+
+				OK
 			}
 
 			Action::GetClipPreferences(ref mut _effect, ref mut _out_args) => REPLY_DEFAULT,
@@ -113,7 +138,7 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::DestroyInstance(ref mut _effect) => OK,
+			Action::DestroyInstance(ref mut _effect) => REPLY_DEFAULT,
 
 			Action::DescribeInContext(ref mut effect, context) => {
 				info!("DescribeInContext {:?} {:?}", effect, context);
@@ -252,7 +277,8 @@ impl Execute for SimplePlugin {
 
 				OK
 			}
-			_ => OK,
+
+			_ => REPLY_DEFAULT,
 		}
 	}
 }

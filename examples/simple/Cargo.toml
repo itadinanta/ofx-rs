@@ -19,3 +19,4 @@ libc = "0.2"
 ofx = { path = "../../ofx" }
 log="*"
 log4rs = "*"
+boolinator = "2.4"
