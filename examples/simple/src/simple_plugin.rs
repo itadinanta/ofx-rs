@@ -82,20 +82,24 @@ impl Execute for SimplePlugin {
 			Action::GetRegionsOfInterest(ref mut effect, ref in_args, ref mut out_args) => {
 				let roi = in_args.get_region_of_interest()?;
 
-				out_args.set_raw("OfxImageClipPropRoI_Source", roi)?;
+				// out_args.set_raw("OfxImageClipPropRoI_Source", roi)?;
 
 				if effect
 					.get_instance_data::<MyInstanceData>()?
 					.is_general_effect
 					&& effect.get_clip("Mask")?.get_connected()?
 				{
-					out_args.set_raw("OfxImageClipPropRoI_Source", roi)?;
+					// out_args.set_raw("OfxImageClipPropRoI_Mask", roi)?;
 				}
 
 				OK
 			}
 
-			Action::GetClipPreferences(ref mut _effect, ref mut _out_args) => REPLY_DEFAULT,
+			Action::GetClipPreferences(ref mut _effect, ref mut out_args) => {
+				
+				
+				OK
+			},
 
 			Action::CreateInstance(ref mut effect) => {
 				let mut effect_props = effect.properties()?;

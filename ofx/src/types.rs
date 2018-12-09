@@ -18,6 +18,7 @@ pub type VoidPtrMut = *mut c_void;
 pub type Status = OfxStatus;
 pub type RectI = ofx_sys::OfxRectI;
 pub type RectD = ofx_sys::OfxRectD;
+pub type Time = ofx_sys::OfxTime;
 
 pub(crate) type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
 pub(crate) type MainEntry = unsafe extern "C" fn(

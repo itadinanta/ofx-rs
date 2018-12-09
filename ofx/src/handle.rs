@@ -214,7 +214,7 @@ where
 		Ok(value)
 	}
 
-	pub fn get_value_at_time(&self, time: OfxTime) -> Result<T> {
+	pub fn get_value_at_time(&self, time: Time) -> Result<T> {
 		let mut value: T = T::default();
 		to_result!(suite_call!(paramGetValueAtTime in self.parameter,
 			self.inner, time, &mut value as *mut _))?;
@@ -235,6 +235,13 @@ impl ImageClipHandle {
 			property,
 			image_effect,
 		}
+	}
+
+	pub fn get_region_of_definition(&self, time: Time) -> Result<RectD> {
+		let mut value: RectD = unsafe { std::mem::zeroed() };
+		to_result!(suite_call!(clipGetRegionOfDefinition in self.image_effect,
+			self.inner, time, &mut value as *mut _))?;
+		Ok(value)
 	}
 }
 

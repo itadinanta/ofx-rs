@@ -96,6 +96,7 @@ impl ValueType for Bool {}
 impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for RectI {}
+impl ValueType for RectD {}
 impl ValueType for String {}
 impl ValueType for str {}
 impl ValueType for [u8] {}
@@ -204,6 +205,21 @@ where
 	}
 }
 
+impl<R, P> Getter<R, P> for RectD
+where
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, _index: usize) -> Result<Self> {
+		let c_name = P::name().c_str()?;
+		let mut c_struct_out: RectD = unsafe { std::mem::zeroed() };
+		// Very, very, very unsafe!
+		to_result! { suite_call!(propGetDoubleN in *readable.suite(),
+			readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
+		=> c_struct_out}
+	}
+}
+
 impl<R, P> Getter<R, P> for CString
 where
 	R: Readable + AsProperties,
@@ -229,6 +245,18 @@ where
 		to_result! { suite_call!(propGetString in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
 		=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }}
+	}
+}
+
+pub trait AnonymousSetter<W, P>
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+	P: Set<ValueType = Self> + ?Sized,
+{
+	fn set_at(writable: &mut W, name: CharPtr, index: usize, value: &Self) -> Result<()>;
+	fn set(writable: &mut W, name: CharPtr, value: &Self) -> Result<()> {
+		Self::set_at(writable, name, 0, value)
 	}
 }
 
@@ -268,11 +296,7 @@ where
 	P: Named + Set<ValueType = Self>,
 	A: CStrWithNul,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
-	where
-		W: AsProperties,
-		P: Named,
-	{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
 		let c_name = P::name().c_str()?;
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
@@ -287,11 +311,7 @@ where
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
-	where
-		W: AsProperties,
-		P: Named,
-	{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
 		let c_name = P::name().c_str()?;
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
@@ -306,11 +326,7 @@ where
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
-	where
-		W: AsProperties,
-		P: Named,
-	{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
 		let c_name = P::name().c_str()?;
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
@@ -325,14 +341,64 @@ where
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
-	where
-		W: AsProperties,
-		P: Named,
-	{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
 		let c_name = P::name().c_str()?;
 		to_result!(suite_call!(propSetPointer in *writable.suite(),
 			writable.handle(), c_name, index as Int, *value as *mut _))
+	}
+}
+
+impl<W, P> Setter<W, P> for Int
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
+		let c_name = P::name().c_str()?;
+		let int_value_in = *value;
+		to_result!(suite_call!(propSetInt in *writable.suite(),
+			writable.handle(), c_name, index as Int, int_value_in))
+	}
+}
+
+/*
+impl<W, P, T> Setter<W, P> for T
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+	T: AnonymousSetter<W, P>,
+{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
+		let c_name = P::name().c_str()?;
+		T::set_at(writable, c_name, index, value)
+	}
+}
+
+impl<W, P> AnonymousSetter<W, P> for Int
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+	P: Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
+		let int_value_in = *value;
+		to_result!(suite_call!(propSetInt in *writable.suite(),
+			writable.handle(), c_name, index as Int, int_value_in))
+	}
+}
+*/
+impl<W, P> Setter<W, P> for RectI
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, _index: usize, value: &Self) -> Result<()> {
+		let c_name = P::name().c_str()?;
+		to_result!(suite_call!(propSetIntN in *writable.suite(),
+			writable.handle(), c_name, 4,  &value.x1 as *const _))
 	}
 }
 
@@ -342,11 +408,7 @@ where
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
-	where
-		W: AsProperties,
-		P: Named,
-	{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
 		let c_name = P::name().c_str()?;
 		let int_value_in = if *value { 1 } else { 0 };
 		to_result!(suite_call!(propSetInt in *writable.suite(),
@@ -360,22 +422,24 @@ where
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>
-	where
-		W: AsProperties,
-		P: Named,
-	{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
 		let c_name = P::name().c_str()?;
 		to_result!(suite_call!(propSetDouble in *writable.suite(),
 			writable.handle(), c_name, index as Int, *value))
 	}
 }
 
-trait Reader<R>
+impl<W, P> Setter<W, P> for RectD
 where
-	R: Named + Get,
+	Self: ValueType,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
 {
-	fn get(&self) -> Result<R::ReturnType>;
+	fn set_at(writable: &mut W, _index: usize, value: &Self) -> Result<()> {
+		let c_name = P::name().c_str()?;
+		to_result!(suite_call!(propSetDoubleN in *writable.suite(),
+			writable.handle(), c_name, 4,  &value.x1 as *const _))
+	}
 }
 
 macro_rules! define_property {
@@ -475,30 +539,6 @@ macro_rules! get_property {
 	}
 }
 
-mod tests {
-	use super::*;
-
-	struct Dummy {}
-	impl Reader<super::Type> for Dummy {
-		fn get(&self) -> Result<String> {
-			Ok(String::from("bah"))
-		}
-	}
-
-	impl Reader<super::IsBackground> for Dummy {
-		fn get(&self) -> Result<Bool> {
-			Ok(false)
-		}
-	}
-
-	#[test]
-	fn prop_dummy() {
-		let d = Dummy {};
-		let sv = <Dummy as Reader<IsBackground>>::get(&d);
-	}
-
-}
-
 define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
 define_property!(read_write PropName as Name: String | str);
@@ -528,7 +568,9 @@ pub mod image_effect {
 	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString | [u8]);
 	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString | [u8]);
 	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString | [u8]);
-	define_property!(read_write ImageEffectPropRenderWindow as RenderWindow: OfxRectI);
+	define_property!(read_write ImageEffectPropRenderWindow as RenderWindow: RectI);
+	define_property!(read_write ImageEffectPropRegionOfInterest as RegionOfInterest: RectI);
+	define_property!(read_write ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
 
 	define_property!(read_only ImageEffectPropComponents as Components: CString);
 }
@@ -651,6 +693,22 @@ pub trait CanGetTime: Readable {
 	get_property!(get_time, Time);
 }
 
+pub trait CanSetRegionOfDefinition: Writable {
+	set_property!(set_region_of_definition, image_effect::RegionOfDefinition);
+}
+
+pub trait CanSetRegionOfInterest: Writable {
+	set_property!(set_region_of_interest, image_effect::RegionOfInterest);
+}
+
+pub trait CanGetRegionOfDefinition: Readable {
+	get_property!(get_region_of_definition, image_effect::RegionOfDefinition);
+}
+
+pub trait CanGetRegionOfInterest: Readable {
+	get_property!(get_region_of_interest, image_effect::RegionOfInterest);
+}
+
 pub trait CanGetConnected: Readable {
 	get_property!(get_connected, image_clip::Connected);
 }
@@ -734,3 +792,9 @@ impl CanSetDoubleParams for ParamDoubleProperties {}
 impl CanSetBooleanParams for ParamBooleanProperties {}
 
 impl CanSetChildren for ParamPageProperties {}
+
+impl CanGetTime for GetRegionOfDefinitionInArgs {}
+impl CanGetRegionOfDefinition for GetRegionOfDefinitionInArgs {}
+impl CanSetRegionOfDefinition for GetRegionOfDefinitionOutArgs {}
+impl CanGetRegionOfInterest for GetRegionsOfInterestInArgs {}
+impl CanSetRegionOfInterest for GetRegionsOfInterestOutArgs {}
