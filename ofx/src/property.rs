@@ -248,28 +248,35 @@ where
 	}
 }
 
-pub trait AnonymousSetter<W, P>
+pub trait RawSetter<W>
 where
 	Self: ValueType,
 	W: Writable + AsProperties,
-	P: Set<ValueType = Self> + ?Sized,
 {
 	fn set_at(writable: &mut W, name: CharPtr, index: usize, value: &Self) -> Result<()>;
-	fn set(writable: &mut W, name: CharPtr, value: &Self) -> Result<()> {
-		Self::set_at(writable, name, 0, value)
-	}
 }
 
-pub trait Setter<W, P>
+pub trait Setter<W, P>: RawSetter<W>
 where
 	Self: ValueType,
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self> + ?Sized,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()>;
-	fn set(writable: &mut W, value: &Self) -> Result<()> {
-		Self::set_at(writable, 0, value)
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
+		let c_name = P::name().c_str()?;
+		RawSetter::set_at(writable, c_name, 0, value)
 	}
+	fn set(writable: &mut W, value: &Self) -> Result<()> {
+		Setter::set_at(writable, 0, value)
+	}
+}
+
+impl<W, P, T> Setter<W, P> for T
+where
+	T: RawSetter<W>,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self> + ?Sized,
+{
 }
 
 pub trait CStrWithNul {
@@ -289,15 +296,12 @@ impl CStrWithNul for [u8] {
 	}
 }
 
-impl<W, P, A> Setter<W, P> for A
+impl<W, A> RawSetter<W> for A
 where
-	Self: ValueType,
 	W: Writable + AsProperties,
-	P: Named + Set<ValueType = Self>,
 	A: CStrWithNul,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
-		let c_name = P::name().c_str()?;
+	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
 		to_result!(suite_call!(propSetString in *writable.suite(),
@@ -305,14 +309,11 @@ where
 	}
 }
 
-impl<W, P> Setter<W, P> for str
+impl<W> RawSetter<W> for str
 where
-	Self: ValueType,
 	W: Writable + AsProperties,
-	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
-		let c_name = P::name().c_str()?;
+	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
 		to_result!(suite_call!(propSetString in *writable.suite(),
@@ -335,14 +336,11 @@ where
 	}
 }
 
-impl<W, P> Setter<W, P> for VoidPtr
+impl<W> RawSetter<W> for VoidPtr
 where
-	Self: ValueType,
 	W: Writable + AsProperties,
-	P: Named + Set<ValueType = Self>,
 {
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
-		let c_name = P::name().c_str()?;
+	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
 		to_result!(suite_call!(propSetPointer in *writable.suite(),
 			writable.handle(), c_name, index as Int, *value as *mut _))
 	}
