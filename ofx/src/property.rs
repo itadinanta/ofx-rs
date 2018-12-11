@@ -474,6 +474,22 @@ macro_rules! get_property {
 	}
 }
 
+macro_rules! define_writable {
+	($trait_name:ident => $($tail:tt)*) => {
+		pub trait $trait_name: Writable {
+			set_property!($($tail)*);
+		}
+	};
+}
+
+macro_rules! define_readable {
+	($trait_name:ident => $($tail:tt)*) => {
+		pub trait $trait_name: Readable {
+			get_property!($($tail)*);
+		}
+	};
+}
+
 define_property!(read_only PropAPIVersion as APIVersion: String);
 define_property!(read_only PropType as Type: String);
 define_property!(read_write PropName as Name: String | str);
@@ -537,22 +553,6 @@ pub mod param {
 		use super::super::*;
 		define_property!(read_write ParamPropPageChild as Child: String | str);
 	}
-}
-
-macro_rules! define_writable {
-	($trait_name:ident => $($tail:tt)*) => {
-		pub trait $trait_name: Writable {
-			set_property!($($tail)*);
-		}
-	};
-}
-
-macro_rules! define_readable {
-	($trait_name:ident => $($tail:tt)*) => {
-		pub trait $trait_name: Readable {
-			get_property!($($tail)*);
-		}
-	};
 }
 
 define_writable!(CanSetLabel => set_label, Label, &str);
