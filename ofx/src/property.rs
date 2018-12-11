@@ -287,75 +287,50 @@ where
 }
 
 macro_rules! raw_setter_impl {
-	($value_type:ty, $stmt:expr) => {
+	(| $writable:ident, $c_name:ident, $index:ident, $value:ident : &$value_type:ty| $stmt:block) => {
 		impl<W> RawSetter<W> for $value_type
 		where
 			W: Writable + AsProperties,
 		{
-			fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
+			fn set_at($writable: &mut W, $c_name: CharPtr, $index: usize, $value: &Self) -> Result<()>
 				$stmt
-			}
 		}
 	};
 }
 
-impl<W> RawSetter<W> for VoidPtr
-where
-	W: Writable + AsProperties,
-{
-	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
+raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
 		to_result!(suite_call!(propSetPointer in *writable.suite(),
 			writable.handle(), c_name, index as Int, *value as *mut _))
 	}
 }
 
-impl<W> RawSetter<W> for Int
-where
-	W: Writable + AsProperties,
-{
-	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
+raw_setter_impl! { |writable, c_name, index, value: &Int| {
 		let int_value_in = *value;
 		to_result!(suite_call!(propSetInt in *writable.suite(),
 			writable.handle(), c_name, index as Int, int_value_in))
 	}
 }
 
-impl<W> RawSetter<W> for RectI
-where
-	W: Writable + AsProperties,
-{
-	fn set_at(writable: &mut W, c_name: CharPtr, _index: usize, value: &Self) -> Result<()> {
+raw_setter_impl! { |writable, c_name, index, value: &RectI| {
 		to_result!(suite_call!(propSetIntN in *writable.suite(),
 			writable.handle(), c_name, 4,  &value.x1 as *const _))
 	}
 }
 
-impl<W> RawSetter<W> for Bool
-where
-	W: Writable + AsProperties,
-{
-	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
+raw_setter_impl! { |writable, c_name, index, value: &Bool| {
 		let int_value_in = if *value { 1 } else { 0 };
 		to_result!(suite_call!(propSetInt in *writable.suite(),
 			writable.handle(), c_name, index as Int, int_value_in))
 	}
 }
 
-impl<W> RawSetter<W> for Double
-where
-	W: Writable + AsProperties,
-{
-	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
+raw_setter_impl! { |writable, c_name, index, value: &Double| {
 		to_result!(suite_call!(propSetDouble in *writable.suite(),
 			writable.handle(), c_name, index as Int, *value))
 	}
 }
 
-impl<W> RawSetter<W> for RectD
-where
-	W: Writable + AsProperties,
-{
-	fn set_at(writable: &mut W, c_name: CharPtr, _index: usize, value: &Self) -> Result<()> {
+raw_setter_impl! { |writable, c_name, index, value: &RectD| {
 		to_result!(suite_call!(propSetDoubleN in *writable.suite(),
 			writable.handle(), c_name, 4,  &value.x1 as *const _))
 	}
@@ -382,21 +357,6 @@ where
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
-}
-
-pub struct DummyProperty;
-impl Set for DummyProperty {
-	type ValueType = [u8];
-}
-impl Named for DummyProperty {
-	fn name() -> &'static [u8] {
-		b"kOfxDummyProperty\0"
-	}
-}
-pub trait CanSetDummyProperty: Writable {
-	fn set_dummy_property<'a>(&mut self, value: &'a [u8]) -> Result<()> {
-		self.set::<DummyProperty>(value)
-	}
 }
 
 macro_rules! define_property {
@@ -478,7 +438,25 @@ macro_rules! set_property {
 			self.set::<$property_name>(value.into())
 		}
 	};
+}
 
+mod tests {
+	// just compiling
+	use super::*;
+	pub struct DummyProperty;
+	impl Set for DummyProperty {
+		type ValueType = [u8];
+	}
+	impl Named for DummyProperty {
+		fn name() -> &'static [u8] {
+			b"kOfxDummyProperty\0"
+		}
+	}
+	pub trait CanSetDummyProperty: Writable {
+		fn set_dummy_property<'a>(&mut self, value: &'a [u8]) -> Result<()> {
+			self.set::<DummyProperty>(value)
+		}
+	}
 }
 
 macro_rules! get_property {
@@ -561,10 +539,23 @@ pub mod param {
 	}
 }
 
-pub trait CanSetLabel: Writable {
-	set_property!(set_label, Label, &str);
+macro_rules! define_writable {
+	($trait_name:ident => $($tail:tt)*) => {
+		pub trait $trait_name: Writable {
+			set_property!($($tail)*);
+		}
+	};
 }
 
+macro_rules! define_readable {
+	($trait_name:ident => $($tail:tt)*) => {
+		pub trait $trait_name: Readable {
+			get_property!($($tail)*);
+		}
+	};
+}
+
+define_writable!(CanSetLabel => set_label, Label, &str);
 pub trait CanSetLabels: Writable + CanSetLabel {
 	set_property!(set_short_label, ShortLabel, &str);
 	set_property!(set_long_label, LongLabel, &str);
@@ -576,15 +567,10 @@ pub trait CanSetLabels: Writable + CanSetLabel {
 	}
 }
 
-pub trait CanGetLabel: Readable {
-	get_property!(get_label, Label);
-}
+define_readable!(CanGetLabel => get_label, Label);
+define_readable!(CanGetName=> get_name, Name);
 
-pub trait CanGetName: Readable {
-	get_property!(get_name, Name);
-}
-
-pub trait CanSetName: Readable {
+pub trait CanSetName: Writable {
 	set_property!(set_name, Name, &str);
 	fn set_name_raw(&mut self, name_raw: &[u8]) -> Result<()> {
 		self.set_name(CStr::from_bytes_with_nul(name_raw)?.to_str()?)
@@ -687,7 +673,7 @@ pub trait CanSetParent: Writable {
 }
 
 pub trait CanSetScriptName: Writable {
-	set_property!(set_script_name, param::Parent, &str);
+	set_property!(set_script_name, param::ScriptName, &str);
 }
 
 pub trait CanSetChildren: Writable {
