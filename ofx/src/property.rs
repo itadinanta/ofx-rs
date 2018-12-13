@@ -117,40 +117,12 @@ pub trait Set: Named {
 	type ValueType: ValueType + ?Sized;
 }
 
-pub trait Edit: Get + Set {
-	type ReturnType: ValueType;
-	type ValueType: ValueType + ?Sized;
-}
-
 pub trait RawGetter<R>
 where
 	Self: ValueType + Sized,
 	R: Readable + AsProperties,
 {
 	fn get_at(readable: &R, name: CharPtr, index: usize) -> Result<Self>;
-}
-
-pub trait Getter<R, P>: RawGetter<R>
-where
-	Self: ValueType + Sized,
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
-		RawGetter::get_at(readable, c_name, index)
-	}
-	fn get(readable: &R) -> Result<Self> {
-		Getter::get_at(readable, 0)
-	}
-}
-
-impl<R, P, T> Getter<R, P> for T
-where
-	T: RawGetter<R>,
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
 }
 
 macro_rules! raw_getter_impl {
@@ -191,7 +163,6 @@ raw_getter_impl! { |readable, c_name, index| -> Double {
 
 raw_getter_impl! { |readable, c_name, index| -> RectI {
 	let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
-	// Very, very, very unsafe!
 	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
 	=> c_struct_out}
 }}
@@ -214,12 +185,27 @@ raw_getter_impl! { |readable, c_name, index| -> String {
 	=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }}
 }}
 
-pub trait RawSetter<W>
+pub trait Getter<R, P>: RawGetter<R>
 where
-	Self: ValueType,
-	W: Writable + AsProperties,
+	Self: ValueType + Sized,
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
 {
-	fn set_at(writable: &mut W, name: CharPtr, index: usize, value: &Self) -> Result<()>;
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
+		let c_name = P::name().c_str()?;
+		RawGetter::get_at(readable, c_name, index)
+	}
+	fn get(readable: &R) -> Result<Self> {
+		Getter::get_at(readable, 0)
+	}
+}
+
+impl<R, P, T> Getter<R, P> for T
+where
+	T: RawGetter<R>,
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
 }
 
 pub trait CStrWithNul {
@@ -237,6 +223,14 @@ impl CStrWithNul for [u8] {
 		let c_str_in = CStr::from_bytes_with_nul(self)?;
 		Ok(c_str_in.to_owned())
 	}
+}
+
+pub trait RawSetter<W>
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+{
+	fn set_at(writable: &mut W, name: CharPtr, index: usize, value: &Self) -> Result<()>;
 }
 
 impl<W, A> RawSetter<W> for A
@@ -268,8 +262,7 @@ raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &Int| {
-	let int_value_in = *value;
-	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, int_value_in)
+	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, *value)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &RectI| {
@@ -277,8 +270,7 @@ raw_setter_impl! { |writable, c_name, index, value: &RectI| {
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &Bool| {
-	let int_value_in = if *value { 1 } else { 0 };
-	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, int_value_in)
+	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, if *value { 1 } else { 0 })
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &Double| {
@@ -312,6 +304,25 @@ where
 {
 }
 
+mod tests {
+	// just compiling
+	use super::*;
+	pub struct DummyProperty;
+	impl Set for DummyProperty {
+		type ValueType = [u8];
+	}
+	impl Named for DummyProperty {
+		fn name() -> &'static [u8] {
+			b"kOfxDummyProperty\0"
+		}
+	}
+	pub trait CanSetDummyProperty: Writable {
+		fn set_dummy_property<'a>(&mut self, value: &'a [u8]) -> Result<()> {
+			self.set::<DummyProperty>(value)
+		}
+	}
+}
+
 macro_rules! define_property {
 	(read_only $ofx_name:ident as $name:ident : $value_type:ty) => {
 		pub struct $name;
@@ -343,6 +354,76 @@ macro_rules! define_property {
 	(read_write $ofx_name:ident as $name:ident : $return_type:ty) => {
 		define_property!(read_write $ofx_name as $name: $return_type | $return_type);
 	};
+}
+
+define_property!(read_only PropAPIVersion as APIVersion: String);
+define_property!(read_only PropType as Type: String);
+define_property!(read_only PropTime as Time: Double);
+
+define_property!(read_write PropName as Name: String | str);
+define_property!(read_write PropLabel as Label: String | str);
+define_property!(read_write PropShortLabel as ShortLabel: String | str);
+define_property!(read_write PropLongLabel as LongLabel: String | str);
+define_property!(read_write PropPluginDescription as PluginDescription: String | str);
+
+define_property!(read_only PropVersion as Version: String);
+define_property!(read_only PropVersionLabel as VersionLabel: String);
+
+pub mod image_effect_host {
+	use super::*;
+	define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool);
+}
+
+pub mod image_effect_plugin {
+	use super::*;
+	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String | str);
+	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool);
+}
+
+pub mod image_effect {
+	use super::*;
+	define_property!(read_only ImageEffectPropContext as Context: CString);
+	define_property!(read_only ImageEffectPropComponents as Components: CString);
+
+	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
+	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString | [u8]);
+	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString | [u8]);
+	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString | [u8]);
+	define_property!(read_write ImageEffectPropRenderWindow as RenderWindow: RectI);
+	define_property!(read_write ImageEffectPropRegionOfInterest as RegionOfInterest: RectI);
+	define_property!(read_write ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
+
+}
+
+pub mod image_clip {
+	use super::*;
+	define_property!(read_only ImageClipPropConnected as Connected: Bool);
+	define_property!(read_only ImageClipPropUnmappedComponents as UnmappedComponents: CString);
+
+	define_property!(read_write ImageClipPropOptional as Optional: Bool);
+}
+
+pub mod param {
+	use super::*;
+	define_property!(read_write ParamPropEnabled as Enabled: Bool);
+	define_property!(read_write ParamPropHint as Hint: String | str);
+	define_property!(read_write ParamPropParent as Parent: String | str);
+	define_property!(read_write ParamPropScriptName as ScriptName: String | str);
+	pub mod double {
+		use super::super::*;
+		define_property!(read_write ParamPropDoubleType as DoubleType: CString | [u8]);
+		define_property!(read_write ParamPropDefault as Default: Double);
+		define_property!(read_write ParamPropDisplayMax as DisplayMax: Double);
+		define_property!(read_write ParamPropDisplayMin as DisplayMin: Double);
+	}
+	pub mod boolean {
+		use super::super::*;
+		define_property!(read_write ParamPropDefault as Default: Bool);
+	}
+	pub mod page {
+		use super::super::*;
+		define_property!(read_write ParamPropPageChild as Child: String | str);
+	}
 }
 
 macro_rules! set_property {
@@ -405,25 +486,6 @@ macro_rules! set_property {
 	};
 }
 
-mod tests {
-	// just compiling
-	use super::*;
-	pub struct DummyProperty;
-	impl Set for DummyProperty {
-		type ValueType = [u8];
-	}
-	impl Named for DummyProperty {
-		fn name() -> &'static [u8] {
-			b"kOfxDummyProperty\0"
-		}
-	}
-	pub trait CanSetDummyProperty: Writable {
-		fn set_dummy_property<'a>(&mut self, value: &'a [u8]) -> Result<()> {
-			self.set::<DummyProperty>(value)
-		}
-	}
-}
-
 macro_rules! get_property {
 	($function_name: ident, $property_name:path, enum $enum_value_type:ident) => {
 		fn $function_name(&self) -> Result<$enum_value_type> {
@@ -445,72 +507,6 @@ macro_rules! get_property {
 	};
 }
 
-define_property!(read_only PropAPIVersion as APIVersion: String);
-define_property!(read_only PropType as Type: String);
-define_property!(read_write PropName as Name: String | str);
-define_property!(read_only PropTime as Time: Double);
-
-define_property!(read_write PropLabel as Label: String | str);
-define_property!(read_write PropShortLabel as ShortLabel: String | str);
-define_property!(read_write PropLongLabel as LongLabel: String | str);
-define_property!(read_write PropPluginDescription as PluginDescription: String | str);
-
-define_property!(read_only PropVersion as Version: String);
-define_property!(read_only PropVersionLabel as VersionLabel: String);
-
-define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool);
-
-pub mod image_effect_plugin {
-	use super::*;
-	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String | str);
-	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool);
-}
-
-pub mod image_effect {
-	use super::*;
-	define_property!(read_only ImageEffectPropContext as Context: CString);
-
-	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
-	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString | [u8]);
-	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString | [u8]);
-	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString | [u8]);
-	define_property!(read_write ImageEffectPropRenderWindow as RenderWindow: RectI);
-	define_property!(read_write ImageEffectPropRegionOfInterest as RegionOfInterest: RectI);
-	define_property!(read_write ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
-
-	define_property!(read_only ImageEffectPropComponents as Components: CString);
-}
-
-pub mod image_clip {
-	use super::*;
-	define_property!(read_only ImageClipPropConnected as Connected: Bool);
-	define_property!(read_only ImageClipPropUnmappedComponents as UnmappedComponents: CString);
-	define_property!(read_write ImageClipPropOptional as Optional: Bool);
-}
-
-pub mod param {
-	use super::*;
-	define_property!(read_write ParamPropEnabled as Enabled: Bool);
-	define_property!(read_write ParamPropHint as Hint: String | str);
-	define_property!(read_write ParamPropParent as Parent: String | str);
-	define_property!(read_write ParamPropScriptName as ScriptName: String | str);
-	pub mod double {
-		use super::super::*;
-		define_property!(read_write ParamPropDoubleType as DoubleType: CString | [u8]);
-		define_property!(read_write ParamPropDefault as Default: Double);
-		define_property!(read_write ParamPropDisplayMax as DisplayMax: Double);
-		define_property!(read_write ParamPropDisplayMin as DisplayMin: Double);
-	}
-	pub mod boolean {
-		use super::super::*;
-		define_property!(read_write ParamPropDefault as Default: Bool);
-	}
-	pub mod page {
-		use super::super::*;
-		define_property!(read_write ParamPropPageChild as Child: String | str);
-	}
-}
-
 get_property!(CanGetLabel => get_label, Label);
 set_property!(CanSetLabel => set_label, &Label);
 pub trait CanSetLabels: CanSetLabel {
@@ -524,7 +520,7 @@ pub trait CanSetLabels: CanSetLabel {
 	}
 }
 
-get_property!(CanGetName=> get_name, Name);
+get_property!(CanGetName => get_name, Name);
 set_property!(CanSetName => set_name, &Name);
 pub trait CanSetNameRaw: CanSetName {
 	fn set_name_raw(&mut self, name_raw: &[u8]) -> Result<()> {
