@@ -122,25 +122,50 @@ pub trait Edit: Get + Set {
 	type ValueType: ValueType + ?Sized;
 }
 
-pub trait Getter<R, P>
+pub trait RawGetter<R>
+where
+	Self: ValueType + Sized,
+	R: Readable + AsProperties,
+{
+	fn get_at(readable: &R, name: CharPtr, index: usize) -> Result<Self>;
+}
+
+pub trait Getter<R, P>: RawGetter<R>
 where
 	Self: ValueType + Sized,
 	R: Readable + AsProperties,
 	P: Named + Get<ReturnType = Self>,
 {
-	fn get_at(readable: &R, index: usize) -> Result<Self>;
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
+		let c_name = P::name().c_str()?;
+		RawGetter::get_at(readable, c_name, index)
+	}
 	fn get(readable: &R) -> Result<Self> {
-		Self::get_at(readable, 0)
+		Getter::get_at(readable, 0)
 	}
 }
 
-impl<R, P> Getter<R, P> for Int
+impl<R, P, T> Getter<R, P> for T
 where
+	T: RawGetter<R>,
 	R: Readable + AsProperties,
 	P: Named + Get<ReturnType = Self>,
 {
-	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
+}
+
+macro_rules! raw_getter_impl {
+	(|$readable:ident, $c_name:ident, $index:ident| -> $value_type: ty $stmt:block) => {
+		impl<R> RawGetter<R> for $value_type
+		where
+			R: Readable + AsProperties,
+		{
+			fn get_at($readable: &R, $c_name: CharPtr, $index: usize) -> Result<Self>
+				$stmt
+		}
+	};
+}
+
+raw_getter_impl! { |readable, c_name, index| -> Int {
 		let mut c_int_out: Int = 0;
 		to_result! {suite_call!(propGetInt in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
@@ -148,13 +173,7 @@ where
 	}
 }
 
-impl<R, P> Getter<R, P> for Bool
-where
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
+raw_getter_impl! { |readable, c_name, index| -> Bool {
 		let mut c_int_out: Int = 0;
 		to_result! { suite_call!(propGetInt in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
@@ -162,13 +181,7 @@ where
 	}
 }
 
-impl<R, P> Getter<R, P> for VoidPtr
-where
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
+raw_getter_impl! { |readable, c_name, index| -> VoidPtr {
 		let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
 		to_result! { suite_call!(propGetPointer in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
@@ -176,13 +189,7 @@ where
 	}
 }
 
-impl<R, P> Getter<R, P> for Double
-where
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
+raw_getter_impl! { |readable, c_name, index| -> Double {
 		let mut c_double_out: Double = 0.0;
 		to_result! { suite_call!(propGetDouble in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_double_out as *mut _)
@@ -190,14 +197,8 @@ where
 	}
 }
 
-impl<R, P> Getter<R, P> for RectI
-where
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, _index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
-		let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
+raw_getter_impl! { |readable, c_name, index| -> RectI {
+	let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
 		// Very, very, very unsafe!
 		to_result! { suite_call!(propGetIntN in *readable.suite(),
 			readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
@@ -205,13 +206,7 @@ where
 	}
 }
 
-impl<R, P> Getter<R, P> for RectD
-where
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, _index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
+raw_getter_impl! { |readable, c_name, index| -> RectD {
 		let mut c_struct_out: RectD = unsafe { std::mem::zeroed() };
 		// Very, very, very unsafe!
 		to_result! { suite_call!(propGetDoubleN in *readable.suite(),
@@ -220,13 +215,7 @@ where
 	}
 }
 
-impl<R, P> Getter<R, P> for CString
-where
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
+raw_getter_impl! { |readable, c_name, index| -> CString {
 		let mut c_ptr_out: CharPtr = std::ptr::null();
 		to_result! { suite_call!(propGetString in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
@@ -234,13 +223,7 @@ where
 	}
 }
 
-impl<R, P> Getter<R, P> for String
-where
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
+raw_getter_impl! { |readable, c_name, index| -> String {
 		let mut c_ptr_out: CharPtr = std::ptr::null();
 		to_result! { suite_call!(propGetString in *readable.suite(),
 			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
@@ -344,7 +327,7 @@ where
 {
 	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
 		let c_name = P::name().c_str()?;
-		RawSetter::set_at(writable, c_name, 0, value)
+		RawSetter::set_at(writable, c_name, index, value)
 	}
 	fn set(writable: &mut W, value: &Self) -> Result<()> {
 		Setter::set_at(writable, 0, value)
@@ -393,11 +376,13 @@ macro_rules! define_property {
 }
 
 macro_rules! set_property {
-	($function_name: ident, $property_name:path) => {
-		set_property!($function_name, $property_name, <$property_name as Set>::ValueType);
+	($function_name: ident, &$property_name:path) => {
+		fn $function_name(&mut self, value: &<$property_name as Set>::ValueType) -> Result<()>{
+			self.set::<$property_name>(value)
+		}
 	};
 
-	($function_name: ident, ref $property_name:path) => {
+	($function_name: ident, $property_name:path) => {
 		set_property!($function_name, $property_name, <$property_name as Set>::ValueType);
 	};
 
@@ -555,10 +540,11 @@ pub mod param {
 	}
 }
 
-set_property!(CanSetLabel => set_label, Label, &str);
-pub trait CanSetLabels: Writable + CanSetLabel {
-	set_property!(set_short_label, ShortLabel, &str);
-	set_property!(set_long_label, LongLabel, &str);
+get_property!(CanGetLabel => get_label, Label);
+set_property!(CanSetLabel => set_label, &Label);
+pub trait CanSetLabels: CanSetLabel {
+	set_property!(set_short_label, &ShortLabel);
+	set_property!(set_long_label, &LongLabel);
 	fn set_labels(&mut self, label: &str, short: &str, long: &str) -> Result<()> {
 		self.set_label(label)?;
 		self.set_short_label(short)?;
@@ -567,17 +553,15 @@ pub trait CanSetLabels: Writable + CanSetLabel {
 	}
 }
 
-get_property!(CanGetLabel => get_label, Label);
 get_property!(CanGetName=> get_name, Name);
-
-pub trait CanSetName: Writable {
-	set_property!(set_name, Name, &str);
+set_property!(CanSetName => set_name, &Name);
+pub trait CanSetNameRaw: CanSetName {
 	fn set_name_raw(&mut self, name_raw: &[u8]) -> Result<()> {
 		self.set_name(CStr::from_bytes_with_nul(name_raw)?.to_str()?)
 	}
 }
 
-set_property!(CanSetGrouping => set_image_effect_plugin_grouping, image_effect_plugin::Grouping);
+set_property!(CanSetGrouping => set_grouping, &image_effect_plugin::Grouping);
 set_property!(CanSetSupportedPixelDepths => set_supported_pixel_depths, image_effect::SupportedPixelDepths, &[enum BitDepth]);
 get_property!(CanGetContext => get_context, image_effect::Context, enum ImageEffectContext);
 set_property!(CanSetSupportedContexts => set_supported_contexts, image_effect::SupportedContexts, &[enum ImageEffectContext]);
@@ -592,30 +576,12 @@ set_property!(CanSetRegionOfInterest => set_region_of_interest, image_effect::Re
 get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect::RegionOfDefinition);
 get_property!(CanGetRegionOfInterest => get_region_of_interest, image_effect::RegionOfInterest);
 get_property!(CanGetConnected => get_connected, image_clip::Connected);
-
-pub trait CanGetComponents: Readable {
-	get_property!(get_components, image_effect::Components, enum ImageComponent);
-}
-
-pub trait CanGetRenderWindow: Readable {
-	get_property!(get_render_window, image_effect::RenderWindow);
-}
-
-pub trait CanSetHint: Writable {
-	set_property!(set_hint, param::Hint, &str);
-}
-
-pub trait CanSetParent: Writable {
-	set_property!(set_parent, param::Parent, &str);
-}
-
-pub trait CanSetScriptName: Writable {
-	set_property!(set_script_name, param::ScriptName, &str);
-}
-
-pub trait CanSetChildren: Writable {
-	set_property!(set_children, param::page::Child, &seq[&str]);
-}
+get_property!(CanGetComponents => get_components, image_effect::Components, enum ImageComponent);
+get_property!(CanGetRenderWindow => get_render_window, image_effect::RenderWindow);
+set_property!(CanSetHint => set_hint, &param::Hint);
+set_property!(CanSetParent => set_parent, &param::Parent);
+set_property!(CanSetScriptName => set_script_name, &param::ScriptName);
+set_property!(CanSetChildren => set_children, param::page::Child, &seq[&str]);
 
 pub trait CanSetDoubleParams: Writable {
 	set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
@@ -624,9 +590,7 @@ pub trait CanSetDoubleParams: Writable {
 	set_property!(set_display_min, param::double::DisplayMin);
 }
 
-pub trait CanSetBooleanParams: Writable {
-	set_property!(set_default, param::boolean::Default);
-}
+set_property!(CanSetBooleanParams => set_default, param::boolean::Default);
 
 pub trait BaseParam:
 	CanSetLabel + CanSetHint + CanSetParent + CanSetScriptName + CanSetEnabled + CanGetEnabled
@@ -651,13 +615,14 @@ impl CanSetSupportedContexts for ImageEffectProperties {}
 impl CanGetContext for DescribeInContextInArgs {}
 impl CanGetTime for IsIdentityInArgs {}
 impl CanSetName for IsIdentityOutArgs {}
+impl CanSetNameRaw for IsIdentityOutArgs {}
 impl CanGetRenderWindow for IsIdentityInArgs {}
 
 pub trait BaseClip: CanSetSupportedComponents + CanSetOptional + CanGetConnected {}
+impl BaseClip for ClipProperties {}
 impl<T> CanGetConnected for T where T: BaseClip {}
 impl<T> CanSetSupportedComponents for T where T: BaseClip {}
 impl<T> CanSetOptional for T where T: BaseClip {}
-impl BaseClip for ClipProperties {}
 
 impl CanGetConnected for ImageClipHandle {}
 impl CanGetComponents for ImageClipHandle {}
