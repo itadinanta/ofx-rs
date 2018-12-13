@@ -397,6 +397,10 @@ macro_rules! set_property {
 		set_property!($function_name, $property_name, <$property_name as Set>::ValueType);
 	};
 
+	($function_name: ident, ref $property_name:path) => {
+		set_property!($function_name, $property_name, <$property_name as Set>::ValueType);
+	};
+
 	($function_name: ident, $property_name:path, &[enum $enum_value_type:ty]) => {
 		fn $function_name(&mut self, values: &[$enum_value_type]) -> Result<()> {
 			for (index, value) in values.iter().enumerate() {
@@ -438,6 +442,12 @@ macro_rules! set_property {
 			self.set::<$property_name>(value.into())
 		}
 	};
+
+	($trait_name:ident => $($tail:tt)*) => {
+		pub trait $trait_name: Writable {
+			set_property!($($tail)*);
+		}
+	};
 }
 
 mod tests {
@@ -471,18 +481,8 @@ macro_rules! get_property {
 		fn $function_name(&self) -> Result<<$property_name as Get>::ReturnType> {
 			self.get::<$property_name>()
 		}
-	}
-}
-
-macro_rules! define_writable {
-	($trait_name:ident => $($tail:tt)*) => {
-		pub trait $trait_name: Writable {
-			set_property!($($tail)*);
-		}
 	};
-}
 
-macro_rules! define_readable {
 	($trait_name:ident => $($tail:tt)*) => {
 		pub trait $trait_name: Readable {
 			get_property!($($tail)*);
@@ -555,7 +555,7 @@ pub mod param {
 	}
 }
 
-define_writable!(CanSetLabel => set_label, Label, &str);
+set_property!(CanSetLabel => set_label, Label, &str);
 pub trait CanSetLabels: Writable + CanSetLabel {
 	set_property!(set_short_label, ShortLabel, &str);
 	set_property!(set_long_label, LongLabel, &str);
@@ -567,8 +567,8 @@ pub trait CanSetLabels: Writable + CanSetLabel {
 	}
 }
 
-define_readable!(CanGetLabel => get_label, Label);
-define_readable!(CanGetName=> get_name, Name);
+get_property!(CanGetLabel => get_label, Label);
+get_property!(CanGetName=> get_name, Name);
 
 pub trait CanSetName: Writable {
 	set_property!(set_name, Name, &str);
@@ -577,84 +577,21 @@ pub trait CanSetName: Writable {
 	}
 }
 
-pub trait CanSetGrouping: Writable {
-	set_property!(
-		set_image_effect_plugin_grouping,
-		image_effect_plugin::Grouping,
-		&str
-	);
-}
-
-pub trait CanSetSupportedPixelDepths: Writable {
-	set_property!(
-		set_supported_pixel_depths,
-		image_effect::SupportedPixelDepths,
-		&[enum BitDepth]
-	);
-}
-
-pub trait CanGetContext: Readable {
-	get_property!(get_context, image_effect::Context, enum ImageEffectContext);
-}
-
-pub trait CanSetSupportedContexts: Writable {
-	set_property!(
-		set_supported_contexts,
-		image_effect::SupportedContexts,
-		&[enum ImageEffectContext]
-	);
-}
-
-pub trait CanGetSupportsMultipleClipDepths: Readable {
-	get_property!(
-		get_supports_multiple_clip_depths,
-		image_effect::SupportsMultipleClipDepths
-	);
-}
-
-pub trait CanSetSupportedComponents: Writable {
-	set_property!(
-		set_supported_components,
-		image_effect::SupportedComponents,
-		&[enum ImageComponent]
-	);
-}
-
-pub trait CanSetOptional: Writable {
-	set_property!(set_optional, image_clip::Optional);
-}
-
-pub trait CanSetEnabled: Writable {
-	set_property!(set_enabled, param::Enabled);
-}
-
-pub trait CanGetEnabled: Readable {
-	get_property!(get_enabled, param::Enabled);
-}
-
-pub trait CanGetTime: Readable {
-	get_property!(get_time, Time);
-}
-
-pub trait CanSetRegionOfDefinition: Writable {
-	set_property!(set_region_of_definition, image_effect::RegionOfDefinition);
-}
-
-pub trait CanSetRegionOfInterest: Writable {
-	set_property!(set_region_of_interest, image_effect::RegionOfInterest);
-}
-
-pub trait CanGetRegionOfDefinition: Readable {
-	get_property!(get_region_of_definition, image_effect::RegionOfDefinition);
-}
-
-pub trait CanGetRegionOfInterest: Readable {
-	get_property!(get_region_of_interest, image_effect::RegionOfInterest);
-}
-
-pub trait CanGetConnected: Readable {
-	get_property!(get_connected, image_clip::Connected);
-}
+set_property!(CanSetGrouping => set_image_effect_plugin_grouping, image_effect_plugin::Grouping);
+set_property!(CanSetSupportedPixelDepths => set_supported_pixel_depths, image_effect::SupportedPixelDepths, &[enum BitDepth]);
+get_property!(CanGetContext => get_context, image_effect::Context, enum ImageEffectContext);
+set_property!(CanSetSupportedContexts => set_supported_contexts, image_effect::SupportedContexts, &[enum ImageEffectContext]);
+get_property!(CanGetSupportsMultipleClipDepths => get_supports_multiple_clip_depths, image_effect::SupportsMultipleClipDepths);
+set_property!(CanSetSupportedComponents => set_supported_components, image_effect::SupportedComponents, &[enum ImageComponent]);
+set_property!(CanSetOptional => set_optional, image_clip::Optional);
+set_property!(CanSetEnabled => set_enabled, param::Enabled);
+get_property!(CanGetEnabled => get_enabled, param::Enabled);
+get_property!(CanGetTime => get_time, Time);
+set_property!(CanSetRegionOfDefinition => set_region_of_definition, image_effect::RegionOfDefinition);
+set_property!(CanSetRegionOfInterest => set_region_of_interest, image_effect::RegionOfInterest);
+get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect::RegionOfDefinition);
+get_property!(CanGetRegionOfInterest => get_region_of_interest, image_effect::RegionOfInterest);
+get_property!(CanGetConnected => get_connected, image_clip::Connected);
 
 pub trait CanGetComponents: Readable {
 	get_property!(get_components, image_effect::Components, enum ImageComponent);
