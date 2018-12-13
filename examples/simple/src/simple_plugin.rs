@@ -47,9 +47,7 @@ impl Execute for SimplePlugin {
 
 				let scale_value = instance_data.scale_param.get_value_at_time(time)?;
 
-				let clip_pixels_are_rgba = false;
-
-				let (sr, sg, sb, sa) = if clip_pixels_are_rgba {
+				let (sr, sg, sb, sa) = if instance_data.source_clip.clip_pixels_are_rgba(false)? {
 					(
 						instance_data.scale_r_param.get_value_at_time(time)?,
 						instance_data.scale_g_param.get_value_at_time(time)?,
@@ -95,11 +93,7 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::GetClipPreferences(ref mut _effect, ref mut out_args) => {
-				
-				
-				OK
-			},
+			Action::GetClipPreferences(ref mut _effect, ref mut out_args) => OK,
 
 			Action::CreateInstance(ref mut effect) => {
 				let mut effect_props = effect.properties()?;
@@ -263,7 +257,7 @@ impl Execute for SimplePlugin {
 				);
 
 				let mut effect_properties = effect.properties()?;
-				effect_properties.set_image_effect_plugin_grouping("Ofx-rs")?;
+				effect_properties.set_grouping("Ofx-rs")?;
 
 				effect_properties.set_label("Ofx-rs simple_plugin sample")?;
 				effect_properties.set_short_label("Ofx-rs simple_plugin")?;

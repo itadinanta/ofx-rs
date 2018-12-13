@@ -91,86 +91,31 @@ pub struct ParamSetHandle {
 }
 
 // TODO: custom_derive?
-impl fmt::Debug for ImageEffectHandle {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "ImageEffectHandle {{...}}")
+macro_rules! trivial_debug {
+	($($struct:ty),*) => {
+		$(impl fmt::Debug for $struct {
+			fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+				write!(f, "{} {{...}}", stringify!($struct))
+			}
+		})
+		*
 	}
 }
 
-impl fmt::Debug for ImageClipHandle {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "ImageClipHandle {{...}}")
-	}
-}
-
-impl<T> fmt::Debug for ParamHandle<T>
-where
-	T: ParamHandleValue,
-{
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "ParamHandle {{...}}")
-	}
-}
-
-impl fmt::Debug for ParamSetHandle {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "ParamSetHandle {{...}}")
-	}
-}
-
-impl fmt::Debug for GetRegionOfDefinitionInArgs {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "GetRegionOfDefinitionInArgs {{...}}")
-	}
-}
-
-impl fmt::Debug for GetRegionOfDefinitionOutArgs {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "GetRegionOfDefinitionOutArgs {{...}}")
-	}
-}
-
-impl fmt::Debug for GetRegionsOfInterestInArgs {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "GetRegionsOfInterestInArgs {{...}}")
-	}
-}
-
-impl fmt::Debug for GetRegionsOfInterestOutArgs {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "GetRegionsOfInterestOutArgs {{...}}")
-	}
-}
-
-impl fmt::Debug for GetClipPreferencesOutArgs {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "GetClipPreferencesOutArgs {{...}}")
-	}
-}
-
-impl fmt::Debug for IsIdentityInArgs {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "IsIdentityInArgs {{...}}")
-	}
-}
-
-impl fmt::Debug for IsIdentityOutArgs {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "IsIdentityOutArgs {{...}}")
-	}
-}
-
-impl fmt::Debug for GenericPluginHandle {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "GenericPluginHandle {{...}}")
-	}
-}
-
-impl fmt::Debug for HostHandle {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "HostHandle {{...}}")
-	}
-}
+trivial_debug!(
+	ImageClipHandle,
+	ImageEffectHandle,
+	ParamSetHandle,
+	GetRegionOfDefinitionInArgs,
+	GetRegionOfDefinitionOutArgs,
+	GetRegionsOfInterestInArgs,
+	GetRegionsOfInterestOutArgs,
+	GetClipPreferencesOutArgs,
+	IsIdentityInArgs,
+	IsIdentityOutArgs,
+	GenericPluginHandle,
+	HostHandle
+);
 
 impl ImageEffectHandle {
 	pub fn new(
@@ -209,15 +154,13 @@ where
 
 	pub fn get_value(&self) -> Result<T> {
 		let mut value: T = T::default();
-		to_result!(suite_call!(paramGetValue in self.parameter,
-			self.inner, &mut value as *mut _))?;
+		suite_fn!(paramGetValue in self.parameter; self.inner, &mut value as *mut _)?;
 		Ok(value)
 	}
 
 	pub fn get_value_at_time(&self, time: Time) -> Result<T> {
 		let mut value: T = T::default();
-		to_result!(suite_call!(paramGetValueAtTime in self.parameter,
-			self.inner, time, &mut value as *mut _))?;
+		suite_fn!(paramGetValueAtTime in self.parameter; self.inner, time, &mut value as *mut _)?;
 		Ok(value)
 	}
 }
@@ -239,9 +182,18 @@ impl ImageClipHandle {
 
 	pub fn get_region_of_definition(&self, time: Time) -> Result<RectD> {
 		let mut value: RectD = unsafe { std::mem::zeroed() };
-		to_result!(suite_call!(clipGetRegionOfDefinition in self.image_effect,
-			self.inner, time, &mut value as *mut _))?;
+		suite_fn!(clipGetRegionOfDefinition in self.image_effect; self.inner, time, &mut value as *mut _)?;
 		Ok(value)
+	}
+
+	pub fn clip_pixels_are_rgba(&self, unmapped: Bool) -> Result<Bool> {
+		let components = if unmapped {
+			self.get_unmapped_components()
+		} else {
+			self.get_components()
+		};
+
+		components.map(|c| c != ImageComponent::Alpha).or(Ok(false))
 	}
 }
 
@@ -317,8 +269,7 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 		let property_set_handle = {
 			let mut property_set_handle = std::ptr::null_mut();
 
-			to_result!(suite_call!(getPropertySet in self.image_effect,
-				self.inner, &mut property_set_handle as *mut _))?;
+			suite_fn!(getPropertySet in self.image_effect; self.inner, &mut property_set_handle as *mut _)?;
 
 			property_set_handle
 		};
@@ -334,8 +285,8 @@ impl ImageEffectHandle {
 		let property_set_handle = {
 			let mut property_set_handle = std::ptr::null_mut();
 
-			to_result!(suite_call!(clipDefine in self.image_effect,
-				self.inner, clip_name.as_ptr() as *const i8, &mut property_set_handle as *mut _))?;
+			suite_fn!(clipDefine in self.image_effect;
+				self.inner, clip_name.as_ptr() as *const i8, &mut property_set_handle as *mut _)?;
 
 			property_set_handle
 		};
@@ -350,8 +301,8 @@ impl ImageEffectHandle {
 			let mut clip_handle = std::ptr::null_mut();
 			let mut clip_properties = std::ptr::null_mut();
 
-			to_result!(suite_call!(clipGetHandle in self.image_effect,
-				self.inner, clip_name.as_ptr() as *const i8, &mut clip_handle as *mut _, &mut clip_properties as *mut _))?;
+			suite_fn!(clipGetHandle in self.image_effect;
+				self.inner, clip_name.as_ptr() as *const i8, &mut clip_handle as *mut _, &mut clip_properties as *mut _)?;
 
 			(clip_handle, clip_properties)
 		};
@@ -367,8 +318,7 @@ impl ImageEffectHandle {
 		let parameters_set_handle = {
 			let mut parameters_set_handle = std::ptr::null_mut();
 
-			to_result!(suite_call!(getParamSet in self.image_effect,
-				self.inner, &mut parameters_set_handle as *mut _))?;
+			suite_fn!(getParamSet in self.image_effect; self.inner, &mut parameters_set_handle as *mut _)?;
 
 			parameters_set_handle
 		};
@@ -416,8 +366,8 @@ impl ImageEffectHandle {
 		let mut effect_props = self.properties()?;
 		let data_box = Box::new(data);
 		let data_ptr = Box::into_raw(data_box);
-		let status = to_result!(suite_call!(propSetPointer in self.property,
-			effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0, data_ptr as *mut _));
+		let status = suite_fn!(propSetPointer in self.property;
+			effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0, data_ptr as *mut _);
 		if status.is_err() {
 			unsafe {
 				Box::from_raw(data_ptr);
@@ -429,7 +379,7 @@ impl ImageEffectHandle {
 	fn get_instance_data_ptr(&mut self) -> Result<VoidPtrMut> {
 		let mut effect_props = self.properties()?;
 		let mut data_ptr = std::ptr::null_mut();
-		to_result! { suite_call!(propGetPointer in self.property,
+		to_result! { suite_call!(propGetPointer in self.property;
 		   effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0, &mut data_ptr)
 		=> data_ptr }
 	}
@@ -476,8 +426,8 @@ impl ParamSetHandle {
 		let name_buf = CString::new(name)?.into_bytes_with_nul();
 		let property_set_handle = {
 			let mut property_set_handle = std::ptr::null_mut();
-			to_result!(suite_call!(paramDefine in self.parameter,
-				self.inner, param_type.as_ptr() as *const _, name_buf.as_ptr() as *const _, &mut property_set_handle as *mut _))?;
+			suite_fn!(paramDefine in self.parameter;
+				self.inner, param_type.as_ptr() as *const _, name_buf.as_ptr() as *const _, &mut property_set_handle as *mut _)?;
 
 			property_set_handle
 		};
@@ -495,8 +445,8 @@ impl ParamSetHandle {
 		let (param_handle, param_properties) = {
 			let mut param_handle = std::ptr::null_mut();
 			let mut param_properties = std::ptr::null_mut();
-			to_result!(suite_call!(paramGetHandle in self.parameter,
-				self.inner, name_buf.as_ptr() as *const _, &mut param_handle as *mut _, &mut param_properties as *mut _))?;
+			suite_fn!(paramGetHandle in self.parameter;
+				self.inner, name_buf.as_ptr() as *const _, &mut param_handle as *mut _, &mut param_properties as *mut _)?;
 
 			(param_handle, param_properties)
 		};

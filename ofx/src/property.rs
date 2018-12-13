@@ -166,70 +166,53 @@ macro_rules! raw_getter_impl {
 }
 
 raw_getter_impl! { |readable, c_name, index| -> Int {
-		let mut c_int_out: Int = 0;
-		to_result! {suite_call!(propGetInt in *readable.suite(),
-			readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
-		=> c_int_out }
-	}
-}
+	let mut c_int_out: Int = 0;
+	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
+	=> c_int_out }
+}}
 
 raw_getter_impl! { |readable, c_name, index| -> Bool {
-		let mut c_int_out: Int = 0;
-		to_result! { suite_call!(propGetInt in *readable.suite(),
-			readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
-		=> c_int_out != 0 }
-	}
-}
+	let mut c_int_out: Int = 0;
+	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
+	=> c_int_out != 0 }
+}}
 
 raw_getter_impl! { |readable, c_name, index| -> VoidPtr {
-		let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
-		to_result! { suite_call!(propGetPointer in *readable.suite(),
-			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
-		=> c_ptr_out }
-	}
-}
+	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
+	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+	=> c_ptr_out }
+}}
 
 raw_getter_impl! { |readable, c_name, index| -> Double {
-		let mut c_double_out: Double = 0.0;
-		to_result! { suite_call!(propGetDouble in *readable.suite(),
-			readable.handle(), c_name, index as Int, &mut c_double_out as *mut _)
-		=> c_double_out}
-	}
-}
+	let mut c_double_out: Double = 0.0;
+	to_result! { suite_call!(propGetDouble in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_double_out as *mut _)
+	=> c_double_out}
+}}
 
 raw_getter_impl! { |readable, c_name, index| -> RectI {
 	let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
-		// Very, very, very unsafe!
-		to_result! { suite_call!(propGetIntN in *readable.suite(),
-			readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
-		=> c_struct_out}
-	}
-}
+	// Very, very, very unsafe!
+	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
+	=> c_struct_out}
+}}
 
 raw_getter_impl! { |readable, c_name, index| -> RectD {
-		let mut c_struct_out: RectD = unsafe { std::mem::zeroed() };
-		// Very, very, very unsafe!
-		to_result! { suite_call!(propGetDoubleN in *readable.suite(),
-			readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
-		=> c_struct_out}
-	}
-}
+	let mut c_struct_out: RectD = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
+	=> c_struct_out}
+}}
 
 raw_getter_impl! { |readable, c_name, index| -> CString {
-		let mut c_ptr_out: CharPtr = std::ptr::null();
-		to_result! { suite_call!(propGetString in *readable.suite(),
-			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
-		=> unsafe { CStr::from_ptr(c_ptr_out).to_owned() }}
-	}
-}
+	let mut c_ptr_out: CharPtr = std::ptr::null();
+	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+	=> unsafe { CStr::from_ptr(c_ptr_out).to_owned() }}
+}}
 
 raw_getter_impl! { |readable, c_name, index| -> String {
-		let mut c_ptr_out: CharPtr = std::ptr::null();
-		to_result! { suite_call!(propGetString in *readable.suite(),
-			readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
-		=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }}
-	}
-}
+	let mut c_ptr_out: CharPtr = std::ptr::null();
+	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+	=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }}
+}}
 
 pub trait RawSetter<W>
 where
@@ -264,8 +247,7 @@ where
 	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
 		let c_str_in = value.as_c_str()?;
 		let c_ptr_in = c_str_in.as_c_str().as_ptr();
-		to_result!(suite_call!(propSetString in *writable.suite(),
-			writable.handle(), c_name, index as Int, c_ptr_in))
+		suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in)
 	}
 }
 
@@ -282,42 +264,30 @@ macro_rules! raw_setter_impl {
 }
 
 raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
-		to_result!(suite_call!(propSetPointer in *writable.suite(),
-			writable.handle(), c_name, index as Int, *value as *mut _))
-	}
-}
+	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, *value as *mut _)
+}}
 
 raw_setter_impl! { |writable, c_name, index, value: &Int| {
-		let int_value_in = *value;
-		to_result!(suite_call!(propSetInt in *writable.suite(),
-			writable.handle(), c_name, index as Int, int_value_in))
-	}
-}
+	let int_value_in = *value;
+	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, int_value_in)
+}}
 
 raw_setter_impl! { |writable, c_name, index, value: &RectI| {
-		to_result!(suite_call!(propSetIntN in *writable.suite(),
-			writable.handle(), c_name, 4,  &value.x1 as *const _))
-	}
-}
+	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, 4,  &value.x1 as *const _)
+}}
 
 raw_setter_impl! { |writable, c_name, index, value: &Bool| {
-		let int_value_in = if *value { 1 } else { 0 };
-		to_result!(suite_call!(propSetInt in *writable.suite(),
-			writable.handle(), c_name, index as Int, int_value_in))
-	}
-}
+	let int_value_in = if *value { 1 } else { 0 };
+	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, int_value_in)
+}}
 
 raw_setter_impl! { |writable, c_name, index, value: &Double| {
-		to_result!(suite_call!(propSetDouble in *writable.suite(),
-			writable.handle(), c_name, index as Int, *value))
-	}
-}
+	suite_fn!(propSetDouble in *writable.suite(); writable.handle(), c_name, index as Int, *value)
+}}
 
 raw_setter_impl! { |writable, c_name, index, value: &RectD| {
-		to_result!(suite_call!(propSetDoubleN in *writable.suite(),
-			writable.handle(), c_name, 4,  &value.x1 as *const _))
-	}
-}
+	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, 4,  &value.x1 as *const _)
+}}
 
 pub trait Setter<W, P>: RawSetter<W>
 where
@@ -514,6 +484,7 @@ pub mod image_effect {
 pub mod image_clip {
 	use super::*;
 	define_property!(read_only ImageClipPropConnected as Connected: Bool);
+	define_property!(read_only ImageClipPropUnmappedComponents as UnmappedComponents: CString);
 	define_property!(read_write ImageClipPropOptional as Optional: Bool);
 }
 
@@ -577,6 +548,7 @@ get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect
 get_property!(CanGetRegionOfInterest => get_region_of_interest, image_effect::RegionOfInterest);
 get_property!(CanGetConnected => get_connected, image_clip::Connected);
 get_property!(CanGetComponents => get_components, image_effect::Components, enum ImageComponent);
+get_property!(CanGetUnmappedComponents => get_unmapped_components, image_clip::UnmappedComponents, enum ImageComponent);
 get_property!(CanGetRenderWindow => get_render_window, image_effect::RenderWindow);
 set_property!(CanSetHint => set_hint, &param::Hint);
 set_property!(CanSetParent => set_parent, &param::Parent);
@@ -626,6 +598,7 @@ impl<T> CanSetOptional for T where T: BaseClip {}
 
 impl CanGetConnected for ImageClipHandle {}
 impl CanGetComponents for ImageClipHandle {}
+impl CanGetUnmappedComponents for ImageClipHandle {}
 impl CanGetComponents for ClipProperties {}
 
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}

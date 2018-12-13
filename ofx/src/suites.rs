@@ -20,11 +20,16 @@ pub struct Suites {
 }
 
 macro_rules! suite_call {
-	($function:ident in $suite:expr, $($arg:expr),*) => {
+	($function:ident in $suite:expr; $($arg:expr),*) => {
 		unsafe { ($suite).$function.ok_or(Error::SuiteNotInitialized)?($($arg),*) }
 	};
 }
 
+macro_rules! suite_fn {
+	($($tail:tt)*) => { to_result!{suite_call!($($tail)*)} }
+}
+
+#[allow(clippy::too_many_arguments)]
 impl Suites {
 	pub fn new(
 		image_effect: OfxImageEffectSuiteV1,
