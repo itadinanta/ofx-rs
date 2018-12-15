@@ -95,11 +95,31 @@ identified_enum! {
 	}
 }
 
+impl BitDepth {
+	pub fn bits(self) -> usize {
+		match self {
+			BitDepth::Byte => 8,
+			BitDepth::Short => 16,
+			BitDepth::Float => 32,
+		}
+	}
+}
+
 identified_enum! {
 	pub enum ImageComponent {
 		RGBA,
 		RGB,
 		Alpha
+	}
+}
+
+impl ImageComponent {
+	pub fn is_alpha(self) -> bool {
+		self == ImageComponent::Alpha
+	}
+
+	pub fn is_rgb(self) -> bool {
+		!self.is_alpha()
 	}
 }
 

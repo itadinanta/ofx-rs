@@ -54,7 +54,8 @@ pub trait RawReadable: AsProperties + Sized + Clone {
 		I: StringId,
 		R: ValueType + Sized + RawGetter<Self>,
 	{
-		let c_name = id.c_str()?;
+		let c_buf = id.c_string()?;
+		let c_name = c_buf.as_ptr();
 		<R as RawGetter<Self>>::get_at(&self, c_name, index)
 	}
 }
@@ -83,7 +84,7 @@ pub trait RawWritable: AsProperties + Sized + Clone {
 	fn set_raw<V, I>(&mut self, id: I, new_value: &V) -> Result<()>
 	where
 		I: StringId,
-		V: ValueType + RawSetter<Self>,
+		V: ValueType + RawSetter<Self> + ?Sized,
 	{
 		self.set_raw_at(id, 0, new_value)
 	}
@@ -91,9 +92,10 @@ pub trait RawWritable: AsProperties + Sized + Clone {
 	fn set_raw_at<V, I>(&mut self, id: I, index: usize, new_value: &V) -> Result<()>
 	where
 		I: StringId,
-		V: ValueType + RawSetter<Self>,
+		V: ValueType + RawSetter<Self> + ?Sized,
 	{
-		let c_name = id.c_str()?;
+		let buf = id.c_string()?;
+		let c_name = buf.as_ptr();
 		<V as RawSetter<_>>::set_at(self, c_name, index, new_value)
 	}
 }
@@ -103,38 +105,20 @@ impl<R> Readable for R where R: AsProperties + Clone {}
 impl<W> Writable for W where W: AsProperties + ?Sized + Clone {}
 
 pub trait StringId {
-	fn c_str(&self) -> Result<CharPtr>;
-}
-
-impl StringId for str {
-	fn c_str(&self) -> Result<CharPtr> {
-		Ok(CString::new(self)?.as_ptr())
-	}
+	fn c_string(self) -> Result<CString>;
 }
 
 impl StringId for &str {
-	fn c_str(&self) -> Result<CharPtr> {
-		Ok(CString::new(*self)?.as_ptr())
+	fn c_string(self) -> Result<CString> {
+		Ok(CString::new(self)?)
 	}
 }
 
 impl StringId for &[u8] {
-	fn c_str(&self) -> Result<CharPtr> {
+	fn c_string(self) -> Result<CString> {
 		Ok(CStr::from_bytes_with_nul(self)
 			.map_err(|_| Error::InvalidNameEncoding)?
-			.as_ptr())
-	}
-}
-
-impl StringId for String {
-	fn c_str(&self) -> Result<CharPtr> {
-		Ok(CString::new(&self[..])?.as_ptr())
-	}
-}
-
-impl StringId for CharPtr {
-	fn c_str(&self) -> Result<CharPtr> {
-		Ok(*self)
+			.to_owned())
 	}
 }
 
@@ -239,8 +223,8 @@ where
 	P: Named + Get<ReturnType = Self>,
 {
 	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().c_str()?;
-		RawGetter::get_at(readable, c_name, index)
+		let c_name = P::name().as_ptr();
+		RawGetter::get_at(readable, c_name as CharPtr, index)
 	}
 }
 
@@ -313,8 +297,8 @@ where
 	P: Named + Set<ValueType = Self>,
 {
 	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
-		let c_name = P::name().c_str()?;
-		RawSetter::set_at(writable, c_name, index, value)
+		let c_name = P::name().as_ptr();
+		RawSetter::set_at(writable, c_name as CharPtr, index, value)
 	}
 }
 
@@ -406,6 +390,7 @@ pub mod image_effect {
 	use super::*;
 	define_property!(read_only ImageEffectPropContext as Context: CString);
 	define_property!(read_only ImageEffectPropComponents as Components: CString);
+	define_property!(read_only ImageEffectPropPixelDepth as PixelDepth: CString);
 
 	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
 	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString | [u8]);
@@ -421,6 +406,7 @@ pub mod image_clip {
 	use super::*;
 	define_property!(read_only ImageClipPropConnected as Connected: Bool);
 	define_property!(read_only ImageClipPropUnmappedComponents as UnmappedComponents: CString);
+	define_property!(read_only ImageClipPropUnmappedPixelDepth as UnmappedPixelDepth: CString);
 
 	define_property!(read_write ImageClipPropOptional as Optional: Bool);
 }
@@ -566,7 +552,9 @@ get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect
 get_property!(CanGetRegionOfInterest => get_region_of_interest, image_effect::RegionOfInterest);
 get_property!(CanGetConnected => get_connected, image_clip::Connected);
 get_property!(CanGetComponents => get_components, image_effect::Components, enum ImageComponent);
+get_property!(CanGetPixelDepth => get_pixel_depth, image_effect::PixelDepth, enum BitDepth);
 get_property!(CanGetUnmappedComponents => get_unmapped_components, image_clip::UnmappedComponents, enum ImageComponent);
+get_property!(CanGetUnmappedPixelDepth => get_unmapped_pixel_depth, image_clip::UnmappedPixelDepth, enum BitDepth);
 get_property!(CanGetRenderWindow => get_render_window, image_effect::RenderWindow);
 set_property!(CanSetHint => set_hint, &param::Hint);
 set_property!(CanSetParent => set_parent, &param::Parent);
@@ -617,6 +605,8 @@ impl<T> CanSetOptional for T where T: BaseClip {}
 impl CanGetConnected for ImageClipHandle {}
 impl CanGetComponents for ImageClipHandle {}
 impl CanGetUnmappedComponents for ImageClipHandle {}
+impl CanGetPixelDepth for ImageClipHandle {}
+impl CanGetUnmappedPixelDepth for ImageClipHandle {}
 impl CanGetComponents for ClipProperties {}
 
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
@@ -634,4 +624,6 @@ impl CanGetRegionOfDefinition for GetRegionOfDefinitionInArgs {}
 impl CanSetRegionOfDefinition for GetRegionOfDefinitionOutArgs {}
 impl CanGetRegionOfInterest for GetRegionsOfInterestInArgs {}
 impl CanSetRegionOfInterest for GetRegionsOfInterestOutArgs {}
+
 impl RawWritable for GetRegionsOfInterestOutArgs {}
+impl RawWritable for GetClipPreferencesOutArgs {}

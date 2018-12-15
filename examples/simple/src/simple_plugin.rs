@@ -10,7 +10,7 @@ plugin_module!(
 
 #[derive(Default)]
 struct SimplePlugin {
-	host_supports_multiple_clip_depths: Option<Bool>,
+	host_supports_multiple_clip_depths: Bool,
 }
 
 impl SimplePlugin {
@@ -80,20 +80,56 @@ impl Execute for SimplePlugin {
 			Action::GetRegionsOfInterest(ref mut effect, ref in_args, ref mut out_args) => {
 				let roi = in_args.get_region_of_interest()?;
 
-				out_args.set_raw_at("OfxImageClipPropRoI_Source", 0, &roi)?;
+				out_args.set_raw("OfxImageClipPropRoI_Source", &roi)?;
 
 				if effect
 					.get_instance_data::<MyInstanceData>()?
 					.is_general_effect
 					&& effect.get_clip("Mask")?.get_connected()?
 				{
-					out_args.set_raw_at("OfxImageClipPropRoI_Mask", 0, &roi)?;
+					out_args.set_raw("OfxImageClipPropRoI_Mask", &roi)?;
 				}
 
 				OK
 			}
 
-			Action::GetClipPreferences(ref mut _effect, ref mut out_args) => OK,
+			Action::GetClipPreferences(ref mut effect, ref mut out_args) => {
+				let my_data = effect.get_instance_data::<MyInstanceData>()?;
+				let bit_depth = my_data.source_clip.get_pixel_depth()?;
+				let image_component = my_data.source_clip.get_components()?;
+				let output_component = match image_component {
+					ImageComponent::RGBA | ImageComponent::RGB => ImageComponent::RGBA,
+					_ => ImageComponent::Alpha,
+				};
+				out_args.set_raw(
+					"OfxImageClipPropComponents_Output",
+					output_component.to_bytes(),
+				)?;
+
+				if self.host_supports_multiple_clip_depths {
+					out_args.set_raw("OfxImageClipPropDepth_Output", bit_depth.to_bytes())?;
+				}
+
+				if my_data.is_general_effect {
+					let is_mask_connected = my_data
+						.mask_clip
+						.as_ref()
+						.and_then(|mask| mask.get_connected().ok())
+						.unwrap_or_default();
+
+					if is_mask_connected {
+						out_args.set_raw(
+							"OfxImageClipPropComponents_Mask",
+							ImageComponent::Alpha.to_bytes(),
+						)?;
+						if self.host_supports_multiple_clip_depths {
+							out_args.set_raw("OfxImageClipPropDepth_Mask", bit_depth.to_bytes())?;
+						}
+					}
+				}
+
+				OK
+			}
 
 			Action::CreateInstance(ref mut effect) => {
 				let mut effect_props = effect.properties()?;
@@ -250,11 +286,9 @@ impl Execute for SimplePlugin {
 			Action::Describe(ref mut effect) => {
 				info!("Describe {:?}", effect);
 
-				self.host_supports_multiple_clip_depths = Some(
-					plugin_context
-						.get_host()
-						.get_supports_multiple_clip_depths()?,
-				);
+				self.host_supports_multiple_clip_depths = plugin_context
+					.get_host()
+					.get_supports_multiple_clip_depths()?;
 
 				let mut effect_properties = effect.properties()?;
 				effect_properties.set_grouping("Ofx-rs")?;
