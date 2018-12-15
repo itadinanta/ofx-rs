@@ -275,13 +275,11 @@ macro_rules! raw_setter_impl {
 raw_setter_impl! { |writable, c_name, index, value: &str| {
 	let c_str_in = CString::new(value)?;
 	let c_ptr_in = c_str_in.as_c_str().as_ptr();
-	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as *mut _)
+	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as *mut _)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &[u8]| {
-	let c_str_in = CStr::from_bytes_with_nul(value)?;
-	let c_ptr_in = c_str_in.as_ptr();
-	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as *mut _)
+	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, value.as_ptr() as *mut _)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
