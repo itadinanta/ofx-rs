@@ -27,10 +27,10 @@ pub trait Readable: AsProperties + Sized + Clone {
 		P: Named + Get,
 		P::ReturnType: ValueType + Sized + Getter<Self, P>,
 	{
-		<P::ReturnType as Getter<Self, P>>::get(&self)
+		self.get_at::<P>(0)
 	}
 
-	fn get_at<P>(&mut self, index: usize) -> Result<P::ReturnType>
+	fn get_at<P>(&self, index: usize) -> Result<P::ReturnType>
 	where
 		P: Named + Get,
 		P::ReturnType: ValueType + Sized + Getter<Self, P>,
@@ -39,13 +39,34 @@ pub trait Readable: AsProperties + Sized + Clone {
 	}
 }
 
+pub trait RawReadable: AsProperties + Sized + Clone {
+	#[inline]
+	fn get_raw<R, I>(&self, id: I) -> Result<R>
+	where
+		I: StringId,
+		R: ValueType + Sized + RawGetter<Self>,
+	{
+		self.get_raw_at(id, 0)
+	}
+
+	fn get_raw_at<R, I>(&self, id: I, index: usize) -> Result<R>
+	where
+		I: StringId,
+		R: ValueType + Sized + RawGetter<Self>,
+	{
+		let c_name = id.c_str()?;
+		<R as RawGetter<Self>>::get_at(&self, c_name, index)
+	}
+}
+
 pub trait Writable: AsProperties + Sized + Clone {
+	#[inline]
 	fn set<P>(&mut self, new_value: &P::ValueType) -> Result<()>
 	where
 		P: Named + Set,
 		P::ValueType: ValueType + Setter<Self, P>,
 	{
-		<P::ValueType as Setter<_, _>>::set(self, new_value)
+		self.set_at::<P>(0, new_value)
 	}
 
 	fn set_at<P>(&mut self, index: usize, new_value: &P::ValueType) -> Result<()>
@@ -54,6 +75,26 @@ pub trait Writable: AsProperties + Sized + Clone {
 		P::ValueType: ValueType + Setter<Self, P>,
 	{
 		<P::ValueType as Setter<Self, P>>::set_at(self, index, new_value)
+	}
+}
+
+pub trait RawWritable: AsProperties + Sized + Clone {
+	#[inline]
+	fn set_raw<V, I>(&mut self, id: I, new_value: &V) -> Result<()>
+	where
+		I: StringId,
+		V: ValueType + RawSetter<Self>,
+	{
+		self.set_raw_at(id, 0, new_value)
+	}
+
+	fn set_raw_at<V, I>(&mut self, id: I, index: usize, new_value: &V) -> Result<()>
+	where
+		I: StringId,
+		V: ValueType + RawSetter<Self>,
+	{
+		let c_name = id.c_str()?;
+		<V as RawSetter<_>>::set_at(self, c_name, index, new_value)
 	}
 }
 
@@ -68,6 +109,12 @@ pub trait StringId {
 impl StringId for str {
 	fn c_str(&self) -> Result<CharPtr> {
 		Ok(CString::new(self)?.as_ptr())
+	}
+}
+
+impl StringId for &str {
+	fn c_str(&self) -> Result<CharPtr> {
+		Ok(CString::new(*self)?.as_ptr())
 	}
 }
 
@@ -195,9 +242,6 @@ where
 		let c_name = P::name().c_str()?;
 		RawGetter::get_at(readable, c_name, index)
 	}
-	fn get(readable: &R) -> Result<Self> {
-		Getter::get_at(readable, 0)
-	}
 }
 
 impl<R, P, T> Getter<R, P> for T
@@ -208,41 +252,12 @@ where
 {
 }
 
-pub trait CStrWithNul {
-	fn as_c_str(&self) -> Result<CString>;
-}
-
-impl CStrWithNul for str {
-	fn as_c_str(&self) -> Result<CString> {
-		Ok(CString::new(self)?)
-	}
-}
-
-impl CStrWithNul for [u8] {
-	fn as_c_str(&self) -> Result<CString> {
-		let c_str_in = CStr::from_bytes_with_nul(self)?;
-		Ok(c_str_in.to_owned())
-	}
-}
-
 pub trait RawSetter<W>
 where
 	Self: ValueType,
 	W: Writable + AsProperties,
 {
 	fn set_at(writable: &mut W, name: CharPtr, index: usize, value: &Self) -> Result<()>;
-}
-
-impl<W, A> RawSetter<W> for A
-where
-	W: Writable + AsProperties,
-	A: CStrWithNul + ValueType + ?Sized,
-{
-	fn set_at(writable: &mut W, c_name: CharPtr, index: usize, value: &Self) -> Result<()> {
-		let c_str_in = value.as_c_str()?;
-		let c_ptr_in = c_str_in.as_c_str().as_ptr();
-		suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in)
-	}
 }
 
 macro_rules! raw_setter_impl {
@@ -256,6 +271,18 @@ macro_rules! raw_setter_impl {
 		}
 	};
 }
+
+raw_setter_impl! { |writable, c_name, index, value: &str| {
+	let c_str_in = CString::new(value)?;
+	let c_ptr_in = c_str_in.as_c_str().as_ptr();
+	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as *mut _)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &[u8]| {
+	let c_str_in = CStr::from_bytes_with_nul(value)?;
+	let c_ptr_in = c_str_in.as_ptr();
+	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as *mut _)
+}}
 
 raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
 	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, *value as *mut _)
@@ -290,9 +317,6 @@ where
 	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
 		let c_name = P::name().c_str()?;
 		RawSetter::set_at(writable, c_name, index, value)
-	}
-	fn set(writable: &mut W, value: &Self) -> Result<()> {
-		Setter::set_at(writable, 0, value)
 	}
 }
 
@@ -612,3 +636,4 @@ impl CanGetRegionOfDefinition for GetRegionOfDefinitionInArgs {}
 impl CanSetRegionOfDefinition for GetRegionOfDefinitionOutArgs {}
 impl CanGetRegionOfInterest for GetRegionsOfInterestInArgs {}
 impl CanSetRegionOfInterest for GetRegionsOfInterestOutArgs {}
+impl RawWritable for GetRegionsOfInterestOutArgs {}
