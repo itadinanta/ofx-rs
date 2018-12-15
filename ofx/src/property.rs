@@ -6,6 +6,7 @@ use ofx_sys::*;
 use result;
 use result::*;
 use std::ffi::{CStr, CString};
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use types::*;
 
@@ -84,7 +85,7 @@ pub trait RawWritable: AsProperties + Sized + Clone {
 	fn set_raw<V, I>(&mut self, id: I, new_value: &V) -> Result<()>
 	where
 		I: StringId,
-		V: ValueType + RawSetter<Self> + ?Sized,
+		V: ValueType + RawSetter<Self> + ?Sized + Debug,
 	{
 		self.set_raw_at(id, 0, new_value)
 	}
@@ -92,7 +93,7 @@ pub trait RawWritable: AsProperties + Sized + Clone {
 	fn set_raw_at<V, I>(&mut self, id: I, index: usize, new_value: &V) -> Result<()>
 	where
 		I: StringId,
-		V: ValueType + RawSetter<Self> + ?Sized,
+		V: ValueType + RawSetter<Self> + ?Sized + Debug,
 	{
 		let buf = id.c_string()?;
 		let c_name = buf.as_ptr();
@@ -162,8 +163,17 @@ macro_rules! raw_getter_impl {
 		where
 			R: Readable + AsProperties,
 		{
-			fn get_at($readable: &R, $c_name: CharPtr, $index: usize) -> Result<Self>
-				$stmt
+			fn get_at($readable: &R, $c_name: CharPtr, $index: usize) -> Result<Self> {
+				let value = { $stmt };
+				debug!(
+					"{:?}.{:?}[{}] -> {:?}",
+					$readable.handle(),
+					unsafe { CStr::from_ptr($c_name) },
+					$index,
+					value
+				);
+				value
+			}
 		}
 	};
 }
@@ -183,7 +193,7 @@ raw_getter_impl! { |readable, c_name, index| -> Bool {
 raw_getter_impl! { |readable, c_name, index| -> VoidPtr {
 	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
 	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
-	=> c_ptr_out }
+	=> c_ptr_out as VoidPtr }
 }}
 
 raw_getter_impl! { |readable, c_name, index| -> Double {
@@ -256,55 +266,86 @@ macro_rules! raw_setter_impl {
 	};
 }
 
+macro_rules! trace_setter {
+	($writable: expr, $c_name:expr, $index: expr, str $value:expr) => {
+		debug!(
+			"{:?}.{:?}[{}] <- &{:?}",
+			$writable,
+			unsafe { CStr::from_ptr($c_name) },
+			$index,
+			unsafe { CStr::from_bytes_with_nul_unchecked($value) }
+			)
+	};
+
+	($writable: expr, $c_name:expr, $index: expr, $value:expr) => {
+		debug!(
+			"{:?}.{:?}[{}] <- {:?}",
+			$writable,
+			unsafe { CStr::from_ptr($c_name) },
+			$index,
+			$value
+			)
+	};
+}
+
 raw_setter_impl! { |writable, c_name, index, value: &str| {
 	let c_str_in = CString::new(value)?;
 	let c_ptr_in = c_str_in.as_c_str().as_ptr();
+	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as *mut _)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &[u8]| {
+	trace_setter!(writable.handle(), c_name, index, str value);
 	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, value.as_ptr() as *mut _)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
+	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, *value as *mut _)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &Int| {
+	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, *value)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &RectI| {
+	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, 4,  &value.x1 as *const _)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &Bool| {
+	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, if *value { 1 } else { 0 })
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &Double| {
+	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetDouble in *writable.suite(); writable.handle(), c_name, index as Int, *value)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &RectD| {
+	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, 4,  &value.x1 as *const _)
 }}
 
 pub trait Setter<W, P>: RawSetter<W>
 where
-	Self: ValueType,
+	Self: ValueType + Debug,
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {
 	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
-		let c_name = P::name().as_ptr();
+		let property_name = P::name();
+		let c_name = property_name.as_ptr();
 		RawSetter::set_at(writable, c_name as CharPtr, index, value)
 	}
 }
 
 impl<W, P, T> Setter<W, P> for T
 where
-	T: RawSetter<W> + ?Sized,
+	T: RawSetter<W> + ?Sized + Debug,
 	W: Writable + AsProperties,
 	P: Named + Set<ValueType = Self>,
 {

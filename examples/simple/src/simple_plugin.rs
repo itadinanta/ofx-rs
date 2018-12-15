@@ -47,7 +47,7 @@ impl Execute for SimplePlugin {
 
 				let scale_value = instance_data.scale_param.get_value_at_time(time)?;
 
-				let (sr, sg, sb, sa) = if instance_data.source_clip.clip_pixels_are_rgba(false)? {
+				let (sr, sg, sb, sa) = if instance_data.source_clip.get_components()?.is_rgb() {
 					(
 						instance_data.scale_r_param.get_value_at_time(time)?,
 						instance_data.scale_g_param.get_value_at_time(time)?,
@@ -71,7 +71,12 @@ impl Execute for SimplePlugin {
 					.get_instance_data::<MyInstanceData>()?
 					.source_clip
 					.get_region_of_definition(time)?;
-
+				//				let rod = RectD {
+				//					x1: 0.0,
+				//					y1: 0.0,
+				//					x2: 0.0,
+				//					y2: 0.0,
+				//				};
 				out_args.set_region_of_definition(rod)?;
 
 				OK
@@ -172,7 +177,7 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::DestroyInstance(ref mut _effect) => REPLY_DEFAULT,
+			Action::DestroyInstance(ref mut _effect) => OK,
 
 			Action::DescribeInContext(ref mut effect, context) => {
 				info!("DescribeInContext {:?} {:?}", effect, context);

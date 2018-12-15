@@ -175,7 +175,7 @@ impl MapAction for PluginDescriptor {
 				_ => Err(Error::InvalidAction),
 			}
 		} else {
-			info!("No action matching");
+			info!("No action matching {:?}", unsafe { CStr::from_ptr(action) });
 			Err(Error::InvalidAction)
 		}
 	}

@@ -29,6 +29,8 @@ macro_rules! suite_fn {
 	($($tail:tt)*) => { to_result!{suite_call!($($tail)*)} }
 }
 
+
+
 #[allow(clippy::too_many_arguments)]
 impl Suites {
 	pub fn new(

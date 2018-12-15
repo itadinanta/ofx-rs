@@ -181,19 +181,14 @@ impl ImageClipHandle {
 	}
 
 	pub fn get_region_of_definition(&self, time: Time) -> Result<RectD> {
-		let mut value: RectD = unsafe { std::mem::zeroed() };
+		let mut value: RectD = RectD {
+			x1: 1.0,
+			y1: 1.0,
+			x2: 1.0,
+			y2: 1.0,
+		};
 		suite_fn!(clipGetRegionOfDefinition in self.image_effect; self.inner, time, &mut value as *mut _)?;
 		Ok(value)
-	}
-
-	pub fn clip_pixels_are_rgba(&self, unmapped: Bool) -> Result<Bool> {
-		let components = if unmapped {
-			self.get_unmapped_components()
-		} else {
-			self.get_components()
-		};
-
-		components.map(|c| c != ImageComponent::Alpha).or(Ok(false))
 	}
 }
 
@@ -284,10 +279,8 @@ impl ImageEffectHandle {
 	fn clip_define(&self, clip_name: &[u8]) -> Result<ClipProperties> {
 		let property_set_handle = {
 			let mut property_set_handle = std::ptr::null_mut();
-
 			suite_fn!(clipDefine in self.image_effect;
 				self.inner, clip_name.as_ptr() as *const i8, &mut property_set_handle as *mut _)?;
-
 			property_set_handle
 		};
 		Ok(ClipProperties(PropertySetHandle::new(
@@ -300,10 +293,8 @@ impl ImageEffectHandle {
 		let (clip_handle, clip_properties) = {
 			let mut clip_handle = std::ptr::null_mut();
 			let mut clip_properties = std::ptr::null_mut();
-
 			suite_fn!(clipGetHandle in self.image_effect;
 				self.inner, clip_name.as_ptr() as *const i8, &mut clip_handle as *mut _, &mut clip_properties as *mut _)?;
-
 			(clip_handle, clip_properties)
 		};
 		Ok(ImageClipHandle::new(
@@ -317,9 +308,7 @@ impl ImageEffectHandle {
 	pub fn parameter_set(&self) -> Result<ParamSetHandle> {
 		let parameters_set_handle = {
 			let mut parameters_set_handle = std::ptr::null_mut();
-
 			suite_fn!(getParamSet in self.image_effect; self.inner, &mut parameters_set_handle as *mut _)?;
-
 			parameters_set_handle
 		};
 		Ok(ParamSetHandle::new(
@@ -334,7 +323,7 @@ impl ImageEffectHandle {
 	}
 
 	pub fn get_simple_input_clip(&self) -> Result<ImageClipHandle> {
-		self.clip_get_handle(ofx_sys::kOfxImageEffectOutputClipName)
+		self.clip_get_handle(ofx_sys::kOfxImageEffectSimpleSourceClipName)
 	}
 
 	pub fn get_clip(&self, name: &str) -> Result<ImageClipHandle> {
@@ -347,7 +336,7 @@ impl ImageEffectHandle {
 	}
 
 	pub fn new_simple_input_clip(&self) -> Result<ClipProperties> {
-		self.clip_define(ofx_sys::kOfxImageEffectOutputClipName)
+		self.clip_define(ofx_sys::kOfxImageEffectSimpleSourceClipName)
 	}
 
 	pub fn new_clip(&self, name: &str) -> Result<ClipProperties> {
@@ -376,7 +365,7 @@ impl ImageEffectHandle {
 		status
 	}
 
-	fn get_instance_data_ptr(&mut self) -> Result<VoidPtrMut> {
+	fn get_instance_data_ptr(&self) -> Result<VoidPtrMut> {
 		let mut effect_props = self.properties()?;
 		let mut data_ptr = std::ptr::null_mut();
 		to_result! { suite_call!(propGetPointer in self.property;
@@ -384,7 +373,7 @@ impl ImageEffectHandle {
 		=> data_ptr }
 	}
 
-	pub fn get_instance_data<T>(&mut self) -> Result<&mut T>
+	pub fn get_instance_data<T>(&self) -> Result<&mut T>
 	where
 		T: Sized,
 	{
