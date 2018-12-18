@@ -238,10 +238,13 @@ properties_newtype!(ImageEffectProperties);
 properties_newtype!(ClipProperties);
 
 properties_newtype!(DescribeInContextInArgs);
+
 properties_newtype!(GetRegionOfDefinitionInArgs);
 properties_newtype!(GetRegionOfDefinitionOutArgs);
+
 properties_newtype!(GetRegionsOfInterestInArgs);
 properties_newtype!(GetRegionsOfInterestOutArgs);
+
 properties_newtype!(GetClipPreferencesOutArgs);
 
 properties_newtype!(IsIdentityInArgs);
@@ -249,8 +252,11 @@ properties_newtype!(IsIdentityOutArgs);
 
 properties_newtype!(BeginInstanceChangedInArgs);
 
+properties_newtype!(InstanceChangedInArgs);
+properties_newtype!(InstanceChangedOutArgs);
+
 properties_newtype!(EndInstanceChangedInArgs);
-properties_newtype!(EndInstanceChangeOutArgs);
+properties_newtype!(EndInstanceChangedOutArgs);
 
 properties_newtype!(ParamDoubleProperties);
 properties_newtype!(ParamIntProperties);

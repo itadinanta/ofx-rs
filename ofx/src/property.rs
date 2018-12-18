@@ -1,6 +1,9 @@
 #![feature(concat_idents)]
 
-use enums::*;
+use enums::{
+	BitDepth, Change, IdentifiedEnum, ImageComponent, ImageEffectContext, ParamDoubleType,
+	Type as EType,
+};
 use handle::*;
 use ofx_sys::*;
 use result;
@@ -127,6 +130,8 @@ pub trait ValueType {}
 impl ValueType for Bool {}
 impl ValueType for Int {}
 impl ValueType for Double {}
+impl ValueType for PointI {}
+impl ValueType for PointD {}
 impl ValueType for RectI {}
 impl ValueType for RectD {}
 impl ValueType for String {}
@@ -159,6 +164,7 @@ where
 
 macro_rules! raw_getter_impl {
 	(|$readable:ident, $c_name:ident, $index:ident| -> $value_type: ty $stmt:block) => {
+		/// Adds the capability to set arbitrary properties to $value_type
 		impl<R> RawGetter<R> for $value_type
 		where
 			R: Readable + AsProperties,
@@ -178,51 +184,63 @@ macro_rules! raw_getter_impl {
 	};
 }
 
-raw_getter_impl! { |readable, c_name, index| -> Int {
-	let mut c_int_out: Int = 0;
-	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
-	=> c_int_out }
-}}
-
 raw_getter_impl! { |readable, c_name, index| -> Bool {
 	let mut c_int_out: Int = 0;
-	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut _)
+	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut Int)
 	=> c_int_out != 0 }
 }}
 
 raw_getter_impl! { |readable, c_name, index| -> VoidPtr {
 	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
-	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut VoidPtrMut)
 	=> c_ptr_out as VoidPtr }
 }}
 
-raw_getter_impl! { |readable, c_name, index| -> Double {
-	let mut c_double_out: Double = 0.0;
-	to_result! { suite_call!(propGetDouble in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_double_out as *mut _)
-	=> c_double_out}
+raw_getter_impl! { |readable, c_name, index| -> Int {
+	let mut c_int_out: Int = 0;
+	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut Int)
+	=> c_int_out }
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> PointI {
+	let mut c_struct_out: PointI = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, POINT_ELEMENTS, &mut c_struct_out.x as *mut Int)
+	=> c_struct_out}
 }}
 
 raw_getter_impl! { |readable, c_name, index| -> RectI {
 	let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
-	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
+	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, RECT_ELEMENTS, &mut c_struct_out.x1 as *mut Int)
+	=> c_struct_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> Double {
+	let mut c_double_out: Double = 0.0;
+	to_result! { suite_call!(propGetDouble in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_double_out as *mut Double)
+	=> c_double_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> PointD {
+	let mut c_struct_out: PointD = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, POINT_ELEMENTS, &mut c_struct_out.x as *mut Double)
 	=> c_struct_out}
 }}
 
 raw_getter_impl! { |readable, c_name, index| -> RectD {
 	let mut c_struct_out: RectD = unsafe { std::mem::zeroed() };
-	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, 4, &mut c_struct_out.x1 as *mut _)
+	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, RECT_ELEMENTS, &mut c_struct_out.x1 as *mut Double)
 	=> c_struct_out}
 }}
 
 raw_getter_impl! { |readable, c_name, index| -> CString {
 	let mut c_ptr_out: CharPtr = std::ptr::null();
-	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut CharPtr)
 	=> unsafe { CStr::from_ptr(c_ptr_out).to_owned() }}
 }}
 
 raw_getter_impl! { |readable, c_name, index| -> String {
 	let mut c_ptr_out: CharPtr = std::ptr::null();
-	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut _)
+	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut CharPtr)
 	=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }}
 }}
 
@@ -292,17 +310,17 @@ raw_setter_impl! { |writable, c_name, index, value: &str| {
 	let c_str_in = CString::new(value)?;
 	let c_ptr_in = c_str_in.as_c_str().as_ptr();
 	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as *mut _)
+	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as CharPtrMut)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &[u8]| {
 	trace_setter!(writable.handle(), c_name, index, str value);
-	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, value.as_ptr() as *mut _)
+	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, value.as_ptr() as CharPtrMut)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
 	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, *value as *mut _)
+	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, *value as VoidPtrMut)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &Int| {
@@ -310,9 +328,14 @@ raw_setter_impl! { |writable, c_name, index, value: &Int| {
 	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, *value)
 }}
 
+raw_setter_impl! { |writable, c_name, index, value: &PointI| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, POINT_ELEMENTS,  &value.x as *const Int)
+}}
+
 raw_setter_impl! { |writable, c_name, index, value: &RectI| {
 	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, 4,  &value.x1 as *const _)
+	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, RECT_ELEMENTS,  &value.x1 as *const Int)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &Bool| {
@@ -325,9 +348,14 @@ raw_setter_impl! { |writable, c_name, index, value: &Double| {
 	suite_fn!(propSetDouble in *writable.suite(); writable.handle(), c_name, index as Int, *value)
 }}
 
+raw_setter_impl! { |writable, c_name, index, value: &PointD| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, POINT_ELEMENTS,  &value.x as *const Double)
+}}
+
 raw_setter_impl! { |writable, c_name, index, value: &RectD| {
 	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, 4,  &value.x1 as *const _)
+	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, RECT_ELEMENTS,  &value.x1 as *const Double)
 }}
 
 pub trait Setter<W, P>: RawSetter<W>
@@ -404,10 +432,10 @@ macro_rules! property {
 }
 
 property!(PropAPIVersion as APIVersion: () -> String);
-property!(PropType as Type: () -> String);
-property!(PropTime as Time: () -> Double);
+property!(PropType as Type: () -> CString);
 
 property!(PropName as Name: (&str) -> String);
+property!(PropTime as Time: Double);
 property!(PropLabel as Label: (&str) -> String);
 property!(PropShortLabel as ShortLabel: (&str) -> String);
 property!(PropLongLabel as LongLabel: (&str) -> String);
@@ -415,6 +443,7 @@ property!(PropPluginDescription as PluginDescription: (&str) -> String);
 
 property!(PropVersion as Version: () -> String);
 property!(PropVersionLabel as VersionLabel: () -> String);
+property!(PropChangeReason as ChangeReason: () -> CString);
 
 pub mod image_effect_host {
 	use super::*;
@@ -438,6 +467,7 @@ pub mod image_effect {
 	property!(ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: (&[u8]) -> CString);
 	property!(ImageEffectPropSupportedComponents as SupportedComponents: (&[u8]) -> CString);
 	property!(ImageEffectPropRenderWindow as RenderWindow: RectI);
+	property!(ImageEffectPropRenderScale as RenderScale: PointD);
 	property!(ImageEffectPropRegionOfInterest as RegionOfInterest: RectD);
 	property!(ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
 
@@ -579,16 +609,24 @@ pub trait CanSetNameRaw: CanSetName {
 
 set_property!(CanSetGrouping => set_grouping, &image_effect_plugin::Grouping);
 set_property!(CanSetSupportedPixelDepths => set_supported_pixel_depths, image_effect::SupportedPixelDepths, &[enum BitDepth]);
+
 get_property!(CanGetContext => get_context, image_effect::Context, enum ImageEffectContext);
+
 set_property!(CanSetSupportedContexts => set_supported_contexts, image_effect::SupportedContexts, &[enum ImageEffectContext]);
+
 get_property!(CanGetSupportsMultipleClipDepths => get_supports_multiple_clip_depths, image_effect::SupportsMultipleClipDepths);
+
 set_property!(CanSetSupportedComponents => set_supported_components, image_effect::SupportedComponents, &[enum ImageComponent]);
 set_property!(CanSetOptional => set_optional, image_clip::Optional);
 set_property!(CanSetEnabled => set_enabled, param::Enabled);
+
 get_property!(CanGetEnabled => get_enabled, param::Enabled);
 get_property!(CanGetTime => get_time, Time);
+get_property!(CanGetType => get_type, Type, enum EType);
+
 set_property!(CanSetRegionOfDefinition => set_region_of_definition, image_effect::RegionOfDefinition);
 set_property!(CanSetRegionOfInterest => set_region_of_interest, image_effect::RegionOfInterest);
+
 get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect::RegionOfDefinition);
 get_property!(CanGetRegionOfInterest => get_region_of_interest, image_effect::RegionOfInterest);
 get_property!(CanGetConnected => get_connected, image_clip::Connected);
@@ -597,10 +635,14 @@ get_property!(CanGetPixelDepth => get_pixel_depth, image_effect::PixelDepth, enu
 get_property!(CanGetUnmappedComponents => get_unmapped_components, image_clip::UnmappedComponents, enum ImageComponent);
 get_property!(CanGetUnmappedPixelDepth => get_unmapped_pixel_depth, image_clip::UnmappedPixelDepth, enum BitDepth);
 get_property!(CanGetRenderWindow => get_render_window, image_effect::RenderWindow);
+get_property!(CanGetRenderScale => get_render_scale, image_effect::RenderScale);
+
 set_property!(CanSetHint => set_hint, &param::Hint);
 set_property!(CanSetParent => set_parent, &param::Parent);
 set_property!(CanSetScriptName => set_script_name, &param::ScriptName);
 set_property!(CanSetChildren => set_children, param::page::Child, &seq[&str]);
+
+get_property!(CanGetChangeReason => get_change_reason, ChangeReason, enum Change);
 
 pub trait CanSetDoubleParams: Writable {
 	set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
@@ -611,60 +653,66 @@ pub trait CanSetDoubleParams: Writable {
 
 set_property!(CanSetBooleanParams => set_default, param::boolean::Default);
 
+macro_rules! capabilities {
+	($trait:ty => $($capability:ty),*) => {
+		$(impl $capability for $trait {})
+		*
+	}
+}
+
+capabilities! { HostHandle => CanGetSupportsMultipleClipDepths }
+
+capabilities! { ImageEffectProperties =>
+	CanSetGrouping, CanSetLabel, CanSetLabels, CanGetLabel,
+	CanGetContext, CanSetSupportedContexts,
+	CanSetSupportedPixelDepths
+}
+
+capabilities! { DescribeInContextInArgs => CanGetContext }
+capabilities! { IsIdentityInArgs => CanGetTime, CanGetRenderWindow }
+capabilities! { IsIdentityOutArgs => CanSetName, CanSetNameRaw }
+
+pub trait BaseClip: CanSetSupportedComponents + CanSetOptional + CanGetConnected {}
+impl<T> CanGetConnected for T where T: BaseClip {}
+impl<T> CanSetSupportedComponents for T where T: BaseClip {}
+impl<T> CanSetOptional for T where T: BaseClip {}
+
+capabilities! { ClipProperties => BaseClip }
+
+capabilities! { ImageClipHandle =>
+	CanGetConnected,
+	CanGetComponents,CanGetUnmappedComponents,
+	CanGetPixelDepth, CanGetUnmappedPixelDepth
+}
+
 pub trait BaseParam:
 	CanSetLabel + CanSetHint + CanSetParent + CanSetScriptName + CanSetEnabled + CanGetEnabled
 {
 }
+impl<T> CanGetEnabled for T where T: BaseParam {}
 impl<T> CanSetLabel for T where T: BaseParam {}
 impl<T> CanSetHint for T where T: BaseParam {}
 impl<T> CanSetParent for T where T: BaseParam {}
 impl<T> CanSetScriptName for T where T: BaseParam {}
 impl<T> CanSetEnabled for T where T: BaseParam {}
-impl<T> CanGetEnabled for T where T: BaseParam {}
-
-impl CanGetSupportsMultipleClipDepths for HostHandle {}
-impl CanSetLabel for ImageEffectProperties {}
-impl CanSetLabels for ImageEffectProperties {}
-impl CanGetLabel for ImageEffectProperties {}
-impl CanGetContext for ImageEffectProperties {}
-impl CanSetGrouping for ImageEffectProperties {}
-impl CanSetSupportedPixelDepths for ImageEffectProperties {}
-impl CanSetSupportedContexts for ImageEffectProperties {}
-
-impl CanGetContext for DescribeInContextInArgs {}
-impl CanGetTime for IsIdentityInArgs {}
-impl CanSetName for IsIdentityOutArgs {}
-impl CanSetNameRaw for IsIdentityOutArgs {}
-impl CanGetRenderWindow for IsIdentityInArgs {}
-
-pub trait BaseClip: CanSetSupportedComponents + CanSetOptional + CanGetConnected {}
-impl BaseClip for ClipProperties {}
-impl<T> CanGetConnected for T where T: BaseClip {}
-impl<T> CanSetSupportedComponents for T where T: BaseClip {}
-impl<T> CanSetOptional for T where T: BaseClip {}
-
-impl CanGetConnected for ImageClipHandle {}
-impl CanGetComponents for ImageClipHandle {}
-impl CanGetUnmappedComponents for ImageClipHandle {}
-impl CanGetPixelDepth for ImageClipHandle {}
-impl CanGetUnmappedPixelDepth for ImageClipHandle {}
-impl CanGetComponents for ClipProperties {}
-
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
-impl BaseParam for ParamDoubleProperties {}
-impl BaseParam for ParamBooleanProperties {}
-impl BaseParam for ParamPageProperties {}
 
-impl CanSetDoubleParams for ParamDoubleProperties {}
-impl CanSetBooleanParams for ParamBooleanProperties {}
+capabilities! { ParamDoubleProperties => BaseParam, CanSetDoubleParams }
+capabilities! { ParamBooleanProperties => BaseParam, CanSetBooleanParams }
+capabilities! { ParamPageProperties => BaseParam, CanSetChildren }
 
-impl CanSetChildren for ParamPageProperties {}
+capabilities! { GetRegionOfDefinitionInArgs => CanGetTime, CanGetRegionOfDefinition }
+capabilities! { GetRegionOfDefinitionOutArgs => CanSetRegionOfDefinition }
+capabilities! { GetRegionsOfInterestInArgs => CanGetRegionOfInterest }
+capabilities! { GetRegionsOfInterestOutArgs => CanSetRegionOfInterest }
 
-impl CanGetTime for GetRegionOfDefinitionInArgs {}
-impl CanGetRegionOfDefinition for GetRegionOfDefinitionInArgs {}
-impl CanSetRegionOfDefinition for GetRegionOfDefinitionOutArgs {}
-impl CanGetRegionOfInterest for GetRegionsOfInterestInArgs {}
-impl CanSetRegionOfInterest for GetRegionsOfInterestOutArgs {}
+capabilities! { GetRegionsOfInterestOutArgs => RawWritable }
+capabilities! { GetClipPreferencesOutArgs => RawWritable }
 
-impl RawWritable for GetRegionsOfInterestOutArgs {}
-impl RawWritable for GetClipPreferencesOutArgs {}
+capabilities! { InstanceChangedInArgs =>
+	CanGetType, CanGetName,
+	CanGetTime, CanGetChangeReason, CanGetRenderScale
+}
+
+capabilities! { BeginInstanceChangedInArgs => CanGetChangeReason}
+capabilities! { EndInstanceChangedInArgs => CanGetChangeReason}

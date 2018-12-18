@@ -55,7 +55,10 @@ pub enum Action {
 	Unload,
 	Describe(ImageEffectHandle),
 	DescribeInContext(ImageEffectHandle, ImageEffectContext),
+
 	CreateInstance(ImageEffectHandle),
+	DestroyInstance(ImageEffectHandle),
+
 	GetRegionOfDefinition(
 		ImageEffectHandle,
 		GetRegionOfDefinitionInArgs,
@@ -66,11 +69,13 @@ pub enum Action {
 		GetRegionsOfInterestInArgs,
 		GetRegionsOfInterestOutArgs,
 	),
+
 	BeginInstanceChanged(ImageEffectHandle, BeginInstanceChangedInArgs),
+	InstanceChanged(ImageEffectHandle, InstanceChangedInArgs),	
 	EndInstanceChanged(ImageEffectHandle, BeginInstanceChangedInArgs),	
+	
 	GetClipPreferences(ImageEffectHandle, GetClipPreferencesOutArgs),
 	IsIdentity(ImageEffectHandle, IsIdentityInArgs, IsIdentityOutArgs),
-	DestroyInstance(ImageEffectHandle),
 	GenericGlobal(GlobalAction, GenericPluginHandle),
 	GenericImageEffect(ImageEffectAction, ImageEffectHandle),
 }
