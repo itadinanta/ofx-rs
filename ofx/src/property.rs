@@ -370,20 +370,8 @@ mod tests {
 	}
 }
 
-macro_rules! define_property {
-	(read_only $ofx_name:ident as $name:ident : $value_type:ty) => {
-		pub struct $name;
-		impl Get for $name {
-			type ReturnType = $value_type;
-		}
-		impl Named for $name {
-			fn name() -> &'static [u8] {
-				concat_idents!(kOfx, $ofx_name)
-			}
-		}
-	};
-
-	(read_write $ofx_name:ident as $name:ident : $return_type:ty | $value_type:ty) => {
+macro_rules! property {
+	($ofx_name:ident as $name:ident : (&$value_type:ty) -> $return_type:ty) => {
 		pub struct $name;
 		impl Get for $name {
 			type ReturnType = $return_type;
@@ -398,80 +386,92 @@ macro_rules! define_property {
 		}
 	};
 
-	(read_write $ofx_name:ident as $name:ident : $return_type:ty) => {
-		define_property!(read_write $ofx_name as $name: $return_type | $return_type);
+	($ofx_name:ident as $name:ident : $return_type:ty) => {
+		property!($ofx_name as $name: (&$return_type) -> $return_type);
+	};
+
+	($ofx_name:ident as $name:ident : () -> $return_type:ty) => {
+		pub struct $name;
+		impl Get for $name {
+			type ReturnType = $return_type;
+		}
+		impl Named for $name {
+			fn name() -> &'static [u8] {
+				concat_idents!(kOfx, $ofx_name)
+			}
+		}
 	};
 }
 
-define_property!(read_only PropAPIVersion as APIVersion: String);
-define_property!(read_only PropType as Type: String);
-define_property!(read_only PropTime as Time: Double);
+property!(PropAPIVersion as APIVersion: () -> String);
+property!(PropType as Type: () -> String);
+property!(PropTime as Time: () -> Double);
 
-define_property!(read_write PropName as Name: String | str);
-define_property!(read_write PropLabel as Label: String | str);
-define_property!(read_write PropShortLabel as ShortLabel: String | str);
-define_property!(read_write PropLongLabel as LongLabel: String | str);
-define_property!(read_write PropPluginDescription as PluginDescription: String | str);
+property!(PropName as Name: (&str) -> String);
+property!(PropLabel as Label: (&str) -> String);
+property!(PropShortLabel as ShortLabel: (&str) -> String);
+property!(PropLongLabel as LongLabel: (&str) -> String);
+property!(PropPluginDescription as PluginDescription: (&str) -> String);
 
-define_property!(read_only PropVersion as Version: String);
-define_property!(read_only PropVersionLabel as VersionLabel: String);
+property!(PropVersion as Version: () -> String);
+property!(PropVersionLabel as VersionLabel: () -> String);
 
 pub mod image_effect_host {
 	use super::*;
-	define_property!(read_only ImageEffectHostPropIsBackground as IsBackground: Bool);
+	property!(ImageEffectHostPropIsBackground as IsBackground: () -> Bool);
 }
 
 pub mod image_effect_plugin {
 	use super::*;
-	define_property!(read_write ImageEffectPluginPropGrouping as Grouping: String | str);
-	define_property!(read_write ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool);
+	property!(ImageEffectPluginPropGrouping as Grouping: (&str) -> String);
+	property!(ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways: Bool);
 }
 
 pub mod image_effect {
 	use super::*;
-	define_property!(read_only ImageEffectPropContext as Context: CString);
-	define_property!(read_only ImageEffectPropComponents as Components: CString);
-	define_property!(read_only ImageEffectPropPixelDepth as PixelDepth: CString);
+	property!(ImageEffectPropContext as Context: () -> CString);
+	property!(ImageEffectPropComponents as Components: () -> CString);
+	property!(ImageEffectPropPixelDepth as PixelDepth: () -> CString);
 
-	define_property!(read_write ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
-	define_property!(read_write ImageEffectPropSupportedContexts as SupportedContexts: CString | [u8]);
-	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString | [u8]);
-	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString | [u8]);
-	define_property!(read_write ImageEffectPropRenderWindow as RenderWindow: RectI);
-	define_property!(read_write ImageEffectPropRegionOfInterest as RegionOfInterest: RectD);
-	define_property!(read_write ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
+	property!(ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
+	property!(ImageEffectPropSupportedContexts as SupportedContexts: (&[u8]) ->CString);
+	property!(ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: (&[u8]) -> CString);
+	property!(ImageEffectPropSupportedComponents as SupportedComponents: (&[u8]) -> CString);
+	property!(ImageEffectPropRenderWindow as RenderWindow: RectI);
+	property!(ImageEffectPropRegionOfInterest as RegionOfInterest: RectD);
+	property!(ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
 
 }
 
 pub mod image_clip {
 	use super::*;
-	define_property!(read_only ImageClipPropConnected as Connected: Bool);
-	define_property!(read_only ImageClipPropUnmappedComponents as UnmappedComponents: CString);
-	define_property!(read_only ImageClipPropUnmappedPixelDepth as UnmappedPixelDepth: CString);
+	property!(ImageClipPropConnected as Connected: () -> Bool);
+	property!(ImageClipPropUnmappedComponents as UnmappedComponents: () -> CString);
+	property!(ImageClipPropUnmappedPixelDepth as UnmappedPixelDepth: () -> CString);
 
-	define_property!(read_write ImageClipPropOptional as Optional: Bool);
+	property!(ImageClipPropOptional as Optional: Bool);
 }
 
 pub mod param {
 	use super::*;
-	define_property!(read_write ParamPropEnabled as Enabled: Bool);
-	define_property!(read_write ParamPropHint as Hint: String | str);
-	define_property!(read_write ParamPropParent as Parent: String | str);
-	define_property!(read_write ParamPropScriptName as ScriptName: String | str);
+	property!(ParamPropEnabled as Enabled: Bool);
+	property!(ParamPropHint as Hint: (&str) -> String);
+	property!(ParamPropParent as Parent: (&str) -> String);
+	property!(ParamPropScriptName as ScriptName: (&str) -> String);
 	pub mod double {
 		use super::super::*;
-		define_property!(read_write ParamPropDoubleType as DoubleType: CString | [u8]);
-		define_property!(read_write ParamPropDefault as Default: Double);
-		define_property!(read_write ParamPropDisplayMax as DisplayMax: Double);
-		define_property!(read_write ParamPropDisplayMin as DisplayMin: Double);
+		property!(ParamPropDoubleType as DoubleType: (&[u8]) -> CString);
+		property!(ParamPropDefault as Default: Double);
+		property!(ParamPropDisplayMax as DisplayMax: Double);
+		property!(ParamPropDisplayMin as DisplayMin: Double);
 	}
 	pub mod boolean {
 		use super::super::*;
-		define_property!(read_write ParamPropDefault as Default: Bool);
+		property!(ParamPropDefault as Default: Bool);
 	}
 	pub mod page {
 		use super::super::*;
-		define_property!(read_write ParamPropPageChild as Child: String | str);
+		property!(ParamPropPageChild as Child: (&str) -> String);
 	}
 }
 

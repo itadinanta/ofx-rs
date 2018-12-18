@@ -190,10 +190,17 @@ identified_enum! {
 }
 
 identified_enum! {
+	pub enum Change {
+		UserEdited,
+		PluginEdited,
+		Time
+	}
+}
+
+identified_enum! {
 	pub enum ParamInvalidate {
 		All,
 		ValueChangeToEnd
-		//ValueChangeToEnd
 	}
 }
 

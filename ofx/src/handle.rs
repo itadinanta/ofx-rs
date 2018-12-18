@@ -105,14 +105,6 @@ macro_rules! trivial_debug {
 trivial_debug!(
 	ImageClipHandle,
 	ImageEffectHandle,
-//	ParamSetHandle,
-//	GetRegionOfDefinitionInArgs,
-//	GetRegionOfDefinitionOutArgs,
-//	GetRegionsOfInterestInArgs,
-//	GetRegionsOfInterestOutArgs,
-//	GetClipPreferencesOutArgs,
-//	IsIdentityInArgs,
-//	IsIdentityOutArgs,
 	GenericPluginHandle,
 	HostHandle
 );
