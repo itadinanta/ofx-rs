@@ -71,12 +71,6 @@ impl Execute for SimplePlugin {
 					.get_instance_data::<MyInstanceData>()?
 					.source_clip
 					.get_region_of_definition(time)?;
-				//				let rod = RectD {
-				//					x1: 0.0,
-				//					y1: 0.0,
-				//					x2: 0.0,
-				//					y2: 0.0,
-				//				};
 				out_args.set_region_of_definition(rod)?;
 
 				OK
@@ -180,8 +174,6 @@ impl Execute for SimplePlugin {
 			Action::DestroyInstance(ref mut _effect) => OK,
 
 			Action::DescribeInContext(ref mut effect, context) => {
-				info!("DescribeInContext {:?} {:?}", effect, context);
-
 				let mut output_clip = effect.new_output_clip()?;
 				output_clip
 					.set_supported_components(&[ImageComponent::RGBA, ImageComponent::Alpha])?;
@@ -289,8 +281,6 @@ impl Execute for SimplePlugin {
 			}
 
 			Action::Describe(ref mut effect) => {
-				info!("Describe {:?}", effect);
-
 				self.host_supports_multiple_clip_depths = plugin_context
 					.get_host()
 					.get_supports_multiple_clip_depths()?;

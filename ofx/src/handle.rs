@@ -105,14 +105,14 @@ macro_rules! trivial_debug {
 trivial_debug!(
 	ImageClipHandle,
 	ImageEffectHandle,
-	ParamSetHandle,
-	GetRegionOfDefinitionInArgs,
-	GetRegionOfDefinitionOutArgs,
-	GetRegionsOfInterestInArgs,
-	GetRegionsOfInterestOutArgs,
-	GetClipPreferencesOutArgs,
-	IsIdentityInArgs,
-	IsIdentityOutArgs,
+//	ParamSetHandle,
+//	GetRegionOfDefinitionInArgs,
+//	GetRegionOfDefinitionOutArgs,
+//	GetRegionsOfInterestInArgs,
+//	GetRegionsOfInterestOutArgs,
+//	GetClipPreferencesOutArgs,
+//	IsIdentityInArgs,
+//	IsIdentityOutArgs,
 	GenericPluginHandle,
 	HostHandle
 );
@@ -236,6 +236,8 @@ macro_rules! properties_newtype {
 				self.0.property.borrow() as *const _
 			}
 		}
+		
+		trivial_debug!($name);
 	};
 }
 
@@ -249,8 +251,14 @@ properties_newtype!(GetRegionOfDefinitionOutArgs);
 properties_newtype!(GetRegionsOfInterestInArgs);
 properties_newtype!(GetRegionsOfInterestOutArgs);
 properties_newtype!(GetClipPreferencesOutArgs);
+
 properties_newtype!(IsIdentityInArgs);
 properties_newtype!(IsIdentityOutArgs);
+
+properties_newtype!(BeginInstanceChangedInArgs);
+
+properties_newtype!(EndInstanceChangedInArgs);
+properties_newtype!(EndInstanceChangeOutArgs);
 
 properties_newtype!(ParamDoubleProperties);
 properties_newtype!(ParamIntProperties);

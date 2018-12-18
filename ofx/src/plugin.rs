@@ -131,7 +131,7 @@ impl MapAction for PluginDescriptor {
 			match action {
 				ImageEffectAction::DescribeInContext => {
 					let context = self
-						.new_typed_properties(DescribeInContextInArgs::new, in_args)?
+						.typed_properties(DescribeInContextInArgs::new, in_args)?
 						.get_context()?;
 					Ok(Action::DescribeInContext(
 						self.new_image_effect_raw(handle)?,
@@ -140,18 +140,40 @@ impl MapAction for PluginDescriptor {
 				}
 				ImageEffectAction::GetRegionOfDefinition => {
 					let in_args =
-						self.new_typed_properties(GetRegionOfDefinitionInArgs::new, in_args)?;
+						self.typed_properties(GetRegionOfDefinitionInArgs::new, in_args)?;
 					let out_args =
-						self.new_typed_properties(GetRegionOfDefinitionOutArgs::new, out_args)?;
+						self.typed_properties(GetRegionOfDefinitionOutArgs::new, out_args)?;
 					Ok(Action::GetRegionOfDefinition(
 						self.new_image_effect_raw(handle)?,
 						in_args,
 						out_args,
 					))
 				}
+				ImageEffectAction::GetRegionsOfInterest => {
+					let in_args =
+						self.typed_properties(GetRegionsOfInterestInArgs::new, in_args)?;
+					let out_args =
+						self.typed_properties(GetRegionsOfInterestOutArgs::new, out_args)?;
+					Ok(Action::GetRegionsOfInterest(
+						self.new_image_effect_raw(handle)?,
+						in_args,
+						out_args,
+					))
+				}
+				ImageEffectAction::IsIdentity => {
+					let in_args =
+						self.typed_properties(IsIdentityInArgs::new, in_args)?;
+					let out_args =
+						self.typed_properties(IsIdentityOutArgs::new, out_args)?;
+					Ok(Action::IsIdentity(
+						self.new_image_effect_raw(handle)?,
+						in_args,
+						out_args,
+					))
+				}				
 				ImageEffectAction::GetClipPreferences => {
 					let out_args =
-						self.new_typed_properties(GetClipPreferencesOutArgs::new, out_args)?;
+						self.typed_properties(GetClipPreferencesOutArgs::new, out_args)?;
 					Ok(Action::GetClipPreferences(
 						self.new_image_effect_raw(handle)?,
 						out_args,
@@ -363,7 +385,7 @@ impl PluginDescriptor {
 		))
 	}
 
-	fn new_typed_properties<T, F>(&self, constructor: F, handle: OfxPropertySetHandle) -> Result<T>
+	fn typed_properties<T, F>(&self, constructor: F, handle: OfxPropertySetHandle) -> Result<T>
 	where
 		F: Fn(OfxPropertySetHandle, Rc<OfxPropertySuiteV1>) -> T,
 	{

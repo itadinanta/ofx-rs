@@ -66,6 +66,8 @@ pub enum Action {
 		GetRegionsOfInterestInArgs,
 		GetRegionsOfInterestOutArgs,
 	),
+	BeginInstanceChanged(ImageEffectHandle, BeginInstanceChangedInArgs),
+	EndInstanceChanged(ImageEffectHandle, BeginInstanceChangedInArgs),	
 	GetClipPreferences(ImageEffectHandle, GetClipPreferencesOutArgs),
 	IsIdentity(ImageEffectHandle, IsIdentityInArgs, IsIdentityOutArgs),
 	DestroyInstance(ImageEffectHandle),

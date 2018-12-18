@@ -438,7 +438,7 @@ pub mod image_effect {
 	define_property!(read_write ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: CString | [u8]);
 	define_property!(read_write ImageEffectPropSupportedComponents as SupportedComponents: CString | [u8]);
 	define_property!(read_write ImageEffectPropRenderWindow as RenderWindow: RectI);
-	define_property!(read_write ImageEffectPropRegionOfInterest as RegionOfInterest: RectI);
+	define_property!(read_write ImageEffectPropRegionOfInterest as RegionOfInterest: RectD);
 	define_property!(read_write ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
 
 }
