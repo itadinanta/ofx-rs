@@ -618,17 +618,21 @@ get_property!(CanGetSupportsMultipleClipDepths => get_supports_multiple_clip_dep
 
 set_property!(CanSetSupportedComponents => set_supported_components, image_effect::SupportedComponents, &[enum ImageComponent]);
 set_property!(CanSetOptional => set_optional, image_clip::Optional);
-set_property!(CanSetEnabled => set_enabled, param::Enabled);
 
 get_property!(CanGetEnabled => get_enabled, param::Enabled);
+set_property!(CanSetEnabled => set_enabled, param::Enabled);
+
 get_property!(CanGetTime => get_time, Time);
+set_property!(CanSetTime => set_time, Time);
+
 get_property!(CanGetType => get_type, Type, enum EType);
 
+get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect::RegionOfDefinition);
 set_property!(CanSetRegionOfDefinition => set_region_of_definition, image_effect::RegionOfDefinition);
+
+get_property!(CanGetRegionOfInterest => get_region_of_interest, image_effect::RegionOfInterest);
 set_property!(CanSetRegionOfInterest => set_region_of_interest, image_effect::RegionOfInterest);
 
-get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect::RegionOfDefinition);
-get_property!(CanGetRegionOfInterest => get_region_of_interest, image_effect::RegionOfInterest);
 get_property!(CanGetConnected => get_connected, image_clip::Connected);
 get_property!(CanGetComponents => get_components, image_effect::Components, enum ImageComponent);
 get_property!(CanGetPixelDepth => get_pixel_depth, image_effect::PixelDepth, enum BitDepth);
@@ -669,8 +673,8 @@ capabilities! { ImageEffectProperties =>
 }
 
 capabilities! { DescribeInContextInArgs => CanGetContext }
-capabilities! { IsIdentityInArgs => CanGetTime, CanGetRenderWindow }
-capabilities! { IsIdentityOutArgs => CanSetName, CanSetNameRaw }
+capabilities! { IsIdentityInArgs => CanGetTime, CanGetRenderWindow, CanGetRenderScale}
+capabilities! { IsIdentityOutArgs => CanSetName, CanSetNameRaw, CanSetTime }
 
 pub trait BaseClip: CanSetSupportedComponents + CanSetOptional + CanGetConnected {}
 impl<T> CanGetConnected for T where T: BaseClip {}
@@ -680,8 +684,7 @@ impl<T> CanSetOptional for T where T: BaseClip {}
 capabilities! { ClipProperties => BaseClip }
 
 capabilities! { ImageClipHandle =>
-	CanGetConnected,
-	CanGetComponents,CanGetUnmappedComponents,
+	CanGetConnected, CanGetComponents,CanGetUnmappedComponents,
 	CanGetPixelDepth, CanGetUnmappedPixelDepth
 }
 
@@ -709,10 +712,7 @@ capabilities! { GetRegionsOfInterestOutArgs => CanSetRegionOfInterest }
 capabilities! { GetRegionsOfInterestOutArgs => RawWritable }
 capabilities! { GetClipPreferencesOutArgs => RawWritable }
 
-capabilities! { InstanceChangedInArgs =>
-	CanGetType, CanGetName,
-	CanGetTime, CanGetChangeReason, CanGetRenderScale
-}
+capabilities! { InstanceChangedInArgs => CanGetType, CanGetName, CanGetTime, CanGetChangeReason, CanGetRenderScale }
 
 capabilities! { BeginInstanceChangedInArgs => CanGetChangeReason}
 capabilities! { EndInstanceChangedInArgs => CanGetChangeReason}
