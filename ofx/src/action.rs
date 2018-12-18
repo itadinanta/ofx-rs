@@ -20,10 +20,11 @@ pub enum GlobalAction {
 	SyncPrivateData,
 	CreateInstance,
 	DestroyInstance,
-	InstanceChanged,
 	BeginInstanceChanged,
+	InstanceChanged,
 	EndInstanceChanged,
 	BeginInstanceEdit,
+	InstanceEdit,
 	EndInstanceEdit,
 	//	DescribeInteract,
 	//	CreateInstanceInteract,
@@ -72,7 +73,7 @@ pub enum Action {
 
 	BeginInstanceChanged(ImageEffectHandle, BeginInstanceChangedInArgs),
 	InstanceChanged(ImageEffectHandle, InstanceChangedInArgs),	
-	EndInstanceChanged(ImageEffectHandle, BeginInstanceChangedInArgs),	
+	EndInstanceChanged(ImageEffectHandle, EndInstanceChangedInArgs),	
 	
 	GetClipPreferences(ImageEffectHandle, GetClipPreferencesOutArgs),
 	IsIdentity(ImageEffectHandle, IsIdentityInArgs, IsIdentityOutArgs),

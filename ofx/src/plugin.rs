@@ -169,6 +169,18 @@ impl MapAction for PluginDescriptor {
 				GlobalAction::CreateInstance => {
 					Ok(Action::CreateInstance(self.new_image_effect_raw(handle)?))
 				}
+				GlobalAction::BeginInstanceChanged => Ok(Action::BeginInstanceChanged(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(BeginInstanceChangedInArgs::new, in_args)?,
+				)),
+				GlobalAction::InstanceChanged => Ok(Action::InstanceChanged(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(InstanceChangedInArgs::new, in_args)?,
+				)),
+				GlobalAction::EndInstanceChanged => Ok(Action::EndInstanceChanged(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(EndInstanceChangedInArgs::new, in_args)?,
+				)),
 				GlobalAction::DestroyInstance => {
 					Ok(Action::DestroyInstance(self.new_image_effect_raw(handle)?))
 				}

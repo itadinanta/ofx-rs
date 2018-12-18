@@ -132,6 +132,8 @@ impl ValueType for Int {}
 impl ValueType for Double {}
 impl ValueType for PointI {}
 impl ValueType for PointD {}
+impl ValueType for RangeI {}
+impl ValueType for RangeD {}
 impl ValueType for RectI {}
 impl ValueType for RectD {}
 impl ValueType for String {}
@@ -208,6 +210,12 @@ raw_getter_impl! { |readable, c_name, index| -> PointI {
 	=> c_struct_out}
 }}
 
+raw_getter_impl! { |readable, c_name, index| -> RangeI {
+	let mut c_struct_out: RangeI = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, RANGE_ELEMENTS, &mut c_struct_out.min as *mut Int)
+	=> c_struct_out}
+}}
+
 raw_getter_impl! { |readable, c_name, index| -> RectI {
 	let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
 	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, RECT_ELEMENTS, &mut c_struct_out.x1 as *mut Int)
@@ -223,6 +231,12 @@ raw_getter_impl! { |readable, c_name, index| -> Double {
 raw_getter_impl! { |readable, c_name, index| -> PointD {
 	let mut c_struct_out: PointD = unsafe { std::mem::zeroed() };
 	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, POINT_ELEMENTS, &mut c_struct_out.x as *mut Double)
+	=> c_struct_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> RangeD {
+	let mut c_struct_out: RangeD = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, RANGE_ELEMENTS, &mut c_struct_out.min as *mut Double)
 	=> c_struct_out}
 }}
 
@@ -333,6 +347,11 @@ raw_setter_impl! { |writable, c_name, index, value: &PointI| {
 	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, POINT_ELEMENTS,  &value.x as *const Int)
 }}
 
+raw_setter_impl! { |writable, c_name, index, value: &RangeI| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, RANGE_ELEMENTS,  &value.min as *const Int)
+}}
+
 raw_setter_impl! { |writable, c_name, index, value: &RectI| {
 	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, RECT_ELEMENTS,  &value.x1 as *const Int)
@@ -351,6 +370,11 @@ raw_setter_impl! { |writable, c_name, index, value: &Double| {
 raw_setter_impl! { |writable, c_name, index, value: &PointD| {
 	trace_setter!(writable.handle(), c_name, index, value);
 	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, POINT_ELEMENTS,  &value.x as *const Double)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &RangeD| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, RANGE_ELEMENTS,  &value.min as *const Double)
 }}
 
 raw_setter_impl! { |writable, c_name, index, value: &RectD| {
