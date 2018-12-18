@@ -711,7 +711,8 @@ impl<T> CanSetOptional for T where T: BaseClip {}
 capabilities! { ClipProperties => BaseClip }
 
 capabilities! { ImageClipHandle =>
-	CanGetConnected, CanGetComponents,CanGetUnmappedComponents,
+	CanGetConnected, CanGetFrameRange,
+	CanGetComponents,CanGetUnmappedComponents,
 	CanGetPixelDepth, CanGetUnmappedPixelDepth
 }
 

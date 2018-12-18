@@ -33,13 +33,13 @@ mod types;
 mod registry;
 pub use action::*;
 pub use enums::*;
+pub use enums::Type as Type;
 pub use handle::*;
 pub use plugin::*;
 pub use property::*;
 pub use result::*;
 pub use types::*;
-
-pub use ofx_sys::*;
+pub use util::*;
 use registry::*;
 
 pub use ofx_sys::{OfxHost, OfxPlugin, OfxPropertySetHandle};
@@ -58,3 +58,4 @@ macro_rules! register_modules {
 		build_plugin_registry!(register_plugins);
 	};
 }
+

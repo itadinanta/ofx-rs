@@ -1,4 +1,3 @@
-use boolinator::*;
 use ofx::*;
 
 plugin_module!(
@@ -39,8 +38,9 @@ struct MyInstanceData {
 impl Execute for SimplePlugin {
 	#[allow(clippy::float_cmp)]
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
+		use Action::*;
 		match *action {
-			Action::IsIdentity(ref mut effect, ref in_args, ref mut out_args) => {
+			IsIdentity(ref mut effect, ref in_args, ref mut out_args) => {
 				let time = in_args.get_time()?;
 				let render_window = in_args.get_render_window()?;
 				let instance_data = effect.get_instance_data::<MyInstanceData>()?;
@@ -58,14 +58,34 @@ impl Execute for SimplePlugin {
 					(1., 1., 1., 1.)
 				};
 				if scale_value == 1. && sr == 1. && sg == 1. && sb == 1. && sa == 1. {
-					out_args.set_name_raw(kOfxImageEffectSimpleSourceClipName)?;
+					out_args.set_name(&image_effect_simple_source_clip_name())?;
 					OK
 				} else {
 					REPLY_DEFAULT
 				}
 			}
 
-			Action::GetRegionOfDefinition(ref mut effect, ref in_args, ref mut out_args) => {
+			InstanceChanged(ref mut effect, ref in_args) => {
+				if in_args.get_change_reason()? == Change::UserEdited {
+					let obj_changed = in_args.get_name()?;
+					let expected = match in_args.get_type()? {
+						Type::Clip => Some(image_effect_simple_source_clip_name()),
+						Type::Parameter => Some("scaleComponents".to_owned()),
+						_ => None,
+					};
+
+					if expected == Some(obj_changed) {
+						Self::set_per_component_scale_enabledness(effect)?;
+						OK
+					} else {
+						REPLY_DEFAULT
+					}
+				} else {
+					REPLY_DEFAULT
+				}
+			}
+
+			GetRegionOfDefinition(ref mut effect, ref in_args, ref mut out_args) => {
 				let time = in_args.get_time()?;
 				let rod = effect
 					.get_instance_data::<MyInstanceData>()?
@@ -76,7 +96,7 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::GetRegionsOfInterest(ref mut effect, ref in_args, ref mut out_args) => {
+			GetRegionsOfInterest(ref mut effect, ref in_args, ref mut out_args) => {
 				let roi = in_args.get_region_of_interest()?;
 
 				out_args.set_raw("OfxImageClipPropRoI_Source", &roi)?;
@@ -92,7 +112,15 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::GetClipPreferences(ref mut effect, ref mut out_args) => {
+			GetTimeDomain(ref mut effect, ref mut out_args) => {
+				let my_data = effect.get_instance_data::<MyInstanceData>()?;
+				let frame_range = my_data.source_clip.get_frame_range()?;
+				out_args.set_frame_range(frame_range)?;
+			
+				OK	
+			}
+
+			GetClipPreferences(ref mut effect, ref mut out_args) => {
 				let my_data = effect.get_instance_data::<MyInstanceData>()?;
 				let bit_depth = my_data.source_clip.get_pixel_depth()?;
 				let image_component = my_data.source_clip.get_components()?;
@@ -130,7 +158,7 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::CreateInstance(ref mut effect) => {
+			CreateInstance(ref mut effect) => {
 				let mut effect_props = effect.properties()?;
 				let mut param_set = effect.parameter_set()?;
 
@@ -171,9 +199,9 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::DestroyInstance(ref mut _effect) => OK,
+			DestroyInstance(ref mut _effect) => OK,
 
-			Action::DescribeInContext(ref mut effect, context) => {
+			DescribeInContext(ref mut effect, context) => {
 				let mut output_clip = effect.new_output_clip()?;
 				output_clip
 					.set_supported_components(&[ImageComponent::RGBA, ImageComponent::Alpha])?;
@@ -280,7 +308,7 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			Action::Describe(ref mut effect) => {
+			Describe(ref mut effect) => {
 				self.host_supports_multiple_clip_depths = plugin_context
 					.get_host()
 					.get_supports_multiple_clip_depths()?;
