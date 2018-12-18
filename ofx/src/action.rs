@@ -72,10 +72,11 @@ pub enum Action {
 	),
 
 	BeginInstanceChanged(ImageEffectHandle, BeginInstanceChangedInArgs),
-	InstanceChanged(ImageEffectHandle, InstanceChangedInArgs),	
-	EndInstanceChanged(ImageEffectHandle, EndInstanceChangedInArgs),	
-	
+	InstanceChanged(ImageEffectHandle, InstanceChangedInArgs),
+	EndInstanceChanged(ImageEffectHandle, EndInstanceChangedInArgs),
+
 	GetClipPreferences(ImageEffectHandle, GetClipPreferencesOutArgs),
+	GetTimeDomain(ImageEffectHandle, GetTimeDomainOutArgs),
 	IsIdentity(ImageEffectHandle, IsIdentityInArgs, IsIdentityOutArgs),
 	GenericGlobal(GlobalAction, GenericPluginHandle),
 	GenericImageEffect(ImageEffectAction, ImageEffectHandle),

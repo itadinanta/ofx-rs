@@ -157,7 +157,10 @@ impl MapAction for PluginDescriptor {
 					self.new_image_effect_raw(handle)?,
 					self.typed_properties(GetClipPreferencesOutArgs::new, out_args)?,
 				)),
-
+				ImageEffectAction::GetTimeDomain => Ok(Action::GetTimeDomain(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(GetTimeDomainOutArgs::new, out_args)?,
+				)),
 				_ => Err(Error::InvalidAction),
 			}
 		} else if let Some(action) = self.global_action_index.find(name) {
@@ -177,6 +180,7 @@ impl MapAction for PluginDescriptor {
 					self.new_image_effect_raw(handle)?,
 					self.typed_properties(InstanceChangedInArgs::new, in_args)?,
 				)),
+
 				GlobalAction::EndInstanceChanged => Ok(Action::EndInstanceChanged(
 					self.new_image_effect_raw(handle)?,
 					self.typed_properties(EndInstanceChangedInArgs::new, in_args)?,

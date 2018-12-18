@@ -258,6 +258,8 @@ properties_newtype!(InstanceChangedOutArgs);
 properties_newtype!(EndInstanceChangedInArgs);
 properties_newtype!(EndInstanceChangedOutArgs);
 
+properties_newtype!(GetTimeDomainOutArgs);
+
 properties_newtype!(ParamDoubleProperties);
 properties_newtype!(ParamIntProperties);
 properties_newtype!(ParamBooleanProperties);

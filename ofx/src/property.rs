@@ -494,7 +494,7 @@ pub mod image_effect {
 	property!(ImageEffectPropRenderScale as RenderScale: PointD);
 	property!(ImageEffectPropRegionOfInterest as RegionOfInterest: RectD);
 	property!(ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
-
+	property!(ImageEffectPropFrameRange as FrameRange: RangeD);
 }
 
 pub mod image_clip {
@@ -665,6 +665,9 @@ get_property!(CanGetUnmappedPixelDepth => get_unmapped_pixel_depth, image_clip::
 get_property!(CanGetRenderWindow => get_render_window, image_effect::RenderWindow);
 get_property!(CanGetRenderScale => get_render_scale, image_effect::RenderScale);
 
+get_property!(CanGetFrameRange => get_frame_range, image_effect::FrameRange);
+set_property!(CanSetFrameRange => set_frame_range, image_effect::FrameRange);
+
 set_property!(CanSetHint => set_hint, &param::Hint);
 set_property!(CanSetParent => set_parent, &param::Parent);
 set_property!(CanSetScriptName => set_script_name, &param::ScriptName);
@@ -740,3 +743,5 @@ capabilities! { InstanceChangedInArgs => CanGetType, CanGetName, CanGetTime, Can
 
 capabilities! { BeginInstanceChangedInArgs => CanGetChangeReason}
 capabilities! { EndInstanceChangedInArgs => CanGetChangeReason}
+
+capabilities! { GetTimeDomainOutArgs => CanSetFrameRange }
