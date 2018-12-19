@@ -116,8 +116,8 @@ impl Execute for SimplePlugin {
 				let my_data = effect.get_instance_data::<MyInstanceData>()?;
 				let frame_range = my_data.source_clip.get_frame_range()?;
 				out_args.set_frame_range(frame_range)?;
-			
-				OK	
+
+				OK
 			}
 
 			GetClipPreferences(ref mut effect, ref mut out_args) => {
@@ -346,32 +346,20 @@ impl SimplePlugin {
 				.per_component_scale_param
 				.get_value()?;
 			let input_clip = effect.get_simple_input_clip()?;
-			let is_rgb = input_clip.get_connected()?
-				&& input_clip.get_components()? != ImageComponent::Alpha;
-			per_component_scale_selected && is_rgb
+			per_component_scale_selected
+				&& input_clip.get_connected()?
+				&& input_clip.get_components()?.is_rgb()
 		};
 
 		let instance_data = effect.get_instance_data::<MyInstanceData>()?;
-		instance_data
-			.scale_r_param
-			.set_enabled(per_component_scale)?;
-		instance_data
-			.scale_g_param
-			.set_enabled(per_component_scale)?;
-		instance_data
-			.scale_b_param
-			.set_enabled(per_component_scale)?;
-		instance_data
-			.scale_a_param
-			.set_enabled(per_component_scale)?;
-
-		// 		does this work too?
-		//		for parameter in &["scaleR", "scaleG", "scaleB", "scaleA"] {
-		//			effect
-		//				.parameter_set()?
-		//				.parameter::<Double>(parameter)?
-		//				.set_enabled(per_component_scale)?;
-		//		}
+		for scale_param in &mut [
+			&mut instance_data.scale_r_param,
+			&mut instance_data.scale_g_param,
+			&mut instance_data.scale_b_param,
+			&mut instance_data.scale_a_param,
+		] {
+			scale_param.set_enabled(per_component_scale)?;
+		}
 
 		Ok(())
 	}
