@@ -152,8 +152,8 @@ impl MapAction for PluginDescriptor {
 		};
 		let name = unsafe { CStr::from_ptr(action) }.to_bytes();
 		if let Some(action) = self.image_effect_action_index.find(name) {
-			info!("Image effect action match {:?}", action);
 			use ImageEffectAction::*;
+			info!("Image effect action {:?}", action);
 			match action {
 				DescribeInContext => map_args! { DescribeInContext(in_args) },
 				GetRegionOfDefinition => map_args! { GetRegionOfDefinition(in_args, out_args) },
@@ -167,18 +167,19 @@ impl MapAction for PluginDescriptor {
 				_ => Err(Error::InvalidAction),
 			}
 		} else if let Some(action) = self.global_action_index.find(name) {
-			info!("Global action {:?}", action);
 			use GlobalAction::*;
+			info!("Global action {:?}", action);
 			match action {
-				Load => Ok(Action::Load),
-				Unload => Ok(Action::Unload),
+				Load => Ok(Action::Load),     // handled by the library
+				Unload => Ok(Action::Unload), // handled by the library
 				Describe => map_args!(Describe()),
 				SyncPrivateData => map_args! { SyncPrivateData() },
+				PurgeCaches => map_args! { PurgeCaches() },
 				CreateInstance => map_args!(CreateInstance()),
 				BeginInstanceChanged => map_args!(BeginInstanceChanged(in_args)),
 				InstanceChanged => map_args!(InstanceChanged(in_args)),
 				EndInstanceChanged => map_args!(EndInstanceChanged(in_args)),
-				DestroyInstance => map_args!(DestroyInstance()),
+				DestroyInstance => map_args!(DestroyInstance()), // handled by the library
 				_ => Err(Error::InvalidAction),
 			}
 		} else {

@@ -77,6 +77,8 @@ pub enum Action {
 
 	SyncPrivateData(ImageEffectHandle),
 
+	PurgeCaches(ImageEffectHandle),
+
 	BeginSequenceRender(ImageEffectHandle, BeginSequenceRenderInArgs),
 	Render(ImageEffectHandle, RenderInArgs),
 	EndSequenceRender(ImageEffectHandle, EndSequenceRenderInArgs),
