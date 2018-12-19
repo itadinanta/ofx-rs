@@ -34,6 +34,14 @@ struct MyInstanceData {
 	scale_b_param: ParamHandle<Double>,
 	scale_a_param: ParamHandle<Double>,
 }
+const PARAM_MAIN_NAME: &str = "Main";
+const PARAM_SCALE_NAME: &str = "scale";
+const PARAM_SCALE_R_NAME: &str = "scaleR";
+const PARAM_SCALE_G_NAME: &str = "scaleG";
+const PARAM_SCALE_B_NAME: &str = "scaleB";
+const PARAM_SCALE_A_NAME: &str = "scaleA";
+const PARAM_SCALE_COMPONENTS_NAME: &str = "scaleComponents";
+const PARAM_COMPONENT_SCALES_NAME: &str = "componentScales";
 
 impl Execute for SimplePlugin {
 	#[allow(clippy::float_cmp)]
@@ -72,7 +80,7 @@ impl Execute for SimplePlugin {
 					let obj_changed = in_args.get_name()?;
 					let expected = match in_args.get_type()? {
 						Type::Clip => Some(image_effect_simple_source_clip_name()),
-						Type::Parameter => Some("scaleComponents".to_owned()),
+						Type::Parameter => Some(PARAM_SCALE_COMPONENTS_NAME.to_owned()),
 						_ => None,
 					};
 
@@ -101,14 +109,16 @@ impl Execute for SimplePlugin {
 			GetRegionsOfInterest(ref mut effect, ref in_args, ref mut out_args) => {
 				let roi = in_args.get_region_of_interest()?;
 
-				out_args.set_raw("OfxImageClipPropRoI_Source", &roi)?;
+				out_args.set_raw(image_clip_prop_roi!(clip_source!()), &roi)?;
 
 				if effect
 					.get_instance_data::<MyInstanceData>()?
 					.is_general_effect
-					&& effect.get_clip("Mask")?.get_connected()?
+					&& effect
+						.get_clip(image_clip_prop_components!(clip_mask!()))?
+						.get_connected()?
 				{
-					out_args.set_raw("OfxImageClipPropRoI_Mask", &roi)?;
+					out_args.set_raw(image_clip_prop_roi!(clip_mask!()), &roi)?;
 				}
 
 				OK
@@ -131,12 +141,13 @@ impl Execute for SimplePlugin {
 					_ => ImageComponent::Alpha,
 				};
 				out_args.set_raw(
-					"OfxImageClipPropComponents_Output",
+					image_clip_prop_components!(clip_output!()),
 					output_component.to_bytes(),
 				)?;
 
 				if self.host_supports_multiple_clip_depths {
-					out_args.set_raw("OfxImageClipPropDepth_Output", bit_depth.to_bytes())?;
+					out_args
+						.set_raw(image_clip_prop_depth!(clip_output!()), bit_depth.to_bytes())?;
 				}
 
 				if my_data.is_general_effect {
@@ -148,11 +159,14 @@ impl Execute for SimplePlugin {
 
 					if is_mask_connected {
 						out_args.set_raw(
-							"OfxImageClipPropComponents_Mask",
+							image_clip_prop_components!(clip_mask!()),
 							ImageComponent::Alpha.to_bytes(),
 						)?;
 						if self.host_supports_multiple_clip_depths {
-							out_args.set_raw("OfxImageClipPropDepth_Mask", bit_depth.to_bytes())?;
+							out_args.set_raw(
+								image_clip_prop_depth!(clip_mask!()),
+								bit_depth.to_bytes(),
+							)?;
 						}
 					}
 				}
@@ -165,21 +179,21 @@ impl Execute for SimplePlugin {
 				let mut param_set = effect.parameter_set()?;
 
 				let is_general_effect = effect_props.get_context()?.is_general();
-				let per_component_scale_param = param_set.parameter("scaleComponents")?;
+				let per_component_scale_param = param_set.parameter(PARAM_SCALE_COMPONENTS_NAME)?;
 
 				let source_clip = effect.get_simple_input_clip()?;
 				let output_clip = effect.get_output_clip()?;
 				let mask_clip = if is_general_effect {
-					Some(effect.get_clip("Mask")?)
+					Some(effect.get_clip(clip_mask!())?)
 				} else {
 					None
 				};
 
-				let scale_param = param_set.parameter("scale")?;
-				let scale_r_param = param_set.parameter("scaleR")?;
-				let scale_g_param = param_set.parameter("scaleG")?;
-				let scale_b_param = param_set.parameter("scaleB")?;
-				let scale_a_param = param_set.parameter("scaleA")?;
+				let scale_param = param_set.parameter(PARAM_SCALE_NAME)?;
+				let scale_r_param = param_set.parameter(PARAM_SCALE_R_NAME)?;
+				let scale_g_param = param_set.parameter(PARAM_SCALE_G_NAME)?;
+				let scale_b_param = param_set.parameter(PARAM_SCALE_B_NAME)?;
+				let scale_a_param = param_set.parameter(PARAM_SCALE_A_NAME)?;
 
 				effect.set_instance_data(MyInstanceData {
 					is_general_effect,
@@ -211,7 +225,7 @@ impl Execute for SimplePlugin {
 					.set_supported_components(&[ImageComponent::RGBA, ImageComponent::Alpha])?;
 
 				if in_args.get_context()?.is_general() {
-					let mut mask = effect.new_clip("Mask")?;
+					let mut mask = effect.new_clip(clip_mask!())?;
 					mask.set_supported_components(&[ImageComponent::Alpha])?;
 					mask.set_optional(true)?;
 				}
@@ -245,64 +259,65 @@ impl Execute for SimplePlugin {
 				let mut param_set = effect.parameter_set()?;
 				define_scale_param(
 					&mut param_set,
+					PARAM_SCALE_NAME,
 					"scale",
-					"scale",
-					"scale",
+					PARAM_SCALE_NAME,
 					"Scales all component in the image",
 					None,
 				)?;
 
-				let mut param_props = param_set.param_define_boolean("scaleComponents")?;
+				let mut param_props =
+					param_set.param_define_boolean(PARAM_SCALE_COMPONENTS_NAME)?;
 				param_props.set_default(false)?;
 				param_props.set_hint("Enables scale on individual components")?;
-				param_props.set_script_name("scaleComponents")?;
+				param_props.set_script_name(PARAM_SCALE_COMPONENTS_NAME)?;
 				param_props.set_label("Scale Individual Components")?;
 
-				let mut param_props = param_set.param_define_group("componentScales")?;
+				let mut param_props = param_set.param_define_group(PARAM_COMPONENT_SCALES_NAME)?;
 				param_props.set_hint("Scales on the individual component")?;
 				param_props.set_label("Components")?;
 
 				define_scale_param(
 					&mut param_set,
-					"scaleR",
+					PARAM_SCALE_R_NAME,
 					"red",
-					"scaleR",
+					PARAM_SCALE_R_NAME,
 					"Scales the red component of the image",
-					Some("componentScales"),
+					Some(PARAM_COMPONENT_SCALES_NAME),
 				)?;
 				define_scale_param(
 					&mut param_set,
-					"scaleG",
+					PARAM_SCALE_G_NAME,
 					"green",
-					"scaleG",
+					PARAM_SCALE_G_NAME,
 					"Scales the green component of the image",
-					Some("componentScales"),
+					Some(PARAM_COMPONENT_SCALES_NAME),
 				)?;
 				define_scale_param(
 					&mut param_set,
-					"scaleB",
+					PARAM_SCALE_B_NAME,
 					"blue",
-					"scaleB",
+					PARAM_SCALE_B_NAME,
 					"Scales the blue component of the image",
-					Some("componentScales"),
+					Some(PARAM_COMPONENT_SCALES_NAME),
 				)?;
 				define_scale_param(
 					&mut param_set,
-					"scaleA",
+					PARAM_SCALE_A_NAME,
 					"alpha",
-					"scaleA",
+					PARAM_SCALE_A_NAME,
 					"Scales the alpha component of the image",
-					Some("componentScales"),
+					Some(PARAM_COMPONENT_SCALES_NAME),
 				)?;
 
-				let mut param_props = param_set.param_define_page("Main")?;
+				let mut param_props = param_set.param_define_page(PARAM_MAIN_NAME)?;
 				param_props.set_children(&[
-					"scale",
-					"scaleComponents",
-					"scaleR",
-					"scaleG",
-					"scaleB",
-					"scaleA",
+					PARAM_SCALE_NAME,
+					PARAM_SCALE_COMPONENTS_NAME,
+					PARAM_SCALE_R_NAME,
+					PARAM_SCALE_G_NAME,
+					PARAM_SCALE_B_NAME,
+					PARAM_SCALE_A_NAME,
 				])?;
 
 				OK
