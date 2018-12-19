@@ -1,8 +1,8 @@
 #![feature(concat_idents)]
 
 use enums::{
-	BitDepth, Change, IdentifiedEnum, ImageComponent, ImageEffectContext, ParamDoubleType,
-	Type as EType,
+	BitDepth, Change, IdentifiedEnum, ImageComponent, ImageEffectContext, ImageField,
+	ParamDoubleType, Type as EType,
 };
 use handle::*;
 use ofx_sys::*;
@@ -460,6 +460,7 @@ property!(PropType as Type: () -> CString);
 
 property!(PropName as Name: (&str) -> String);
 property!(PropTime as Time: Double);
+property!(PropIsInteractive as IsInteractive: Bool);
 property!(PropLabel as Label: (&str) -> String);
 property!(PropShortLabel as ShortLabel: (&str) -> String);
 property!(PropLongLabel as LongLabel: (&str) -> String);
@@ -487,7 +488,7 @@ pub mod image_effect {
 	property!(ImageEffectPropPixelDepth as PixelDepth: () -> CString);
 
 	property!(ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
-	property!(ImageEffectPropSupportedContexts as SupportedContexts: (&[u8]) ->CString);
+	property!(ImageEffectPropSupportedContexts as SupportedContexts: (&[u8]) -> CString);
 	property!(ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: (&[u8]) -> CString);
 	property!(ImageEffectPropSupportedComponents as SupportedComponents: (&[u8]) -> CString);
 	property!(ImageEffectPropRenderWindow as RenderWindow: RectI);
@@ -495,6 +496,12 @@ pub mod image_effect {
 	property!(ImageEffectPropRegionOfInterest as RegionOfInterest: RectD);
 	property!(ImageEffectPropRegionOfDefinition as RegionOfDefinition: RectD);
 	property!(ImageEffectPropFrameRange as FrameRange: RangeD);
+	property!(ImageEffectPropFrameStep as FrameStep: () -> Double);
+	property!(ImageEffectPropFieldToRender as FieldToRender: () -> CString);
+	property!(ImageEffectPropSequentialRenderStatus as SequentialRenderStatus: () -> Bool);
+	property!(ImageEffectPropInteractiveRenderStatus as InteractiveRenderStatus: () -> Bool);
+	property!(ImageEffectPropRenderQualityDraft as RenderQualityDraft: () -> Bool);
+
 }
 
 pub mod image_clip {
@@ -649,6 +656,8 @@ set_property!(CanSetEnabled => set_enabled, param::Enabled);
 get_property!(CanGetTime => get_time, Time);
 set_property!(CanSetTime => set_time, Time);
 
+get_property!(CanGetIsInteractive => get_is_interactive, IsInteractive);
+
 get_property!(CanGetType => get_type, Type, enum EType);
 
 get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect::RegionOfDefinition);
@@ -668,12 +677,19 @@ get_property!(CanGetRenderScale => get_render_scale, image_effect::RenderScale);
 get_property!(CanGetFrameRange => get_frame_range, image_effect::FrameRange);
 set_property!(CanSetFrameRange => set_frame_range, image_effect::FrameRange);
 
+get_property!(CanGetFrameStep => get_frame_step, image_effect::FrameStep);
+
 set_property!(CanSetHint => set_hint, &param::Hint);
 set_property!(CanSetParent => set_parent, &param::Parent);
 set_property!(CanSetScriptName => set_script_name, &param::ScriptName);
 set_property!(CanSetChildren => set_children, param::page::Child, &seq[&str]);
 
 get_property!(CanGetChangeReason => get_change_reason, ChangeReason, enum Change);
+
+get_property!(CanGetFieldToRender => get_field_to_render, image_effect::FieldToRender, enum ImageField);
+get_property!(CanGetSequentialRenderStatus => get_sequential_render_status, image_effect::SequentialRenderStatus);
+get_property!(CanGetInteractiveRenderStatus => get_interactive_render_status, image_effect::InteractiveRenderStatus);
+get_property!(CanGetRenderQualityDraft => get_field_to_render, image_effect::FieldToRender);
 
 pub trait CanSetDoubleParams: Writable {
 	set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
@@ -744,5 +760,33 @@ capabilities! { InstanceChangedInArgs => CanGetType, CanGetName, CanGetTime, Can
 
 capabilities! { BeginInstanceChangedInArgs => CanGetChangeReason}
 capabilities! { EndInstanceChangedInArgs => CanGetChangeReason}
+
+capabilities! { RenderInArgs =>
+	CanGetTime,
+	CanGetFieldToRender, CanGetRenderWindow, CanGetRenderScale,
+	CanGetSequentialRenderStatus,
+	CanGetInteractiveRenderStatus,
+	CanGetRenderQualityDraft
+}
+
+capabilities! { BeginSequenceRenderInArgs =>
+	CanGetFrameRange,
+	CanGetFrameStep,
+	CanGetIsInteractive,
+	CanGetRenderScale,
+	CanGetSequentialRenderStatus,
+	CanGetInteractiveRenderStatus,
+	CanGetRenderQualityDraft
+}
+
+capabilities! { EndSequenceRenderInArgs =>
+	CanGetFrameRange,
+	CanGetFrameStep,
+	CanGetIsInteractive,
+	CanGetRenderScale,
+	CanGetSequentialRenderStatus,
+	CanGetInteractiveRenderStatus,
+	CanGetRenderQualityDraft
+}
 
 capabilities! { GetTimeDomainOutArgs => CanSetFrameRange }

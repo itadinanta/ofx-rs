@@ -75,6 +75,10 @@ pub enum Action {
 	InstanceChanged(ImageEffectHandle, InstanceChangedInArgs),
 	EndInstanceChanged(ImageEffectHandle, EndInstanceChangedInArgs),
 
+	BeginSequenceRender(ImageEffectHandle, BeginSequenceRenderInArgs),
+	Render(ImageEffectHandle, RenderInArgs),
+	EndSequenceRender(ImageEffectHandle, EndSequenceRenderInArgs),
+
 	GetClipPreferences(ImageEffectHandle, GetClipPreferencesOutArgs),
 	GetTimeDomain(ImageEffectHandle, GetTimeDomainOutArgs),
 	IsIdentity(ImageEffectHandle, IsIdentityInArgs, IsIdentityOutArgs),

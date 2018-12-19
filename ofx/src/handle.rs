@@ -228,7 +228,7 @@ macro_rules! properties_newtype {
 				self.0.property.borrow() as *const _
 			}
 		}
-		
+
 		trivial_debug!($name);
 	};
 }
@@ -259,6 +259,10 @@ properties_newtype!(EndInstanceChangedInArgs);
 properties_newtype!(EndInstanceChangedOutArgs);
 
 properties_newtype!(GetTimeDomainOutArgs);
+
+properties_newtype!(BeginSequenceRenderInArgs);
+properties_newtype!(RenderInArgs);
+properties_newtype!(EndSequenceRenderInArgs);
 
 properties_newtype!(ParamDoubleProperties);
 properties_newtype!(ParamIntProperties);
