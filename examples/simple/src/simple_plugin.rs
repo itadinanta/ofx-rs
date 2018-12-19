@@ -17,7 +17,7 @@ impl SimplePlugin {
 		SimplePlugin::default()
 	}
 }
-
+#[allow(unused)]
 struct MyInstanceData {
 	is_general_effect: bool,
 
@@ -40,9 +40,11 @@ impl Execute for SimplePlugin {
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		use Action::*;
 		match *action {
+			Render(ref mut _effect, ref _in_args) => OK,
+
 			IsIdentity(ref mut effect, ref in_args, ref mut out_args) => {
 				let time = in_args.get_time()?;
-				let render_window = in_args.get_render_window()?;
+				let _render_window = in_args.get_render_window()?;
 				let instance_data = effect.get_instance_data::<MyInstanceData>()?;
 
 				let scale_value = instance_data.scale_param.get_value_at_time(time)?;
@@ -162,10 +164,8 @@ impl Execute for SimplePlugin {
 				let mut effect_props = effect.properties()?;
 				let mut param_set = effect.parameter_set()?;
 
-				let is_general_effect =
-					ImageEffectContext::General == effect_props.get_context()?;
-
-				let per_component_scale_param = param_set.parameter("scale")?;
+				let is_general_effect = effect_props.get_context()?.is_general();
+				let per_component_scale_param = param_set.parameter("scaleComponents")?;
 
 				let source_clip = effect.get_simple_input_clip()?;
 				let output_clip = effect.get_output_clip()?;
@@ -201,7 +201,7 @@ impl Execute for SimplePlugin {
 
 			DestroyInstance(ref mut _effect) => OK,
 
-			DescribeInContext(ref mut effect, context) => {
+			DescribeInContext(ref mut effect, ref in_args) => {
 				let mut output_clip = effect.new_output_clip()?;
 				output_clip
 					.set_supported_components(&[ImageComponent::RGBA, ImageComponent::Alpha])?;
@@ -210,7 +210,7 @@ impl Execute for SimplePlugin {
 				input_clip
 					.set_supported_components(&[ImageComponent::RGBA, ImageComponent::Alpha])?;
 
-				if context == ImageEffectContext::General {
+				if in_args.get_context()?.is_general() {
 					let mut mask = effect.new_clip("Mask")?;
 					mask.set_supported_components(&[ImageComponent::Alpha])?;
 					mask.set_optional(true)?;
@@ -258,7 +258,7 @@ impl Execute for SimplePlugin {
 				param_props.set_script_name("scaleComponents")?;
 				param_props.set_label("Scale Individual Components")?;
 
-				let mut param_props = param_set.param_define_boolean("componentScales")?;
+				let mut param_props = param_set.param_define_group("componentScales")?;
 				param_props.set_hint("Scales on the individual component")?;
 				param_props.set_label("Components")?;
 
@@ -340,18 +340,14 @@ impl Execute for SimplePlugin {
 
 impl SimplePlugin {
 	fn set_per_component_scale_enabledness(effect: &mut ImageEffectHandle) -> Result<()> {
-		let per_component_scale = {
-			let per_component_scale_selected = effect
-				.get_instance_data::<MyInstanceData>()?
-				.per_component_scale_param
-				.get_value()?;
-			let input_clip = effect.get_simple_input_clip()?;
-			per_component_scale_selected
-				&& input_clip.get_connected()?
-				&& input_clip.get_components()?.is_rgb()
-		};
-
 		let instance_data = effect.get_instance_data::<MyInstanceData>()?;
+		let input_clip = effect.get_simple_input_clip()?;
+		let is_input_rgb = input_clip.get_connected()? && input_clip.get_components()?.is_rgb();
+		instance_data
+			.per_component_scale_param
+			.set_enabled(is_input_rgb)?;
+		let per_component_scale =
+			is_input_rgb && instance_data.per_component_scale_param.get_value()?;
 		for scale_param in &mut [
 			&mut instance_data.scale_r_param,
 			&mut instance_data.scale_g_param,
@@ -359,6 +355,9 @@ impl SimplePlugin {
 			&mut instance_data.scale_a_param,
 		] {
 			scale_param.set_enabled(per_component_scale)?;
+			instance_data
+				.scale_param
+				.set_enabled(!per_component_scale)?
 		}
 
 		Ok(())

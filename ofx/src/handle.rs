@@ -71,6 +71,10 @@ impl ParamHandleValue for Int {}
 impl ParamHandleValue for Bool {}
 impl ParamHandleValue for Double {}
 
+pub trait ParamHandleValueDefault: ParamHandleValue + Default {}
+impl ParamHandleValueDefault for Int {}
+impl ParamHandleValueDefault for Double {}
+
 #[derive(Clone)]
 pub struct ParamHandle<T>
 where
@@ -143,17 +147,36 @@ where
 			_type: PhantomData,
 		}
 	}
+}
 
+impl<T> ParamHandle<T>
+where
+	T: ParamHandleValueDefault,
+{
 	pub fn get_value(&self) -> Result<T> {
 		let mut value: T = T::default();
-		suite_fn!(paramGetValue in self.parameter; self.inner, &mut value as *mut _)?;
+		suite_fn!(paramGetValue in self.parameter; self.inner, &mut value as *mut T)?;
 		Ok(value)
 	}
 
 	pub fn get_value_at_time(&self, time: Time) -> Result<T> {
 		let mut value: T = T::default();
-		suite_fn!(paramGetValueAtTime in self.parameter; self.inner, time, &mut value as *mut _)?;
+		suite_fn!(paramGetValueAtTime in self.parameter; self.inner, time, &mut value as *mut T)?;
 		Ok(value)
+	}
+}
+
+impl ParamHandle<Bool> {
+	pub fn get_value(&self) -> Result<Bool> {
+		let mut value: Int = 0;
+		suite_fn!(paramGetValue in self.parameter; self.inner, &mut value as *mut Int)?;
+		Ok(value != 0)
+	}
+
+	pub fn get_value_at_time(&self, time: Time) -> Result<Bool> {
+		let mut value: Int = 0;
+		suite_fn!(paramGetValueAtTime in self.parameter; self.inner, time, &mut value as *mut Int)?;
+		Ok(value != 0)
 	}
 }
 
@@ -268,6 +291,7 @@ properties_newtype!(ParamDoubleProperties);
 properties_newtype!(ParamIntProperties);
 properties_newtype!(ParamBooleanProperties);
 properties_newtype!(ParamPageProperties);
+properties_newtype!(ParamGroupProperties);
 
 impl DescribeInContextInArgs {}
 
@@ -448,13 +472,8 @@ impl ParamSetHandle {
 			let mut param_properties = std::ptr::null_mut();
 			suite_fn!(paramGetHandle in self.parameter;
 				self.inner, name_buf.as_ptr() as *const _, &mut param_handle as *mut _, &mut param_properties as *mut _)?;
-
 			(param_handle, param_properties)
 		};
-		assert!(
-			!OfxParamHandle::is_null(param_handle)
-				&& !OfxPropertySetHandle::is_null(param_properties)
-		);
 		Ok(ParamHandle::new(
 			param_handle,
 			param_properties,
@@ -473,6 +492,10 @@ impl ParamSetHandle {
 
 	pub fn param_define_boolean(&mut self, name: &str) -> Result<ParamBooleanProperties> {
 		self.param_define(ParamType::Boolean, name)
+	}
+
+	pub fn param_define_group(&mut self, name: &str) -> Result<ParamGroupProperties> {
+		self.param_define(ParamType::Group, name)
 	}
 
 	pub fn param_define_page(&mut self, name: &str) -> Result<ParamPageProperties> {

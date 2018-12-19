@@ -87,6 +87,12 @@ identified_enum! {
 	}
 }
 
+impl ImageEffectContext {
+	pub fn is_general(self) -> bool {
+		self == ImageEffectContext::General
+	}
+}
+
 identified_enum! {
 	pub enum BitDepth {
 		Byte,

@@ -55,7 +55,7 @@ pub enum Action {
 	Load,
 	Unload,
 	Describe(ImageEffectHandle),
-	DescribeInContext(ImageEffectHandle, ImageEffectContext),
+	DescribeInContext(ImageEffectHandle, DescribeInContextInArgs),
 
 	CreateInstance(ImageEffectHandle),
 	DestroyInstance(ImageEffectHandle),

@@ -129,15 +129,10 @@ impl MapAction for PluginDescriptor {
 		if let Some(action) = self.image_effect_action_index.find(name) {
 			info!("Image effect action match {:?}", action);
 			match action {
-				ImageEffectAction::DescribeInContext => {
-					let context = self
-						.typed_properties(DescribeInContextInArgs::new, in_args)?
-						.get_context()?;
-					Ok(Action::DescribeInContext(
-						self.new_image_effect_raw(handle)?,
-						context,
-					))
-				}
+				ImageEffectAction::DescribeInContext => Ok(Action::DescribeInContext(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(DescribeInContextInArgs::new, in_args)?,
+				)),
 				ImageEffectAction::GetRegionOfDefinition => Ok(Action::GetRegionOfDefinition(
 					self.new_image_effect_raw(handle)?,
 					self.typed_properties(GetRegionOfDefinitionInArgs::new, in_args)?,
@@ -161,6 +156,19 @@ impl MapAction for PluginDescriptor {
 					self.new_image_effect_raw(handle)?,
 					self.typed_properties(GetTimeDomainOutArgs::new, out_args)?,
 				)),
+				ImageEffectAction::BeginSequenceRender => Ok(Action::BeginSequenceRender(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(BeginSequenceRenderInArgs::new, in_args)?,
+				)),
+				ImageEffectAction::Render => Ok(Action::Render(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(RenderInArgs::new, in_args)?,
+				)),
+				ImageEffectAction::EndSequenceRender => Ok(Action::EndSequenceRender(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(EndSequenceRenderInArgs::new, in_args)?,
+				)),
+
 				_ => Err(Error::InvalidAction),
 			}
 		} else if let Some(action) = self.global_action_index.find(name) {

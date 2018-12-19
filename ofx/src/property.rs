@@ -716,8 +716,8 @@ capabilities! { ImageEffectProperties =>
 }
 
 capabilities! { DescribeInContextInArgs => CanGetContext }
-capabilities! { IsIdentityInArgs => CanGetTime, CanGetRenderWindow, CanGetRenderScale}
-capabilities! { IsIdentityOutArgs => CanSetName, CanSetNameRaw, CanSetTime }
+capabilities! { IsIdentityInArgs => CanGetTime, CanGetFieldToRender, CanGetRenderWindow, CanGetRenderScale}
+capabilities! { IsIdentityOutArgs => CanSetName, CanSetTime }
 
 pub trait BaseClip: CanSetSupportedComponents + CanSetOptional + CanGetConnected {}
 impl<T> CanGetConnected for T where T: BaseClip {}
@@ -747,6 +747,7 @@ impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
 capabilities! { ParamDoubleProperties => BaseParam, CanSetDoubleParams }
 capabilities! { ParamBooleanProperties => BaseParam, CanSetBooleanParams }
 capabilities! { ParamPageProperties => BaseParam, CanSetChildren }
+capabilities! { ParamGroupProperties => BaseParam }
 
 capabilities! { GetRegionOfDefinitionInArgs => CanGetTime, CanGetRegionOfDefinition }
 capabilities! { GetRegionOfDefinitionOutArgs => CanSetRegionOfDefinition }
