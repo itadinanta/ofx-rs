@@ -75,6 +75,8 @@ pub enum Action {
 	InstanceChanged(ImageEffectHandle, InstanceChangedInArgs),
 	EndInstanceChanged(ImageEffectHandle, EndInstanceChangedInArgs),
 
+	SyncPrivateData(ImageEffectHandle),
+
 	BeginSequenceRender(ImageEffectHandle, BeginSequenceRenderInArgs),
 	Render(ImageEffectHandle, RenderInArgs),
 	EndSequenceRender(ImageEffectHandle, EndSequenceRenderInArgs),
@@ -82,6 +84,7 @@ pub enum Action {
 	GetClipPreferences(ImageEffectHandle, GetClipPreferencesOutArgs),
 	GetTimeDomain(ImageEffectHandle, GetTimeDomainOutArgs),
 	IsIdentity(ImageEffectHandle, IsIdentityInArgs, IsIdentityOutArgs),
+
 	GenericGlobal(GlobalAction, GenericPluginHandle),
 	GenericImageEffect(ImageEffectAction, ImageEffectHandle),
 }

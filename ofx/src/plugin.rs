@@ -17,11 +17,6 @@ use types::*;
 pub struct ApiVersion(pub Int);
 pub struct PluginVersion(pub UnsignedInt, pub UnsignedInt);
 
-#[macro_export]
-macro_rules! static_str (
-	($name:expr) => { unsafe { CStr::from_bytes_with_nul_unchecked($name).as_ptr() } }
-);
-
 #[derive(Debug)]
 struct EnumIndex<T>
 where
@@ -125,77 +120,65 @@ impl MapAction for PluginDescriptor {
 		in_args: OfxPropertySetHandle,
 		out_args: OfxPropertySetHandle,
 	) -> Result<Action> {
+		macro_rules! map_args {
+			($action:ident()) => {
+				Ok(Action::$action(self.new_image_effect_raw(handle)?))
+			};
+			($action:ident(in_args)) => {
+				Ok(Action::$action(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(build_typed::<concat_idents!($action, InArgs)>, in_args)?,
+					))
+			};
+			($action:ident(out_args)) => {
+				Ok(Action::$action(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(
+						build_typed::<concat_idents!($action, OutArgs)>,
+						out_args,
+					)?,
+					))
+			};
+			($action:ident(in_args, out_args)) => {
+				Ok(Action::$action(
+					self.new_image_effect_raw(handle)?,
+					self.typed_properties(build_typed::<concat_idents!($action, InArgs)>, in_args)?,
+					self.typed_properties(
+						build_typed::<concat_idents!($action, OutArgs)>,
+						out_args,
+					)?,
+					))
+			};
+		};
 		let name = unsafe { CStr::from_ptr(action) }.to_bytes();
 		if let Some(action) = self.image_effect_action_index.find(name) {
 			info!("Image effect action match {:?}", action);
+			use ImageEffectAction::*;
 			match action {
-				ImageEffectAction::DescribeInContext => Ok(Action::DescribeInContext(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(DescribeInContextInArgs::new, in_args)?,
-				)),
-				ImageEffectAction::GetRegionOfDefinition => Ok(Action::GetRegionOfDefinition(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(GetRegionOfDefinitionInArgs::new, in_args)?,
-					self.typed_properties(GetRegionOfDefinitionOutArgs::new, out_args)?,
-				)),
-				ImageEffectAction::GetRegionsOfInterest => Ok(Action::GetRegionsOfInterest(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(GetRegionsOfInterestInArgs::new, in_args)?,
-					self.typed_properties(GetRegionsOfInterestOutArgs::new, out_args)?,
-				)),
-				ImageEffectAction::IsIdentity => Ok(Action::IsIdentity(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(IsIdentityInArgs::new, in_args)?,
-					self.typed_properties(IsIdentityOutArgs::new, out_args)?,
-				)),
-				ImageEffectAction::GetClipPreferences => Ok(Action::GetClipPreferences(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(GetClipPreferencesOutArgs::new, out_args)?,
-				)),
-				ImageEffectAction::GetTimeDomain => Ok(Action::GetTimeDomain(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(GetTimeDomainOutArgs::new, out_args)?,
-				)),
-				ImageEffectAction::BeginSequenceRender => Ok(Action::BeginSequenceRender(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(BeginSequenceRenderInArgs::new, in_args)?,
-				)),
-				ImageEffectAction::Render => Ok(Action::Render(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(RenderInArgs::new, in_args)?,
-				)),
-				ImageEffectAction::EndSequenceRender => Ok(Action::EndSequenceRender(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(EndSequenceRenderInArgs::new, in_args)?,
-				)),
-
+				DescribeInContext => map_args! { DescribeInContext(in_args) },
+				GetRegionOfDefinition => map_args! { GetRegionOfDefinition(in_args, out_args) },
+				GetRegionsOfInterest => map_args! { GetRegionsOfInterest(in_args, out_args) },
+				IsIdentity => map_args! { IsIdentity(in_args, out_args) },
+				GetClipPreferences => map_args! { GetClipPreferences(out_args) },
+				GetTimeDomain => map_args!(GetTimeDomain(out_args)),
+				BeginSequenceRender => map_args! { BeginSequenceRender(in_args) },
+				Render => map_args! { Render(in_args) },
+				EndSequenceRender => map_args!(EndSequenceRender(in_args)),
 				_ => Err(Error::InvalidAction),
 			}
 		} else if let Some(action) = self.global_action_index.find(name) {
 			info!("Global action {:?}", action);
+			use GlobalAction::*;
 			match action {
-				GlobalAction::Load => Ok(Action::Load),
-				GlobalAction::Unload => Ok(Action::Unload),
-				GlobalAction::Describe => Ok(Action::Describe(self.new_image_effect_raw(handle)?)),
-				GlobalAction::CreateInstance => {
-					Ok(Action::CreateInstance(self.new_image_effect_raw(handle)?))
-				}
-				GlobalAction::BeginInstanceChanged => Ok(Action::BeginInstanceChanged(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(BeginInstanceChangedInArgs::new, in_args)?,
-				)),
-				GlobalAction::InstanceChanged => Ok(Action::InstanceChanged(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(InstanceChangedInArgs::new, in_args)?,
-				)),
-
-				GlobalAction::EndInstanceChanged => Ok(Action::EndInstanceChanged(
-					self.new_image_effect_raw(handle)?,
-					self.typed_properties(EndInstanceChangedInArgs::new, in_args)?,
-				)),
-				GlobalAction::DestroyInstance => {
-					Ok(Action::DestroyInstance(self.new_image_effect_raw(handle)?))
-				}
+				Load => Ok(Action::Load),
+				Unload => Ok(Action::Unload),
+				Describe => map_args!(Describe()),
+				SyncPrivateData => map_args! { SyncPrivateData() },
+				CreateInstance => map_args!(CreateInstance()),
+				BeginInstanceChanged => map_args!(BeginInstanceChanged(in_args)),
+				InstanceChanged => map_args!(InstanceChanged(in_args)),
+				EndInstanceChanged => map_args!(EndInstanceChanged(in_args)),
+				DestroyInstance => map_args!(DestroyInstance()),
 				_ => Err(Error::InvalidAction),
 			}
 		} else {

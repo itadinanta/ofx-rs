@@ -223,7 +223,17 @@ pub struct ImageEffectInstanceHandle {
 }
 
 trait IsPropertiesNewType {
-	fn new(inner: PropertySetHandle) -> Self;
+	fn wrap(inner: PropertySetHandle) -> Self;
+}
+
+pub trait PropertiesNewTypeConstructor {
+	fn build(host: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> Self;
+}
+
+#[inline]
+pub fn build_typed<T>(host: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> T 
+	where T: PropertiesNewTypeConstructor {
+		T::build(host, property)
 }
 
 macro_rules! properties_newtype {
@@ -232,8 +242,14 @@ macro_rules! properties_newtype {
 		pub struct $name(PropertySetHandle);
 
 		impl IsPropertiesNewType for $name {
-			fn new(inner: PropertySetHandle) -> Self {
+			fn wrap(inner: PropertySetHandle) -> Self {
 				$name(inner)
+			}
+		}
+
+		impl PropertiesNewTypeConstructor for $name {
+			fn build(host: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> Self {
+				$name::new(host, property)
 			}
 		}
 
@@ -456,7 +472,7 @@ impl ParamSetHandle {
 
 			property_set_handle
 		};
-		Ok(T::new(PropertySetHandle::new(
+		Ok(T::wrap(PropertySetHandle::new(
 			property_set_handle,
 			self.property.clone(),
 		)))
