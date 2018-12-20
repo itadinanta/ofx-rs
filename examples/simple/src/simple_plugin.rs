@@ -115,7 +115,7 @@ impl Execute for SimplePlugin {
 					.get_instance_data::<MyInstanceData>()?
 					.is_general_effect
 					&& effect
-						.get_clip(image_clip_prop_components!(clip_mask!()))?
+						.get_clip(clip_mask!())?
 						.get_connected()?
 				{
 					out_args.set_raw(image_clip_prop_roi!(clip_mask!()), &roi)?;

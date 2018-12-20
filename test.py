@@ -5,7 +5,7 @@ under_test = app1.createNode("net.itadinanta.ofx-rs.simple_plugin_1")
 under_test.connectInput(0, source)
 under_test.connectInput(1, mask)
 
-under_test.zcale = 0.5
+under_test.getParam("scale").setValue(0.5)
 
 write = app.createWriter("target/filtered_test_####.png")
 write.connectInput(0, under_test)
