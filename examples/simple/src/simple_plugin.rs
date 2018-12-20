@@ -53,7 +53,7 @@ impl Execute for SimplePlugin {
 			IsIdentity(ref mut effect, ref in_args, ref mut out_args) => {
 				let time = in_args.get_time()?;
 				let _render_window = in_args.get_render_window()?;
-				let instance_data = effect.get_instance_data::<MyInstanceData>()?;
+				let instance_data: &MyInstanceData = effect.get_instance_data()?;
 
 				let scale_value = instance_data.scale_param.get_value_at_time(time)?;
 
@@ -114,9 +114,7 @@ impl Execute for SimplePlugin {
 				if effect
 					.get_instance_data::<MyInstanceData>()?
 					.is_general_effect
-					&& effect
-						.get_clip(clip_mask!())?
-						.get_connected()?
+					&& effect.get_clip(clip_mask!())?.get_connected()?
 				{
 					out_args.set_raw(image_clip_prop_roi!(clip_mask!()), &roi)?;
 				}
@@ -125,7 +123,7 @@ impl Execute for SimplePlugin {
 			}
 
 			GetTimeDomain(ref mut effect, ref mut out_args) => {
-				let my_data = effect.get_instance_data::<MyInstanceData>()?;
+				let my_data: &MyInstanceData = effect.get_instance_data()?;
 				let frame_range = my_data.source_clip.get_frame_range()?;
 				out_args.set_frame_range(frame_range)?;
 
@@ -133,7 +131,7 @@ impl Execute for SimplePlugin {
 			}
 
 			GetClipPreferences(ref mut effect, ref mut out_args) => {
-				let my_data = effect.get_instance_data::<MyInstanceData>()?;
+				let my_data: &MyInstanceData = effect.get_instance_data()?;
 				let bit_depth = my_data.source_clip.get_pixel_depth()?;
 				let image_component = my_data.source_clip.get_components()?;
 				let output_component = match image_component {
@@ -355,7 +353,7 @@ impl Execute for SimplePlugin {
 
 impl SimplePlugin {
 	fn set_per_component_scale_enabledness(effect: &mut ImageEffectHandle) -> Result<()> {
-		let instance_data = effect.get_instance_data::<MyInstanceData>()?;
+		let instance_data: &mut MyInstanceData = effect.get_instance_data()?;
 		let input_clip = effect.get_simple_input_clip()?;
 		let is_input_rgb = input_clip.get_connected()? && input_clip.get_components()?.is_rgb();
 		instance_data
