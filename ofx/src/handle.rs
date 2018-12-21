@@ -262,12 +262,6 @@ impl HasProperties<ClipProperties> for ImageClipHandle {
 	}
 }
 
-#[derive(Clone, Copy)]
-pub struct ImageEffectInstanceHandle {
-	inner: OfxImageEffectHandle,
-	property: &'static OfxPropertySuiteV1,
-}
-
 trait IsPropertiesNewType {
 	fn wrap(inner: PropertySetHandle) -> Self;
 }
@@ -405,6 +399,10 @@ impl ImageEffectHandle {
 		))
 	}
 
+	pub fn abort(&self) -> Result<Bool> {
+		Ok(suite_call!(abort in self.image_effect; self.inner) != 0)
+	}
+
 	pub fn parameter_set(&self) -> Result<ParamSetHandle> {
 		let parameters_set_handle = {
 			let mut parameters_set_handle = std::ptr::null_mut();
@@ -473,6 +471,7 @@ impl ImageEffectHandle {
 		=> data_ptr }
 	}
 
+	// TODO: this is not safe enough
 	pub fn get_instance_data<T>(&self) -> Result<&mut T>
 	where
 		T: Sized,
