@@ -153,7 +153,6 @@ impl MapAction for PluginDescriptor {
 		let name = unsafe { CStr::from_ptr(action) }.to_bytes();
 		if let Some(action) = self.image_effect_action_index.find(name) {
 			use ImageEffectAction::*;
-			info!("Image effect action {:?}", action);
 			match action {
 				DescribeInContext => map_args! { DescribeInContext(in_args) },
 				GetRegionOfDefinition => map_args! { GetRegionOfDefinition(in_args, out_args) },
@@ -168,7 +167,6 @@ impl MapAction for PluginDescriptor {
 			}
 		} else if let Some(action) = self.global_action_index.find(name) {
 			use GlobalAction::*;
-			info!("Global action {:?}", action);
 			match action {
 				Load => Ok(Action::Load),     // handled by the library
 				Unload => Ok(Action::Unload), // handled by the library
@@ -183,7 +181,7 @@ impl MapAction for PluginDescriptor {
 				_ => Err(Error::InvalidAction),
 			}
 		} else {
-			info!("No action matching {:?}", unsafe { CStr::from_ptr(action) });
+			warn!("map_action: No action matching {:?}", unsafe { CStr::from_ptr(action) });
 			Err(Error::InvalidAction)
 		}
 	}
@@ -249,7 +247,7 @@ impl Dispatch for PluginDescriptor {
 impl Execute for PluginDescriptor {
 	fn execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
 		let result = self.instance.execute(context, action);
-		info!(
+		debug!(
 			"Executed {:?} of {} -> {:?}",
 			action, self.module_name, result
 		);
@@ -386,7 +384,7 @@ impl PluginDescriptor {
 		const V1: Int = 1;
 		const V2: Int = 2;
 
-		info!("Fetching suites");
+		debug!("Fetching suites");
 		macro_rules! fetch_suite {
 			($suite_name:ident, $suite_version:ident) => {
 				unsafe {
@@ -404,7 +402,7 @@ impl PluginDescriptor {
 						error!("Failed to load {}", stringify!($suite_name));
 						None
 					} else {
-						info!(
+						debug!(
 							"Found suite '{}' at {:?}",
 							stringify!($suite_name),
 							suiteptr

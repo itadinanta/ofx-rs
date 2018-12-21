@@ -31,6 +31,7 @@ mod property;
 mod types;
 #[macro_use]
 mod registry;
+mod image;
 pub use action::*;
 pub use enums::*;
 pub use enums::Type as Type;
@@ -40,6 +41,7 @@ pub use property::*;
 pub use result::*;
 pub use types::*;
 pub use util::*;
+pub use image::*;
 use registry::*;
 
 pub use ofx_sys::{OfxHost, OfxPlugin, OfxPropertySetHandle};

@@ -513,6 +513,17 @@ pub mod image_clip {
 	property!(ImageClipPropOptional as Optional: Bool);
 }
 
+pub mod image {
+	use super::*;
+	property!(ImagePropRowBytes as RowBytes: () -> Int);
+	property!(ImagePropBounds as Bounds: () -> RectI);
+	property!(ImagePropData as Data: () -> VoidPtr);
+	property!(ImagePropField as Field: () -> CString);
+	property!(ImagePropPixelAspectRatio as PixelAspectRatio: () -> Double);
+	property!(ImagePropRegionOfDefinition as RegionOfDefinition: () -> RectI);
+	property!(ImagePropUniqueIdentifier as UniqueIdentifier: () -> String);
+}
+
 pub mod param {
 	use super::*;
 	property!(ParamPropEnabled as Enabled: Bool);
@@ -691,6 +702,13 @@ get_property!(CanGetSequentialRenderStatus => get_sequential_render_status, imag
 get_property!(CanGetInteractiveRenderStatus => get_interactive_render_status, image_effect::InteractiveRenderStatus);
 get_property!(CanGetRenderQualityDraft => get_field_to_render, image_effect::FieldToRender);
 
+get_property!(CanGetBounds => get_bounds, image::Bounds);
+get_property!(CanGetData => get_bounds, image::Data);
+// there are two RegionOfDefinition, one for clips and one for images,
+get_property!(CanGetPixelAspectRatio => get_region_of_definition, image::PixelAspectRatio);
+get_property!(CanGetImageRegionOfDefinition => get_region_of_definition, image::RegionOfDefinition);
+get_property!(CanGetRowBytes => get_row_bytes, image::RowBytes);
+
 pub trait CanSetDoubleParams: Writable {
 	set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
 	set_property!(set_default, param::double::Default);
@@ -761,6 +779,16 @@ capabilities! { InstanceChangedInArgs => CanGetType, CanGetName, CanGetTime, Can
 
 capabilities! { BeginInstanceChangedInArgs => CanGetChangeReason}
 capabilities! { EndInstanceChangedInArgs => CanGetChangeReason}
+
+capabilities! { ImageHandle =>
+	CanGetBounds,
+	CanGetData,
+	CanGetRowBytes,
+	CanGetImageRegionOfDefinition,
+	CanGetPixelAspectRatio,
+	CanGetPixelDepth,
+	CanGetUnmappedPixelDepth
+}
 
 capabilities! { RenderInArgs =>
 	CanGetTime,

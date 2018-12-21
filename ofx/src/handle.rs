@@ -66,6 +66,13 @@ pub struct ImageClipHandle {
 	image_effect: Rc<OfxImageEffectSuiteV1>,
 }
 
+#[derive(Clone)]
+pub struct ImageHandle {
+	inner: OfxPropertySetHandle,
+	property: Rc<OfxPropertySuiteV1>,
+	image_effect: Rc<OfxImageEffectSuiteV1>,
+}
+
 pub trait ParamHandleValue: Default + Clone {}
 impl ParamHandleValue for Int {}
 impl ParamHandleValue for Bool {}
@@ -196,14 +203,54 @@ impl ImageClipHandle {
 	}
 
 	pub fn get_region_of_definition(&self, time: Time) -> Result<RectD> {
-		let mut value: RectD = RectD {
-			x1: 1.0,
-			y1: 1.0,
-			x2: 1.0,
-			y2: 1.0,
+		let mut value = RectD {
+			x1: 0.0,
+			y1: 0.0,
+			x2: 0.0,
+			y2: 0.0,
 		};
-		suite_fn!(clipGetRegionOfDefinition in self.image_effect; self.inner, time, &mut value as *mut _)?;
+		suite_fn!(clipGetRegionOfDefinition in self.image_effect; self.inner, time, &mut value as *mut RectD)?;
+		debug!("RoD at time {} is {:?}", time, value);
 		Ok(value)
+	}
+
+	pub fn get_image(&mut self, time: Time, region: Option<RectD>) -> Result<Rc<ImageHandle>> {
+		let mut image: OfxPropertySetHandle = std::ptr::null_mut();
+		let region_ptr = region
+			.as_ref()
+			.map(|m| m as *const RectD)
+			.unwrap_or(std::ptr::null());
+		suite_fn!(clipGetImage in self.image_effect; self.inner, time, region_ptr, &mut image as *mut OfxPropertySetHandle)?;
+		Ok(Rc::new(ImageHandle::new(
+			image,
+			self.property.clone(),
+			self.image_effect.clone(),
+		)))
+	}
+}
+
+impl Drop for ImageHandle {
+	fn drop(&mut self) {
+		self.drop_image()
+			.expect("Unable to drop image handle. This is likely a bug");
+	}
+}
+
+impl ImageHandle {
+	pub fn new(
+		inner: OfxPropertySetHandle,
+		property: Rc<OfxPropertySuiteV1>,
+		image_effect: Rc<OfxImageEffectSuiteV1>,
+	) -> Self {
+		ImageHandle {
+			inner,
+			property,
+			image_effect,
+		}
+	}
+
+	fn drop_image(&mut self) -> Result<()> {
+		suite_fn!(clipReleaseImage in self.image_effect; self.inner)
 	}
 }
 
@@ -231,9 +278,11 @@ pub trait PropertiesNewTypeConstructor {
 }
 
 #[inline]
-pub fn build_typed<T>(host: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> T 
-	where T: PropertiesNewTypeConstructor {
-		T::build(host, property)
+pub fn build_typed<T>(host: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> T
+where
+	T: PropertiesNewTypeConstructor,
+{
+	T::build(host, property)
 }
 
 macro_rules! properties_newtype {
@@ -531,6 +580,15 @@ impl AsProperties for HostHandle {
 impl AsProperties for ImageClipHandle {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner_properties
+	}
+	fn suite(&self) -> *const OfxPropertySuiteV1 {
+		self.property.borrow() as *const _
+	}
+}
+
+impl AsProperties for ImageHandle {
+	fn handle(&self) -> OfxPropertySetHandle {
+		self.inner
 	}
 	fn suite(&self) -> *const OfxPropertySuiteV1 {
 		self.property.borrow() as *const _
