@@ -210,7 +210,6 @@ impl ImageClipHandle {
 			y2: 0.0,
 		};
 		suite_fn!(clipGetRegionOfDefinition in self.image_effect; self.inner, time, &mut value as *mut RectD)?;
-		debug!("RoD at time {} is {:?}", time, value);
 		Ok(value)
 	}
 
