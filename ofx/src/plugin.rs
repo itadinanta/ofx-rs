@@ -181,7 +181,9 @@ impl MapAction for PluginDescriptor {
 				_ => Err(Error::InvalidAction),
 			}
 		} else {
-			warn!("map_action: No action matching {:?}", unsafe { CStr::from_ptr(action) });
+			warn!("map_action: No action matching {:?}", unsafe {
+				CStr::from_ptr(action)
+			});
 			Err(Error::InvalidAction)
 		}
 	}
@@ -199,7 +201,12 @@ impl Filter for PluginDescriptor {
 		OK
 	}
 
-	fn after_execute(&mut self, context: &PluginContext, action: &mut Action) -> Result<Int> {
+	fn after_execute(
+		&mut self,
+		context: &PluginContext,
+		action: &mut Action,
+		_status: Result<Int>,
+	) -> Result<Int> {
 		match action {
 			Action::DestroyInstance(ref mut effect) => effect.drop_instance_data(),
 			_ => Ok(()),
@@ -230,11 +237,10 @@ impl Dispatch for PluginDescriptor {
 				if let (Some(host), Some(suites)) = (self.host, self.suites.clone()) {
 					let plugin_context = PluginContext {
 						host: HostHandle::new(host.host, suites.property()),
-						suites: suites,
+						suites,
 					};
 					let status = self.execute(&plugin_context, &mut mapped_action);
-					// TODO: do we call after even if execute fails?
-					self.after_execute(&plugin_context, &mut mapped_action)?;
+					self.after_execute(&plugin_context, &mut mapped_action, status)?;
 					status
 				} else {
 					OK
