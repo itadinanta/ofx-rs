@@ -26,6 +26,17 @@ pub type RectI = ofx_sys::OfxRectI;
 pub type RectD = ofx_sys::OfxRectD;
 pub const RECT_ELEMENTS: Int = 4;
 pub type Time = ofx_sys::OfxTime;
+pub type RGBAColourB = ofx_sys::OfxRGBAColourB;
+pub type RGBAColourS = ofx_sys::OfxRGBAColourS;
+pub type RGBAColourF = ofx_sys::OfxRGBAColourF;
+pub type RGBAColourD = ofx_sys::OfxRGBAColourD;
+pub type RGBColourB = ofx_sys::OfxRGBColourB;
+pub type RGBColourS = ofx_sys::OfxRGBColourS;
+pub type RGBColourF = ofx_sys::OfxRGBColourF;
+pub type RGBColourD = ofx_sys::OfxRGBColourD;
+pub type YUVAColourB = ofx_sys::OfxYUVAColourB;
+pub type YUVAColourS = ofx_sys::OfxYUVAColourS;
+pub type YUVAColourF = ofx_sys::OfxYUVAColourF;
 
 pub(crate) type SetHost = unsafe extern "C" fn(*mut ofx_sys::OfxHost);
 pub(crate) type MainEntry = unsafe extern "C" fn(
