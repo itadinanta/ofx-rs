@@ -498,6 +498,7 @@ pub mod image_effect {
 	property!(ImageEffectPropFrameRange as FrameRange: RangeD);
 	property!(ImageEffectPropFrameStep as FrameStep: () -> Double);
 	property!(ImageEffectPropFieldToRender as FieldToRender: () -> CString);
+	property!(ImageEffectPropTemporalClipAccess as TemporalClipAccess: Bool);
 	property!(ImageEffectPropSequentialRenderStatus as SequentialRenderStatus: () -> Bool);
 	property!(ImageEffectPropInteractiveRenderStatus as InteractiveRenderStatus: () -> Bool);
 	property!(ImageEffectPropRenderQualityDraft as RenderQualityDraft: () -> Bool);
@@ -677,6 +678,9 @@ set_property!(CanSetRegionOfDefinition => set_region_of_definition, image_effect
 get_property!(CanGetRegionOfInterest => get_region_of_interest, image_effect::RegionOfInterest);
 set_property!(CanSetRegionOfInterest => set_region_of_interest, image_effect::RegionOfInterest);
 
+get_property!(CanGetTemporalClipAccess => get_temporal_clip_access, image_effect::TemporalClipAccess);
+get_property!(CanSetTemporalClipAccess => set_temporal_clip_access, image_effect::TemporalClipAccess);
+
 get_property!(CanGetConnected => get_connected, image_clip::Connected);
 get_property!(CanGetComponents => get_components, image_effect::Components, enum ImageComponent);
 get_property!(CanGetPixelDepth => get_pixel_depth, image_effect::PixelDepth, enum BitDepth);
@@ -725,7 +729,19 @@ macro_rules! capabilities {
 	}
 }
 
-capabilities! { HostHandle => CanGetSupportsMultipleClipDepths }
+macro_rules! capability_group {
+	($trait:ident => $capability_head:ident, $($capability_tail:ident),*) => {
+		pub trait $trait: $capability_head
+			$(+ $capability_tail)*
+			{}
+
+		impl<T> $capability_head for T where T: $trait {}
+		$(impl<T> $capability_tail for T where T: $trait {})
+		*
+	}
+}
+
+capabilities! { HostHandle => CanGetSupportsMultipleClipDepths, CanGetTemporalClipAccess }
 
 capabilities! { ImageEffectProperties =>
 	CanSetGrouping, CanSetLabel, CanSetLabels, CanGetLabel,
@@ -737,12 +753,11 @@ capabilities! { DescribeInContextInArgs => CanGetContext }
 capabilities! { IsIdentityInArgs => CanGetTime, CanGetFieldToRender, CanGetRenderWindow, CanGetRenderScale}
 capabilities! { IsIdentityOutArgs => CanSetName, CanSetTime }
 
-pub trait BaseClip: CanSetSupportedComponents + CanSetOptional + CanGetConnected {}
-impl<T> CanGetConnected for T where T: BaseClip {}
-impl<T> CanSetSupportedComponents for T where T: BaseClip {}
-impl<T> CanSetOptional for T where T: BaseClip {}
-
-capabilities! { ClipProperties => BaseClip }
+capabilities! { ClipProperties =>
+	CanSetSupportedComponents,
+	CanSetOptional, CanGetConnected,
+	CanGetTemporalClipAccess, CanSetTemporalClipAccess
+}
 
 capabilities! { ImageClipHandle =>
 	CanGetConnected, CanGetFrameRange,
@@ -750,16 +765,10 @@ capabilities! { ImageClipHandle =>
 	CanGetPixelDepth, CanGetUnmappedPixelDepth
 }
 
-pub trait BaseParam:
-	CanSetLabel + CanSetHint + CanSetParent + CanSetScriptName + CanSetEnabled + CanGetEnabled
-{
+capability_group! { BaseParam =>
+	CanSetLabel, CanSetHint, CanSetParent, CanSetScriptName, CanSetEnabled, CanGetEnabled
 }
-impl<T> CanGetEnabled for T where T: BaseParam {}
-impl<T> CanSetLabel for T where T: BaseParam {}
-impl<T> CanSetHint for T where T: BaseParam {}
-impl<T> CanSetParent for T where T: BaseParam {}
-impl<T> CanSetScriptName for T where T: BaseParam {}
-impl<T> CanSetEnabled for T where T: BaseParam {}
+
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
 
 capabilities! { ParamDoubleProperties => BaseParam, CanSetDoubleParams }

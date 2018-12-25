@@ -1,8 +1,10 @@
 use types::*;
 
-struct ImageDescriptor {
+struct ImageDescriptor<T> {
 	pub time: Time,
-	pub row_bytes: Int,
 	pub bit_depth: Int,
 	pub bounds: RectI,
+	row_bytes: Int,
+	ptr: *mut T,
 }
+
