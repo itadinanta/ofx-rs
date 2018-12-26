@@ -90,7 +90,90 @@ where
 	T: PixelFormat,
 {
 	pub time: Time,
-	pub bounds: RectI,
-	row_bytes: Int,
+	bounds: RectI,
+	stride: isize,
+	// FIXME: lifetime for ptr is unsound
 	ptr: *mut T,
+}
+
+impl<T> Drop for ImageDescriptor<T>
+where
+	T: PixelFormat,
+{
+	fn drop(&mut self) {
+		// TODO: we need to somehow release the ptr
+	}
+}
+
+impl<T> ImageDescriptor<T>
+where
+	T: PixelFormat,
+{
+	pub fn new(time: Time, bounds: RectI, row_bytes: Int, ptr: VoidPtrMut) -> Self {
+		ImageDescriptor {
+			time,
+			bounds,
+			stride: row_bytes as isize,
+			ptr: ptr as *mut T,
+		}
+	}
+
+	pub fn bounds(&self) -> RectI {
+		self.bounds
+	}
+
+	pub fn dimensions(&self) -> (isize, isize) {
+		let xmin = self.bounds.x2.min(self.bounds.x1);
+		let xmax = self.bounds.x2.max(self.bounds.x1);
+		let width = xmax - xmin;
+
+		let ymin = self.bounds.y2.min(self.bounds.y1);
+		let ymax = self.bounds.y2.max(self.bounds.y1);
+		let height = ymax - ymin;
+
+		(width as isize, height as isize)
+	}
+
+	#[inline]
+	unsafe fn pixel_address(&self, x: Int, y: Int) -> *const T {
+		(self.ptr.offset((y - self.bounds.y1) as isize * self.stride) as *const T)
+			.offset((x - self.bounds.x1) as isize)
+	}
+
+	#[inline]
+	unsafe fn pixel_address_mut(&mut self, x: Int, y: Int) -> *mut T {
+		(self.ptr.offset((y - self.bounds.y1) as isize * self.stride) as *mut T)
+			.offset((x - self.bounds.x1) as isize)
+	}
+
+	pub fn as_slice(&self) -> &[T] {
+		unsafe {
+			let x = self.bounds.x1;
+			let y = self.bounds.y1;
+			let (width, height) = self.dimensions();
+			std::slice::from_raw_parts(self.pixel_address(x, y), (width * height) as usize)
+		}
+	}
+
+	pub fn row_as_slice(&self, y: Int) -> &[T] {
+		assert!(y >= self.bounds.y1 && y < self.bounds.y2);
+		let x = self.bounds.x1;
+		let (width, _) = self.dimensions();
+		unsafe { std::slice::from_raw_parts(self.pixel_address(x, y), width as usize) }
+	}
+
+	pub fn as_slice_mut(&mut self) -> &mut [T] {
+		unsafe {
+			let x = self.bounds.x1;
+			let y = self.bounds.y1;
+			let (width, height) = self.dimensions();
+			std::slice::from_raw_parts_mut(self.pixel_address_mut(x, y), (width * height) as usize)
+		}
+	}
+
+	pub fn row_as_slice_mut(&mut self, y: Int) -> &mut [T] {
+		let x = self.bounds.x1;
+		let (width, _) = self.dimensions();
+		unsafe { std::slice::from_raw_parts_mut(self.pixel_address_mut(x, y), width as usize) }
+	}
 }
