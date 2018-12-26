@@ -89,7 +89,7 @@ pub struct ImageDescriptor<T>
 where
 	T: PixelFormat,
 {
-	pub time: Time,
+	time: Time,
 	bounds: RectI,
 	stride: isize,
 	// FIXME: lifetime for ptr is unsound
@@ -116,6 +116,10 @@ where
 			stride: row_bytes as isize,
 			ptr: ptr as *mut T,
 		}
+	}
+
+	pub fn time(&self) -> Time {
+		self.time
 	}
 
 	pub fn bounds(&self) -> RectI {
