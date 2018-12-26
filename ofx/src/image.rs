@@ -6,15 +6,6 @@ pub trait ChannelFormat {
 	fn to_f32(&self) -> f32;
 }
 
-impl ChannelFormat for f64 {
-	fn from_f32(src: f32) -> Self {
-		Self::from(src)
-	}
-	fn to_f32(&self) -> f32 {
-		*self as f32
-	}
-}
-
 impl ChannelFormat for f32 {
 	fn from_f32(src: f32) -> Self {
 		src
@@ -90,10 +81,6 @@ impl PixelFormat for RGBAColourF {
 	type ChannelType = f32;
 }
 
-impl PixelFormat for RGBAColourD {
-	type ChannelType = f64;
-}
-
 impl PixelFormat for RGBColourB {
 	type ChannelType = u8;
 }
@@ -104,10 +91,6 @@ impl PixelFormat for RGBColourS {
 
 impl PixelFormat for RGBColourF {
 	type ChannelType = f32;
-}
-
-impl PixelFormat for RGBColourD {
-	type ChannelType = f64;
 }
 
 impl PixelFormat for YUVAColourB {
