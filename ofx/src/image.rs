@@ -1,11 +1,48 @@
 use enums::{BitDepth, ImageComponent};
 use types::*;
 
-pub trait ChannelFormat {}
-impl ChannelFormat for f64 {}
-impl ChannelFormat for f32 {}
-impl ChannelFormat for u16 {}
-impl ChannelFormat for u8 {}
+pub trait ChannelFormat {
+	fn from_f32(src: f32) -> Self;
+	fn to_f32(&self) -> f32;
+}
+
+impl ChannelFormat for f64 {
+	fn from_f32(src: f32) -> Self {
+		Self::from(src)
+	}
+	fn to_f32(&self) -> f32 {
+		*self as f32
+	}
+}
+
+impl ChannelFormat for f32 {
+	fn from_f32(src: f32) -> Self {
+		src
+	}
+	fn to_f32(&self) -> f32 {
+		*self
+	}
+}
+
+impl ChannelFormat for u16 {
+	fn from_f32(src: f32) -> Self {
+		let clamp = f32::from(std::u16::MAX);
+		clamp.min(src * clamp) as u16
+	}
+	fn to_f32(&self) -> f32 {
+		f32::from(*self) * f32::from(std::u16::MAX)
+	}
+}
+
+impl ChannelFormat for u8 {
+	fn from_f32(src: f32) -> Self {
+		let clamp = f32::from(std::u8::MAX);
+		clamp.min(src * clamp) as u8
+	}
+	fn to_f32(&self) -> f32 {
+		f32::from(*self) * f32::from(std::u8::MAX)
+	}
+}
 
 pub trait PixelFormat: Sized {
 	type ChannelType: ChannelFormat;
