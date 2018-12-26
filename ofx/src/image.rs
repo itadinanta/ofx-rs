@@ -2,45 +2,63 @@ use enums::{BitDepth, ImageComponent};
 use types::*;
 
 pub trait ChannelFormat {
+	fn range_max() -> f32;
 	fn from_f32(src: f32) -> Self;
 	fn to_f32(&self) -> f32;
 }
 
 impl ChannelFormat for f32 {
+	#[inline]
+	fn range_max() -> f32 {
+		1.0
+	}
+	#[inline]
 	fn from_f32(src: f32) -> Self {
 		src
 	}
+	#[inline]
 	fn to_f32(&self) -> f32 {
 		*self
 	}
 }
 
 impl ChannelFormat for u16 {
+	#[inline]
+	fn range_max() -> f32 {
+		f32::from(std::u16::MAX)
+	}
 	fn from_f32(src: f32) -> Self {
-		let clamp = f32::from(std::u16::MAX);
+		let clamp = Self::range_max();
 		clamp.min(src * clamp) as u16
 	}
+	#[inline]
 	fn to_f32(&self) -> f32 {
-		f32::from(*self) * f32::from(std::u16::MAX)
+		f32::from(*self) * Self::range_max()
 	}
 }
 
 impl ChannelFormat for u8 {
+	#[inline]
+	fn range_max() -> f32 {
+		f32::from(std::u8::MAX)
+	}
+
 	fn from_f32(src: f32) -> Self {
-		let clamp = f32::from(std::u8::MAX);
+		let clamp = Self::range_max();
 		clamp.min(src * clamp) as u8
 	}
+	#[inline]
 	fn to_f32(&self) -> f32 {
-		f32::from(*self) * f32::from(std::u8::MAX)
+		f32::from(*self) * Self::range_max()
 	}
 }
 
 pub trait PixelFormat: Sized {
-	type ChannelType: ChannelFormat;
+	type ChannelValue: ChannelFormat;
 
 	#[inline]
 	fn num_components() -> usize {
-		std::mem::size_of::<Self>() / std::mem::size_of::<Self::ChannelType>()
+		std::mem::size_of::<Self>() / std::mem::size_of::<Self::ChannelValue>()
 	}
 
 	#[inline]
@@ -55,7 +73,7 @@ pub trait PixelFormat: Sized {
 
 	#[inline]
 	fn num_bits_depth() -> usize {
-		8 * std::mem::size_of::<Self::ChannelType>()
+		8 * std::mem::size_of::<Self::ChannelValue>()
 	}
 
 	#[inline]
@@ -64,45 +82,45 @@ pub trait PixelFormat: Sized {
 			8 => BitDepth::Byte,
 			16 => BitDepth::Short,
 			32 => BitDepth::Float,
-			_ => BitDepth::Float, // Where is Double?
+			_ => BitDepth::Float,
 		}
 	}
 }
 
 impl PixelFormat for RGBAColourB {
-	type ChannelType = u8;
+	type ChannelValue = u8;
 }
 
 impl PixelFormat for RGBAColourS {
-	type ChannelType = u16;
+	type ChannelValue = u16;
 }
 
 impl PixelFormat for RGBAColourF {
-	type ChannelType = f32;
+	type ChannelValue = f32;
 }
 
 impl PixelFormat for RGBColourB {
-	type ChannelType = u8;
+	type ChannelValue = u8;
 }
 
 impl PixelFormat for RGBColourS {
-	type ChannelType = u16;
+	type ChannelValue = u16;
 }
 
 impl PixelFormat for RGBColourF {
-	type ChannelType = f32;
+	type ChannelValue = f32;
 }
 
 impl PixelFormat for YUVAColourB {
-	type ChannelType = u8;
+	type ChannelValue = u8;
 }
 
 impl PixelFormat for YUVAColourS {
-	type ChannelType = u16;
+	type ChannelValue = u16;
 }
 
 impl PixelFormat for YUVAColourF {
-	type ChannelType = f32;
+	type ChannelValue = f32;
 }
 
 pub struct ImageDescriptor<T>
