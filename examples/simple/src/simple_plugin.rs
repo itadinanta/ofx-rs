@@ -34,6 +34,77 @@ struct MyInstanceData {
 	scale_b_param: ParamHandle<Double>,
 	scale_a_param: ParamHandle<Double>,
 }
+
+struct Processor<T>
+where
+	T: PixelFormat,
+{
+	instance: ImageEffectHandle,
+	r_scale: Double,
+	g_scale: Double,
+	b_scale: Double,
+	a_scale: Double,
+	src: ImageDescriptor<T>,
+	dst: ImageDescriptor<T>,
+	mask: Option<ImageDescriptor<T>>,
+	render_window: RectI,
+}
+
+impl<T> Processor<T>
+where
+	T: PixelFormat,
+{
+	fn new(
+		instance: ImageEffectHandle,
+		r_scale: Double,
+		g_scale: Double,
+		b_scale: Double,
+		a_scale: Double,
+		src: ImageDescriptor<T>,
+		dst: ImageDescriptor<T>,
+		mask: Option<ImageDescriptor<T>>,
+		render_window: RectI,
+	) -> Self {
+		Processor {
+			instance,
+			r_scale,
+			g_scale,
+			b_scale,
+			a_scale,
+			src,
+			dst,
+			mask,
+			render_window,
+		}
+	}
+}
+
+trait ProcessAlpha<T> {
+	fn do_processing(&self, proc_window: RectI) -> Result<()>;
+}
+
+trait ProcessRGBA<T> {
+	fn do_processing(&self, proc_window: RectI) -> Result<()>;
+}
+
+impl<T> ProcessRGBA<T> for Processor<T>
+where
+	T: PixelFormatRGB,
+{
+	fn do_processing(&self, proc_window: RectI) -> Result<()> {
+		Ok(())
+	}
+}
+
+impl<T> ProcessAlpha<T> for Processor<T>
+where
+	T: PixelFormatAlpha,
+{
+	fn do_processing(&self, proc_window: RectI) -> Result<()> {
+		Ok(())
+	}
+}
+
 const PARAM_MAIN_NAME: &str = "Main";
 const PARAM_SCALE_NAME: &str = "scale";
 const PARAM_SCALE_R_NAME: &str = "scaleR";
@@ -48,25 +119,40 @@ impl Execute for SimplePlugin {
 	fn execute(&mut self, plugin_context: &PluginContext, action: &mut Action) -> Result<Int> {
 		use Action::*;
 		match *action {
-			Render(ref mut _effect, ref _in_args) => OK,
+			Render(ref mut effect, ref in_args) => {
+				let time = in_args.get_time()?;
+				let render_window = in_args.get_render_window()?;
+				let instance_data: &MyInstanceData = effect.get_instance_data()?;
+
+				let source_image = instance_data.source_clip.get_image(time)?;
+				let output_image = instance_data.output_clip.get_image(time)?;
+				let mask_image = match instance_data.mask_clip {
+					None => None,
+					Some(ref mask_clip) => {
+						if instance_data.is_general_effect && mask_clip.get_connected()? {
+							Some(mask_clip.get_image(time)?)
+						} else {
+							None
+						}
+					}
+				};
+
+				let (sv, sr, sg, sb, sa) = instance_data.get_scale_components(time)?;
+				let (r_scale, g_scale, b_scale, a_scale) = (sv * sr, sv * sg, sv * sb, sv * sa);
+				if effect.abort()? {
+					FAILED
+				} else {
+					OK
+				}
+			}
 
 			IsIdentity(ref mut effect, ref in_args, ref mut out_args) => {
 				let time = in_args.get_time()?;
 				let _render_window = in_args.get_render_window()?;
 				let instance_data: &MyInstanceData = effect.get_instance_data()?;
 
-				let scale_value = instance_data.scale_param.get_value_at_time(time)?;
+				let (scale_value, sr, sg, sb, sa) = instance_data.get_scale_components(time)?;
 
-				let (sr, sg, sb, sa) = if instance_data.source_clip.get_components()?.is_rgb() {
-					(
-						instance_data.scale_r_param.get_value_at_time(time)?,
-						instance_data.scale_g_param.get_value_at_time(time)?,
-						instance_data.scale_b_param.get_value_at_time(time)?,
-						instance_data.scale_a_param.get_value_at_time(time)?,
-					)
-				} else {
-					(1., 1., 1., 1.)
-				};
 				if scale_value == 1. && sr == 1. && sg == 1. && sb == 1. && sa == 1. {
 					out_args.set_name(&image_effect_simple_source_clip_name())?;
 					OK
@@ -124,8 +210,7 @@ impl Execute for SimplePlugin {
 
 			GetTimeDomain(ref mut effect, ref mut out_args) => {
 				let my_data: &MyInstanceData = effect.get_instance_data()?;
-				let frame_range = my_data.source_clip.get_frame_range()?;
-				out_args.set_frame_range(frame_range)?;
+				out_args.set_frame_range(my_data.source_clip.get_frame_range()?)?;
 
 				OK
 			}
@@ -374,5 +459,23 @@ impl SimplePlugin {
 		}
 
 		Ok(())
+	}
+}
+
+impl MyInstanceData {
+	fn get_scale_components(&self, time: Time) -> Result<(f64, f64, f64, f64, f64)> {
+		let scale_value = self.scale_param.get_value_at_time(time)?;
+		let per_component_scale = self.per_component_scale_param.get_value_at_time(time)?;
+		if per_component_scale && self.source_clip.get_components()?.is_rgb() {
+			Ok((
+				scale_value,
+				self.scale_r_param.get_value_at_time(time)?,
+				self.scale_g_param.get_value_at_time(time)?,
+				self.scale_b_param.get_value_at_time(time)?,
+				self.scale_a_param.get_value_at_time(time)?,
+			))
+		} else {
+			Ok((scale_value, 1., 1., 1., 1.))
+		}
 	}
 }

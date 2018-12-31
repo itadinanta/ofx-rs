@@ -31,6 +31,7 @@ pub enum Error {
 
 pub const OK: Result<Int> = Ok(eOfxStatus_OK);
 pub const REPLY_DEFAULT: Result<Int> = Ok(eOfxStatus_ReplyDefault);
+pub const FAILED: Result<Int> = Ok(eOfxStatus_Failed);
 pub const UNIMPLEMENTED: Result<Int> = Err(Error::Unimplemented);
 
 impl From<OfxStatus> for Error {

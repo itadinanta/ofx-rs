@@ -53,6 +53,9 @@ impl ChannelFormat for u8 {
 	}
 }
 
+pub trait PixelFormatRGB: PixelFormat {}
+pub trait PixelFormatAlpha: PixelFormat {}
+
 pub trait PixelFormat: Sized {
 	type ChannelValue: ChannelFormat;
 
@@ -87,6 +90,16 @@ pub trait PixelFormat: Sized {
 	}
 }
 
+impl PixelFormatRGB for RGBAColourB {}
+impl PixelFormatRGB for RGBAColourS {}
+impl PixelFormatRGB for RGBAColourF {}
+impl PixelFormatRGB for RGBColourB {}
+impl PixelFormatRGB for RGBColourS {}
+impl PixelFormatRGB for RGBColourF {}
+impl PixelFormatAlpha for u8 {}
+impl PixelFormatAlpha for u16 {}
+impl PixelFormatAlpha for f32 {}
+
 impl PixelFormat for RGBAColourB {
 	type ChannelValue = u8;
 }
@@ -96,6 +109,18 @@ impl PixelFormat for RGBAColourS {
 }
 
 impl PixelFormat for RGBAColourF {
+	type ChannelValue = f32;
+}
+
+impl PixelFormat for u8 {
+	type ChannelValue = u8;
+}
+
+impl PixelFormat for u16 {
+	type ChannelValue = u16;
+}
+
+impl PixelFormat for f32 {
 	type ChannelValue = f32;
 }
 

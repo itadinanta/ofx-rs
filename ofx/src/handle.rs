@@ -213,7 +213,33 @@ impl ImageClipHandle {
 		Ok(value)
 	}
 
-	pub fn get_image(&mut self, time: Time, region: Option<RectD>) -> Result<Rc<ImageHandle>> {
+	pub fn get_image_mut(&mut self, time: Time) -> Result<Rc<ImageHandle>> {
+		self.get_image_rect(time, None)
+	}
+
+	pub fn get_image(&self, time: Time) -> Result<Rc<ImageHandle>> {
+		self.get_image_rect(time, None)
+	}
+
+	pub fn get_image_rect(&self, time: Time, region: Option<RectD>) -> Result<Rc<ImageHandle>> {
+		let mut image: OfxPropertySetHandle = std::ptr::null_mut();
+		let region_ptr = region
+			.as_ref()
+			.map(|m| m as *const RectD)
+			.unwrap_or(std::ptr::null());
+		suite_fn!(clipGetImage in self.image_effect; self.inner, time, region_ptr, &mut image as *mut OfxPropertySetHandle)?;
+		Ok(Rc::new(ImageHandle::new(
+			image,
+			self.property.clone(),
+			self.image_effect.clone(),
+		)))
+	}
+
+	pub fn get_image_rect_mut(
+		&mut self,
+		time: Time,
+		region: Option<RectD>,
+	) -> Result<Rc<ImageHandle>> {
 		let mut image: OfxPropertySetHandle = std::ptr::null_mut();
 		let region_ptr = region
 			.as_ref()
@@ -249,6 +275,7 @@ impl ImageHandle {
 	}
 
 	fn drop_image(&mut self) -> Result<()> {
+		info!("Image handle out of scope, releasing data");
 		suite_fn!(clipReleaseImage in self.image_effect; self.inner)
 	}
 }
