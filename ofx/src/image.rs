@@ -56,7 +56,7 @@ impl ChannelFormat for u8 {
 pub trait PixelFormatRGB: PixelFormat {}
 pub trait PixelFormatAlpha: PixelFormat {}
 
-pub trait PixelFormat: Sized {
+pub trait PixelFormat: Sized + Copy + Clone {
 	type ChannelValue: ChannelFormat;
 
 	#[inline]
@@ -207,40 +207,51 @@ where
 			.offset((x - self.bounds.x1) as isize)
 	}
 
+	fn make_slice(&self, x: Int, y: Int, width: usize) -> &[T] {
+		unsafe { std::slice::from_raw_parts(self.pixel_address(x, y), width as usize) }
+	}
+
+	pub fn as_slice(&self) -> &[T] {
+		let x = self.bounds.x1;
+		let y = self.bounds.y1;
+		let (width, height) = self.dimensions();
+		self.make_slice(x, y, (width * height) as usize)
+	}
+
+	pub fn row_as_slice(&self, y: Int) -> &[T] {
+		let x = self.bounds.x1;
+		let (width, _) = self.dimensions();
+		self.make_slice(x, y, width as usize)
+	}
+
+	pub fn row_range_as_slice(&self, x1: Int, x2: Int, y: Int) -> &[T] {
+		self.make_slice(x1, y, (x2 - x1) as usize)
+	}
+
 	#[inline]
 	unsafe fn pixel_address_mut(&mut self, x: Int, y: Int) -> *mut T {
 		(self.ptr.offset((y - self.bounds.y1) as isize * self.stride) as *mut T)
 			.offset((x - self.bounds.x1) as isize)
 	}
 
-	pub fn as_slice(&self) -> &[T] {
-		unsafe {
-			let x = self.bounds.x1;
-			let y = self.bounds.y1;
-			let (width, height) = self.dimensions();
-			std::slice::from_raw_parts(self.pixel_address(x, y), (width * height) as usize)
-		}
-	}
-
-	pub fn row_as_slice(&self, y: Int) -> &[T] {
-		assert!(y >= self.bounds.y1 && y < self.bounds.y2);
-		let x = self.bounds.x1;
-		let (width, _) = self.dimensions();
-		unsafe { std::slice::from_raw_parts(self.pixel_address(x, y), width as usize) }
+	fn make_slice_mut(&mut self, x: Int, y: Int, width: usize) -> &mut [T] {
+		unsafe { std::slice::from_raw_parts_mut(self.pixel_address_mut(x, y), width as usize) }
 	}
 
 	pub fn as_slice_mut(&mut self) -> &mut [T] {
-		unsafe {
-			let x = self.bounds.x1;
-			let y = self.bounds.y1;
-			let (width, height) = self.dimensions();
-			std::slice::from_raw_parts_mut(self.pixel_address_mut(x, y), (width * height) as usize)
-		}
+		let x = self.bounds.x1;
+		let y = self.bounds.y1;
+		let (width, height) = self.dimensions();
+		self.make_slice_mut(x, y, (width * height) as usize)
 	}
 
 	pub fn row_as_slice_mut(&mut self, y: Int) -> &mut [T] {
 		let x = self.bounds.x1;
 		let (width, _) = self.dimensions();
-		unsafe { std::slice::from_raw_parts_mut(self.pixel_address_mut(x, y), width as usize) }
+		self.make_slice_mut(x, y, width as usize)
+	}
+
+	pub fn row_range_as_slice_mut(&mut self, x1: Int, x2: Int, y: Int) -> &mut [T] {
+		self.make_slice_mut(x1, y, (x2 - x1) as usize)
 	}
 }

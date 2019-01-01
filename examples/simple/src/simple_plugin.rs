@@ -80,18 +80,34 @@ where
 }
 
 trait ProcessAlpha<T> {
-	fn do_processing(&self, proc_window: RectI) -> Result<()>;
+	fn do_processing(&mut self, proc_window: RectI) -> Result<()>;
 }
 
 trait ProcessRGBA<T> {
-	fn do_processing(&self, proc_window: RectI) -> Result<()>;
+	fn do_processing(&mut self, proc_window: RectI) -> Result<()>;
 }
 
 impl<T> ProcessRGBA<T> for Processor<T>
 where
 	T: PixelFormatRGB,
 {
-	fn do_processing(&self, proc_window: RectI) -> Result<()> {
+	fn do_processing(&mut self, proc_window: RectI) -> Result<()> {
+		for y in proc_window.y1..proc_window.y2 {
+			if self.instance.abort()? {
+				break;
+			}
+			let mut dst_row = self
+				.dst
+				.row_range_as_slice_mut(proc_window.x1, proc_window.x2, y);
+			let src_row = self
+				.src
+				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
+
+			for (dst, src) in dst_row.iter_mut().zip(src_row.iter()) {
+				*dst = *src;
+			}
+		}
+
 		Ok(())
 	}
 }
@@ -100,7 +116,7 @@ impl<T> ProcessAlpha<T> for Processor<T>
 where
 	T: PixelFormatAlpha,
 {
-	fn do_processing(&self, proc_window: RectI) -> Result<()> {
+	fn do_processing(&mut self, proc_window: RectI) -> Result<()> {
 		Ok(())
 	}
 }
@@ -139,6 +155,8 @@ impl Execute for SimplePlugin {
 
 				let (sv, sr, sg, sb, sa) = instance_data.get_scale_components(time)?;
 				let (r_scale, g_scale, b_scale, a_scale) = (sv * sr, sv * sg, sv * sb, sv * sa);
+				
+				
 				if effect.abort()? {
 					FAILED
 				} else {
