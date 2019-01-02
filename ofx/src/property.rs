@@ -141,6 +141,7 @@ impl ValueType for str {}
 impl ValueType for [u8] {}
 impl ValueType for CharPtr {}
 impl ValueType for VoidPtr {}
+impl ValueType for VoidPtrMut {}
 impl ValueType for CString {}
 
 type StaticName = &'static [u8];
@@ -196,6 +197,12 @@ raw_getter_impl! { |readable, c_name, index| -> VoidPtr {
 	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
 	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut VoidPtrMut)
 	=> c_ptr_out as VoidPtr }
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> VoidPtrMut {
+	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
+	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut VoidPtrMut)
+	=> c_ptr_out as VoidPtrMut }
 }}
 
 raw_getter_impl! { |readable, c_name, index| -> Int {
@@ -491,6 +498,7 @@ pub mod image_effect {
 	property!(ImageEffectPropSupportedContexts as SupportedContexts: (&[u8]) -> CString);
 	property!(ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: (&[u8]) -> CString);
 	property!(ImageEffectPropSupportedComponents as SupportedComponents: (&[u8]) -> CString);
+	property!(ImageEffectPropPreMultiplication as PreMultiplication: Bool);
 	property!(ImageEffectPropRenderWindow as RenderWindow: RectI);
 	property!(ImageEffectPropRenderScale as RenderScale: PointD);
 	property!(ImageEffectPropRegionOfInterest as RegionOfInterest: RectD);
@@ -518,7 +526,7 @@ pub mod image {
 	use super::*;
 	property!(ImagePropRowBytes as RowBytes: () -> Int);
 	property!(ImagePropBounds as Bounds: () -> RectI);
-	property!(ImagePropData as Data: () -> VoidPtr);
+	property!(ImagePropData as Data: () -> VoidPtrMut);
 	property!(ImagePropField as Field: () -> CString);
 	property!(ImagePropPixelAspectRatio as PixelAspectRatio: () -> Double);
 	property!(ImagePropRegionOfDefinition as RegionOfDefinition: () -> RectI);
@@ -671,6 +679,7 @@ set_property!(CanSetTime => set_time, Time);
 get_property!(CanGetIsInteractive => get_is_interactive, IsInteractive);
 
 get_property!(CanGetType => get_type, Type, enum EType);
+get_property!(CanGetPreMultiplication => get_pre_multiplication, image_effect::PreMultiplication);
 
 get_property!(CanGetRegionOfDefinition => get_region_of_definition, image_effect::RegionOfDefinition);
 set_property!(CanSetRegionOfDefinition => set_region_of_definition, image_effect::RegionOfDefinition);
@@ -707,7 +716,7 @@ get_property!(CanGetInteractiveRenderStatus => get_interactive_render_status, im
 get_property!(CanGetRenderQualityDraft => get_field_to_render, image_effect::FieldToRender);
 
 get_property!(CanGetBounds => get_bounds, image::Bounds);
-get_property!(CanGetData => get_bounds, image::Data);
+get_property!(CanGetData => get_data, image::Data);
 // there are two RegionOfDefinition, one for clips and one for images,
 get_property!(CanGetPixelAspectRatio => get_region_of_definition, image::PixelAspectRatio);
 get_property!(CanGetImageRegionOfDefinition => get_region_of_definition, image::RegionOfDefinition);
@@ -790,13 +799,17 @@ capabilities! { BeginInstanceChangedInArgs => CanGetChangeReason}
 capabilities! { EndInstanceChangedInArgs => CanGetChangeReason}
 
 capabilities! { ImageHandle =>
+	CanGetType,
 	CanGetBounds,
 	CanGetData,
 	CanGetRowBytes,
 	CanGetImageRegionOfDefinition,
 	CanGetPixelAspectRatio,
 	CanGetPixelDepth,
-	CanGetUnmappedPixelDepth
+	CanGetPreMultiplication,
+	CanGetComponents,
+	CanGetUnmappedPixelDepth,
+	CanGetUnmappedComponents
 }
 
 capabilities! { RenderInArgs =>

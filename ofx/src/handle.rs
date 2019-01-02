@@ -1,4 +1,5 @@
 use enums::*;
+use image::*;
 use ofx_sys::*;
 use property::*;
 use result::*;
@@ -214,7 +215,7 @@ impl ImageClipHandle {
 	}
 
 	pub fn get_image_mut(&mut self, time: Time) -> Result<Rc<ImageHandle>> {
-		self.get_image_rect(time, None)
+		self.get_image_rect_mut(time, None)
 	}
 
 	pub fn get_image(&self, time: Time) -> Result<Rc<ImageHandle>> {
@@ -272,6 +273,28 @@ impl ImageHandle {
 			property,
 			image_effect,
 		}
+	}
+
+	pub fn get_descriptor<T>(&self) -> Result<ImageDescriptor<T>>
+	where
+		T: PixelFormat,
+	{
+		let bounds = self.get_bounds()?;
+		let row_bytes = self.get_row_bytes()?;
+		let mut ptr = self.get_data()?;
+
+		Ok(ImageDescriptor::new(bounds, row_bytes, ptr))
+	}
+
+	pub fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptor<T>>
+	where
+		T: PixelFormat,
+	{
+		let bounds = self.get_bounds()?;
+		let row_bytes = self.get_row_bytes()?;
+		let mut ptr = self.get_data()?;
+
+		Ok(ImageDescriptor::new(bounds, row_bytes, ptr))
 	}
 
 	fn drop_image(&mut self) -> Result<()> {

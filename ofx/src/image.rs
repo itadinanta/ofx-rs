@@ -54,6 +54,7 @@ impl ChannelFormat for u8 {
 }
 
 pub trait PixelFormatRGB: PixelFormat {}
+pub trait PixelFormatRGBA: PixelFormatRGB {}
 pub trait PixelFormatAlpha: PixelFormat {}
 
 pub trait PixelFormat: Sized + Copy + Clone {
@@ -90,12 +91,15 @@ pub trait PixelFormat: Sized + Copy + Clone {
 	}
 }
 
-impl PixelFormatRGB for RGBAColourB {}
-impl PixelFormatRGB for RGBAColourS {}
-impl PixelFormatRGB for RGBAColourF {}
 impl PixelFormatRGB for RGBColourB {}
 impl PixelFormatRGB for RGBColourS {}
 impl PixelFormatRGB for RGBColourF {}
+impl PixelFormatRGB for RGBAColourB {}
+impl PixelFormatRGB for RGBAColourS {}
+impl PixelFormatRGB for RGBAColourF {}
+impl PixelFormatRGBA for RGBAColourB {}
+impl PixelFormatRGBA for RGBAColourS {}
+impl PixelFormatRGBA for RGBAColourF {}
 impl PixelFormatAlpha for u8 {}
 impl PixelFormatAlpha for u16 {}
 impl PixelFormatAlpha for f32 {}
@@ -152,7 +156,6 @@ pub struct ImageDescriptor<T>
 where
 	T: PixelFormat,
 {
-	time: Time,
 	bounds: RectI,
 	stride: isize,
 	// FIXME: lifetime for ptr is unsound
@@ -172,18 +175,17 @@ impl<T> ImageDescriptor<T>
 where
 	T: PixelFormat,
 {
-	pub fn new(time: Time, bounds: RectI, row_bytes: Int, ptr: VoidPtrMut) -> Self {
+	pub fn new(bounds: RectI, row_bytes: Int, ptr: VoidPtrMut) -> Self {
 		ImageDescriptor {
-			time,
 			bounds,
 			stride: row_bytes as isize,
 			ptr: ptr as *mut T,
 		}
 	}
 
-	pub fn time(&self) -> Time {
-		self.time
-	}
+//	pub fn time(&self) -> Time {
+//		self.time
+//	}
 
 	pub fn bounds(&self) -> RectI {
 		self.bounds

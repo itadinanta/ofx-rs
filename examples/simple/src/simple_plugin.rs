@@ -89,7 +89,7 @@ trait ProcessRGBA<T> {
 
 impl<T> ProcessRGBA<T> for Processor<T>
 where
-	T: PixelFormatRGB,
+	T: PixelFormatRGBA,
 {
 	fn do_processing(&mut self, proc_window: RectI) -> Result<()> {
 		for y in proc_window.y1..proc_window.y2 {
@@ -117,6 +117,22 @@ where
 	T: PixelFormatAlpha,
 {
 	fn do_processing(&mut self, proc_window: RectI) -> Result<()> {
+		for y in proc_window.y1..proc_window.y2 {
+			if self.instance.abort()? {
+				break;
+			}
+			let mut dst_row = self
+				.dst
+				.row_range_as_slice_mut(proc_window.x1, proc_window.x2, y);
+			let src_row = self
+				.src
+				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
+
+			for (dst, src) in dst_row.iter_mut().zip(src_row.iter()) {
+				*dst = *src;
+			}
+		}
+
 		Ok(())
 	}
 }
@@ -138,10 +154,10 @@ impl Execute for SimplePlugin {
 			Render(ref mut effect, ref in_args) => {
 				let time = in_args.get_time()?;
 				let render_window = in_args.get_render_window()?;
-				let instance_data: &MyInstanceData = effect.get_instance_data()?;
+				let instance_data: &mut MyInstanceData = effect.get_instance_data()?;
 
 				let source_image = instance_data.source_clip.get_image(time)?;
-				let output_image = instance_data.output_clip.get_image(time)?;
+				let output_image = instance_data.output_clip.get_image_mut(time)?;
 				let mask_image = match instance_data.mask_clip {
 					None => None,
 					Some(ref mask_clip) => {
@@ -155,8 +171,30 @@ impl Execute for SimplePlugin {
 
 				let (sv, sr, sg, sb, sa) = instance_data.get_scale_components(time)?;
 				let (r_scale, g_scale, b_scale, a_scale) = (sv * sr, sv * sg, sv * sb, sv * sa);
-				
-				
+
+				macro_rules! make_processor {
+					($format:ty) => {
+						Processor::new(
+							effect.clone(),
+							r_scale,
+							g_scale,
+							b_scale,
+							a_scale,
+							source_image.get_descriptor::<$format>()?,
+							output_image.get_descriptor::<$format>()?,
+							mask_image.and_then(|mask| mask.get_descriptor::<$format>().ok()),
+							render_window,
+							)
+					};
+				}
+
+				if output_image.get_pixel_depth()? == BitDepth::Float
+					&& output_image.get_components()?.is_rgb()
+				{
+					let mut processor = make_processor!(RGBAColourF);
+					// processor.do_processing(render_window)?;
+				}
+
 				if effect.abort()? {
 					FAILED
 				} else {
