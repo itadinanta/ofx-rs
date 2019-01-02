@@ -494,10 +494,16 @@ pub mod image_effect {
 	property!(ImageEffectPropComponents as Components: () -> CString);
 	property!(ImageEffectPropPixelDepth as PixelDepth: () -> CString);
 
-	property!(ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: Bool);
+	property!(ImageEffectPropSupportsOverlays as SupportsOverlays: () -> Bool);
+	property!(ImageEffectPropSupportsMultiResolution as SupportsMultiResolution: () -> Bool);
+	property!(ImageEffectPropSupportsTiles as SupportsTiles: () -> Bool);
+	property!(ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: () -> Bool);
+	property!(ImageEffectPropSupportsMultipleClipPARs as SupportsMultipleClipPARs: () -> Bool);
+
 	property!(ImageEffectPropSupportedContexts as SupportedContexts: (&[u8]) -> CString);
 	property!(ImageEffectPropSupportedPixelDepths as SupportedPixelDepths: (&[u8]) -> CString);
 	property!(ImageEffectPropSupportedComponents as SupportedComponents: (&[u8]) -> CString);
+
 	property!(ImageEffectPropPreMultiplication as PreMultiplication: Bool);
 	property!(ImageEffectPropRenderWindow as RenderWindow: RectI);
 	property!(ImageEffectPropRenderScale as RenderScale: PointD);
@@ -531,6 +537,17 @@ pub mod image {
 	property!(ImagePropPixelAspectRatio as PixelAspectRatio: () -> Double);
 	property!(ImagePropRegionOfDefinition as RegionOfDefinition: () -> RectI);
 	property!(ImagePropUniqueIdentifier as UniqueIdentifier: () -> String);
+}
+
+pub mod param_host {
+	use super::*;
+	property!(ParamHostPropSupportsCustomInteract as SupportsCustomInteract: () -> Bool);
+	property!(ParamHostPropSupportsCustomAnimation as SupportsCustomAnimation: () -> Bool);
+	property!(ParamHostPropSupportsStringAnimation as SupportsStringAnimation: () -> Bool);
+	property!(ParamHostPropSupportsChoiceAnimation as SupportsChoiceAnimation: () -> Bool);
+	property!(ParamHostPropSupportsBooleanAnimation as SupportsBooleanAnimation: () -> Bool);
+	property!(ParamHostPropMaxParameters as MaxParameters: () -> Int);
+	property!(ParamHostPropMaxPages as MaxPages: () -> Int);
 }
 
 pub mod param {
@@ -649,6 +666,10 @@ pub trait CanSetLabels: CanSetLabel {
 		Ok(())
 	}
 }
+pub trait CanGetLabels: CanGetLabel {
+	get_property!(get_short_label, ShortLabel);
+	get_property!(get_long_label, LongLabel);
+}
 
 get_property!(CanGetName => get_name, Name);
 set_property!(CanSetName => set_name, &Name);
@@ -658,16 +679,24 @@ pub trait CanSetNameRaw: CanSetName {
 	}
 }
 
+get_property!(CanGetVersion => get_version, Version);
+get_property!(CanGetVersionLabel => get_version_label, VersionLabel);
+
+get_property!(CanGetGrouping => get_grouping, image_effect_plugin::Grouping);
 set_property!(CanSetGrouping => set_grouping, &image_effect_plugin::Grouping);
+
 set_property!(CanSetSupportedPixelDepths => set_supported_pixel_depths, image_effect::SupportedPixelDepths, &[enum BitDepth]);
 
 get_property!(CanGetContext => get_context, image_effect::Context, enum ImageEffectContext);
 
+get_property!(CanGetSupportedContexts => get_supported_contexts, image_effect::SupportedContexts);
 set_property!(CanSetSupportedContexts => set_supported_contexts, image_effect::SupportedContexts, &[enum ImageEffectContext]);
 
 get_property!(CanGetSupportsMultipleClipDepths => get_supports_multiple_clip_depths, image_effect::SupportsMultipleClipDepths);
 
+get_property!(CanGetSupportedComponents => get_supported_components, image_effect::SupportedComponents);
 set_property!(CanSetSupportedComponents => set_supported_components, image_effect::SupportedComponents, &[enum ImageComponent]);
+
 set_property!(CanSetOptional => set_optional, image_clip::Optional);
 
 get_property!(CanGetEnabled => get_enabled, param::Enabled);
@@ -750,53 +779,37 @@ macro_rules! capability_group {
 	}
 }
 
-capabilities! { HostHandle => CanGetSupportsMultipleClipDepths, CanGetTemporalClipAccess }
+capabilities! { HostHandle =>
+	CanGetName,
+	CanGetVersion,
+	CanGetVersionLabel,
+	CanGetSupportsMultipleClipDepths,
+	CanGetTemporalClipAccess
+}
 
 capabilities! { ImageEffectProperties =>
-	CanSetGrouping, CanSetLabel, CanSetLabels, CanGetLabel,
+	CanGetType,
+	CanGetGrouping, CanSetGrouping,
+	CanSetLabel, CanSetLabels, CanGetLabel,
 	CanGetContext, CanSetSupportedContexts,
 	CanSetSupportedPixelDepths
 }
 
-capabilities! { DescribeInContextInArgs => CanGetContext }
-capabilities! { IsIdentityInArgs => CanGetTime, CanGetFieldToRender, CanGetRenderWindow, CanGetRenderScale}
-capabilities! { IsIdentityOutArgs => CanSetName, CanSetTime }
-
+// Clip Descriptor
 capabilities! { ClipProperties =>
-	CanSetSupportedComponents,
+	CanGetType,
+	CanGetSupportedComponents, CanSetSupportedComponents,
 	CanSetOptional, CanGetConnected,
 	CanGetTemporalClipAccess, CanSetTemporalClipAccess
 }
 
+// Clip Instance
 capabilities! { ImageClipHandle =>
+	CanGetType,
 	CanGetConnected, CanGetFrameRange,
 	CanGetComponents,CanGetUnmappedComponents,
 	CanGetPixelDepth, CanGetUnmappedPixelDepth
 }
-
-capability_group! { BaseParam =>
-	CanSetLabel, CanSetHint, CanSetParent, CanSetScriptName, CanSetEnabled, CanGetEnabled
-}
-
-impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
-
-capabilities! { ParamDoubleProperties => BaseParam, CanSetDoubleParams }
-capabilities! { ParamBooleanProperties => BaseParam, CanSetBooleanParams }
-capabilities! { ParamPageProperties => BaseParam, CanSetChildren }
-capabilities! { ParamGroupProperties => BaseParam }
-
-capabilities! { GetRegionOfDefinitionInArgs => CanGetTime, CanGetRegionOfDefinition }
-capabilities! { GetRegionOfDefinitionOutArgs => CanSetRegionOfDefinition }
-capabilities! { GetRegionsOfInterestInArgs => CanGetRegionOfInterest }
-capabilities! { GetRegionsOfInterestOutArgs => CanSetRegionOfInterest }
-
-capabilities! { GetRegionsOfInterestOutArgs => RawWritable }
-capabilities! { GetClipPreferencesOutArgs => RawWritable }
-
-capabilities! { InstanceChangedInArgs => CanGetType, CanGetName, CanGetTime, CanGetChangeReason, CanGetRenderScale }
-
-capabilities! { BeginInstanceChangedInArgs => CanGetChangeReason}
-capabilities! { EndInstanceChangedInArgs => CanGetChangeReason}
 
 capabilities! { ImageHandle =>
 	CanGetType,
@@ -811,6 +824,35 @@ capabilities! { ImageHandle =>
 	CanGetUnmappedPixelDepth,
 	CanGetUnmappedComponents
 }
+
+capability_group! { BaseParam =>
+	CanSetLabel, CanSetHint, CanSetParent, CanSetScriptName, CanSetEnabled, CanGetEnabled
+}
+
+impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
+
+capabilities! { ParamDoubleProperties => BaseParam, CanSetDoubleParams }
+capabilities! { ParamBooleanProperties => BaseParam, CanSetBooleanParams }
+capabilities! { ParamPageProperties => BaseParam, CanSetChildren }
+capabilities! { ParamGroupProperties => BaseParam }
+
+capabilities! { DescribeInContextInArgs => CanGetContext }
+
+capabilities! { IsIdentityInArgs => CanGetTime, CanGetFieldToRender, CanGetRenderWindow, CanGetRenderScale}
+capabilities! { IsIdentityOutArgs => CanSetName, CanSetTime }
+
+capabilities! { GetRegionOfDefinitionInArgs => CanGetTime, CanGetRegionOfDefinition }
+capabilities! { GetRegionOfDefinitionOutArgs => CanSetRegionOfDefinition }
+
+capabilities! { GetRegionsOfInterestInArgs => CanGetRegionOfInterest }
+capabilities! { GetRegionsOfInterestOutArgs => RawWritable, CanSetRegionOfInterest }
+
+capabilities! { GetClipPreferencesOutArgs => RawWritable }
+
+capabilities! { InstanceChangedInArgs => CanGetType, CanGetName, CanGetTime, CanGetChangeReason, CanGetRenderScale }
+
+capabilities! { BeginInstanceChangedInArgs => CanGetChangeReason}
+capabilities! { EndInstanceChangedInArgs => CanGetChangeReason}
 
 capabilities! { RenderInArgs =>
 	CanGetTime,

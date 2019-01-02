@@ -104,7 +104,7 @@ where
 				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
 
 			for (dst, src) in dst_row.iter_mut().zip(src_row.iter()) {
-				*dst = *src;
+				//*dst = *src;
 			}
 		}
 
@@ -192,7 +192,7 @@ impl Execute for SimplePlugin {
 					&& output_image.get_components()?.is_rgb()
 				{
 					let mut processor = make_processor!(RGBAColourF);
-					// processor.do_processing(render_window)?;
+					processor.do_processing(render_window)?;
 				}
 
 				if effect.abort()? {
