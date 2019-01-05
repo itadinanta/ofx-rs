@@ -4,6 +4,7 @@ use ofx_sys::*;
 use property::*;
 use result::*;
 use std::borrow::Borrow;
+use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::marker::PhantomData;
@@ -214,7 +215,7 @@ impl ImageClipHandle {
 		Ok(value)
 	}
 
-	pub fn get_image_mut(&mut self, time: Time) -> Result<Rc<ImageHandle>> {
+	pub fn get_image_mut(&mut self, time: Time) -> Result<Rc<RefCell<ImageHandle>>> {
 		self.get_image_rect_mut(time, None)
 	}
 
@@ -240,18 +241,18 @@ impl ImageClipHandle {
 		&mut self,
 		time: Time,
 		region: Option<RectD>,
-	) -> Result<Rc<ImageHandle>> {
+	) -> Result<Rc<RefCell<ImageHandle>>> {
 		let mut image: OfxPropertySetHandle = std::ptr::null_mut();
 		let region_ptr = region
 			.as_ref()
 			.map(|m| m as *const RectD)
 			.unwrap_or(std::ptr::null());
 		suite_fn!(clipGetImage in self.image_effect; self.inner, time, region_ptr, &mut image as *mut OfxPropertySetHandle)?;
-		Ok(Rc::new(ImageHandle::new(
+		Ok(Rc::new(RefCell::new(ImageHandle::new(
 			image,
 			self.property.clone(),
 			self.image_effect.clone(),
-		)))
+		))))
 	}
 }
 
@@ -281,12 +282,12 @@ impl ImageHandle {
 	{
 		let bounds = self.get_bounds()?;
 		let row_bytes = self.get_row_bytes()?;
-		let mut ptr = self.get_data()?;
+		let ptr = self.get_data()?;
 
 		Ok(ImageDescriptor::new(bounds, row_bytes, ptr))
 	}
 
-	pub fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptor<T>>
+	pub fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptorMut<T>>
 	where
 		T: PixelFormat,
 	{
@@ -294,7 +295,7 @@ impl ImageHandle {
 		let row_bytes = self.get_row_bytes()?;
 		let mut ptr = self.get_data()?;
 
-		Ok(ImageDescriptor::new(bounds, row_bytes, ptr))
+		Ok(ImageDescriptorMut::new(bounds, row_bytes, ptr))
 	}
 
 	fn drop_image(&mut self) -> Result<()> {
