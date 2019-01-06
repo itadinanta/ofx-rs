@@ -287,7 +287,7 @@ impl ImageHandle {
 		Ok(ImageDescriptor::new(bounds, row_bytes, ptr))
 	}
 
-	pub fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptorMut<T>>
+	fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptorMut<T>>
 	where
 		T: PixelFormat,
 	{
@@ -296,6 +296,17 @@ impl ImageHandle {
 		let mut ptr = self.get_data()?;
 
 		Ok(ImageDescriptorMut::new(bounds, row_bytes, ptr))
+	}
+
+	pub fn get_tiles_mut<T>(&mut self, count: usize) -> Result<Vec<ImageTileMut<T>>>
+	where
+		T: PixelFormat,
+	{
+		let bounds = self.get_bounds()?;
+		let row_bytes = self.get_row_bytes()?;
+		let mut ptr = self.get_data()?;
+
+		Ok(ImageDescriptorMut::new(bounds, row_bytes, ptr).into_tiles(count))
 	}
 
 	fn drop_image(&mut self) -> Result<()> {

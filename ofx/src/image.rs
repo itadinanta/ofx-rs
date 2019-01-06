@@ -385,6 +385,7 @@ pixel_format_yuva!(YUVAColourB, u8);
 pixel_format_yuva!(YUVAColourS, u16);
 pixel_format_yuva!(YUVAColourF, f32);
 
+#[derive(Clone)]
 pub struct ImageMetrics {
 	bounds: RectI,
 	row_bytes: isize,
@@ -432,6 +433,7 @@ impl ImageMetrics {
 	}
 }
 
+#[derive(Clone)]
 pub struct ImageDescriptor<'a, T>
 where
 	T: PixelFormat,
@@ -445,6 +447,16 @@ where
 	T: PixelFormat,
 {
 	metrics: ImageMetrics,
+	data: &'a mut [T],
+}
+
+pub struct ImageTileMut<'a, T>
+where
+	T: PixelFormat,
+{
+	metrics: ImageMetrics,
+	pub y1: Int,
+	pub y2: Int,
 	data: &'a mut [T],
 }
 
@@ -498,10 +510,36 @@ where
 		}
 	}
 
-	fn make_slice(&mut self, x: Int, y: Int, width: usize) -> &mut [T] {
-		let start = self.metrics.pixel_offset(x, y);
+	pub fn into_tiles(self, count: usize) -> Vec<ImageTileMut<'a, T>> {
+		let rows_per_chunk = self.metrics.height / count;
+		let chunk_size = rows_per_chunk * self.metrics.width;
+		let height = self.metrics.height;
+		let metrics = self.metrics.clone();
+		self.data
+			.chunks_mut(chunk_size)
+			.enumerate()
+			.map(|(chunk_index, chunk)| {
+				let y1 = chunk_index * rows_per_chunk;
+				let y2 = height.min(y1 + rows_per_chunk);
+				ImageTileMut {
+					metrics: metrics.clone(),
+					y1: y1 as i32,
+					y2: y2 as i32,
+					data: chunk,
+				}
+			})
+			.collect()
+	}
+}
+
+impl<'a, T> ImageTileMut<'a, T>
+where
+	T: PixelFormat,
+{
+	fn make_slice(&mut self, x: Int, y: Int, length: usize) -> &mut [T] {
+		let start = self.metrics.pixel_offset(x, y - self.y1);
 		assert!(start >= 0); // is this the case?
-		&mut self.data[start as usize..start as usize + width]
+		&mut self.data[start as usize..start as usize + length]
 	}
 
 	pub fn as_slice(&mut self) -> &mut [T] {

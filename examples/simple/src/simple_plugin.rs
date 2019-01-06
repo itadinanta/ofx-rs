@@ -43,14 +43,14 @@ where
 	instance: ImageEffectHandle,
 	scale: RGBAColourD,
 	src: ImageDescriptor<'a, T>,
-	dst: ImageDescriptorMut<'a, T>,
+	dst: ImageTileMut<'a, T>,
 	mask: Option<ImageDescriptor<'a, M>>,
 	render_window: RectI,
 }
 
 impl<'a, T, M> Processor<'a, T, M>
 where
-	T: PixelFormatRGBA,
+	T: PixelFormat + ScaleMix,
 	M: PixelFormatAlpha,
 {
 	fn new(
@@ -60,7 +60,7 @@ where
 		b_scale: Double,
 		a_scale: Double,
 		src: ImageDescriptor<'a, T>,
-		dst: ImageDescriptorMut<'a, T>,
+		dst: ImageTileMut<'a, T>,
 		mask: Option<ImageDescriptor<'a, M>>,
 		render_window: RectI,
 	) -> Self {
@@ -81,73 +81,29 @@ where
 	}
 }
 
-trait ProcessAlpha<'a, T, M> {
-	fn do_processing(&'a mut self, proc_window: RectI) -> Result<()>;
-}
-
 trait ProcessRGBA<'a, T, M> {
 	fn do_processing(&'a mut self, proc_window: RectI) -> Result<()>;
 }
 
 impl<'a, T, M> ProcessRGBA<'a, T, M> for Processor<'a, T, M>
 where
-	T: PixelFormatRGBA,
+	T: PixelFormat + ScaleMix,
 	M: PixelFormatAlpha,
 {
 	fn do_processing(&'a mut self, proc_window: RectI) -> Result<()> {
-		for y in proc_window.y1..proc_window.y2 {
-			if self.instance.abort()? {
-				break;
-			}
-			let scale = self.scale;
-			let mut dst_row = self
+		let scale = self.scale;
+		for y in self.dst.y1.max(proc_window.y1)..self.dst.y2.min(proc_window.y2) {
+			let dst_row = self
 				.dst
 				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
+
 			let src_row = self
 				.src
 				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
 
-			let src_mask = self
-				.mask
-				.as_ref()
-				.map(|mask| mask.row_range_as_slice(proc_window.x1, proc_window.x2, y));
-
-			match src_mask {
-				None => {
-					for (dst, src) in dst_row.iter_mut().zip(src_row.iter()) {
-						*dst = src.scaled(&scale);
-					}
-				}
-				Some(src_mask) => {
-					for ((dst, src), mask) in dst_row.iter_mut().zip(src_row.iter()).zip(src_mask) {
-						let mask0 = mask.to_f32();
-						*dst = src.mix(&src.scaled(&scale), mask0);
-					}
-				}
-			}
-		}
-
-		Ok(())
-	}
-}
-
-impl<'a, T, M> ProcessAlpha<'a, T, M> for Processor<'a, T, M>
-where
-	T: PixelFormatAlpha + ScaleMix,
-	M: PixelFormatAlpha,
-{
-	fn do_processing(&mut self, proc_window: RectI) -> Result<()> {
-		for y in proc_window.y1..proc_window.y2 {
 			if self.instance.abort()? {
 				break;
 			}
-			let scale = self.scale;
-			let mut dst_row = self
-				.dst
-				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
-			let src_row = self
-				.src
-				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
 
 			let src_mask = self
 				.mask
@@ -208,29 +164,50 @@ impl Execute for SimplePlugin {
 				let (sv, sr, sg, sb, sa) = instance_data.get_scale_components(time)?;
 				let (r_scale, g_scale, b_scale, a_scale) = (sv * sr, sv * sg, sv * sb, sv * sa);
 				let mut output_image = output_image.borrow_mut();
-				macro_rules! make_processor {
-					($rgba_format:ty, $mask_format:ty) => {
-						Processor::new(
-							effect.clone(),
-							r_scale,
-							g_scale,
-							b_scale,
-							a_scale,
-							source_image.get_descriptor::<$rgba_format>()?,
-							output_image.get_descriptor_mut::<$rgba_format>()?,
-							mask_image
-								.as_ref()
-								.and_then(|mask| mask.get_descriptor::<$mask_format>().ok()),
-							render_window,
-							)
-					};
+				const NUM_TILES: usize = 10;
+				macro_rules! tiles {
+					($rgba_format:ty, $mask_format:ty) => {{
+						output_image
+							.get_tiles_mut::<$rgba_format>(NUM_TILES)?
+							.into_iter()
+							.map(|tile| {
+								let src = source_image.get_descriptor::<$rgba_format>().unwrap();
+								let mask = mask_image
+									.as_ref()
+									.and_then(|mask| mask.get_descriptor::<$mask_format>().ok());
+								Processor::new(
+									effect.clone(),
+									r_scale,
+									g_scale,
+									b_scale,
+									a_scale,
+									src,
+									tile,
+									mask,
+									render_window,
+								)
+							})
+						}};
 				}
 
-				if output_image.get_pixel_depth()? == BitDepth::Float
-					&& output_image.get_components()?.is_rgb()
-				{
-					let mut processor = make_processor!(RGBAColourF, f32);
-					processor.do_processing(render_window)?;
+				macro_rules! process_tiles {
+					($rgba_format:ty, $mask_format:ty) => {
+						for mut tile in tiles!($rgba_format, $mask_format) {
+							tile.do_processing(render_window)?;
+							}
+					};
+				}
+				match (
+					output_image.get_pixel_depth()?,
+					output_image.get_components()?,
+				) {
+					(BitDepth::Float, ImageComponent::RGBA) => process_tiles!(RGBAColourF, f32),
+					(BitDepth::Byte, ImageComponent::RGBA) => process_tiles!(RGBAColourB, u8),
+					(BitDepth::Short, ImageComponent::RGBA) => process_tiles!(RGBAColourS, u16),
+					(BitDepth::Float, ImageComponent::Alpha) => process_tiles!(f32, f32),
+					(BitDepth::Byte, ImageComponent::Alpha) => process_tiles!(u8, u8),
+					(BitDepth::Short, ImageComponent::Alpha) => process_tiles!(u16, u16),
+					(_, _) => return FAILED,
 				}
 
 				if effect.abort()? {
