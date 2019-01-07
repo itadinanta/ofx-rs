@@ -464,15 +464,16 @@ impl Execute for SimplePlugin {
 					Some(PARAM_COMPONENT_SCALES_NAME),
 				)?;
 
-				let mut param_props = param_set.param_define_page(PARAM_MAIN_NAME)?;
-				param_props.set_children(&[
-					PARAM_SCALE_NAME,
-					PARAM_SCALE_COMPONENTS_NAME,
-					PARAM_SCALE_R_NAME,
-					PARAM_SCALE_G_NAME,
-					PARAM_SCALE_B_NAME,
-					PARAM_SCALE_A_NAME,
-				])?;
+				param_set
+					.param_define_page(PARAM_MAIN_NAME)?
+					.set_children(&[
+						PARAM_SCALE_NAME,
+						PARAM_SCALE_COMPONENTS_NAME,
+						PARAM_SCALE_R_NAME,
+						PARAM_SCALE_G_NAME,
+						PARAM_SCALE_B_NAME,
+						PARAM_SCALE_A_NAME,
+					])?;
 
 				OK
 			}
