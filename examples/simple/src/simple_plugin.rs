@@ -1,4 +1,5 @@
 use ofx::*;
+use std::sync::{Arc, Mutex};
 
 plugin_module!(
 	"net.itadinanta.ofx-rs.simple_plugin_1",
@@ -35,7 +36,7 @@ struct MyInstanceData {
 	scale_a_param: ParamHandle<Double>,
 }
 
-struct Processor<'a, T, M>
+struct TileProcessor<'a, T, M>
 where
 	T: PixelFormat,
 	M: PixelFormatAlpha,
@@ -48,7 +49,20 @@ where
 	render_window: RectI,
 }
 
-impl<'a, T, M> Processor<'a, T, M>
+// Members of the TileProcessor are either:
+// - shared + read only
+// - shareable handles and memory blocks from OFX (for which we can spray and pray)
+// - owned by the tileprocessor
+// so we can assume it can be processed across multiple threads even if rustc says no
+//
+unsafe impl<'a, T, M> Send for TileProcessor<'a, T, M>
+where
+	T: PixelFormat + ScaleMix,
+	M: PixelFormatAlpha,
+{
+}
+
+impl<'a, T, M> TileProcessor<'a, T, M>
 where
 	T: PixelFormat + ScaleMix,
 	M: PixelFormatAlpha,
@@ -70,7 +84,7 @@ where
 			b: b_scale,
 			a: a_scale,
 		};
-		Processor {
+		TileProcessor {
 			instance,
 			scale,
 			src,
@@ -81,17 +95,60 @@ where
 	}
 }
 
-trait ProcessRGBA<'a, T, M> {
-	fn do_processing(&'a mut self, proc_window: RectI) -> Result<()>;
-}
-
-impl<'a, T, M> ProcessRGBA<'a, T, M> for Processor<'a, T, M>
+struct TileDispatch<'a, T, M>
 where
 	T: PixelFormat + ScaleMix,
 	M: PixelFormatAlpha,
 {
-	fn do_processing(&'a mut self, proc_window: RectI) -> Result<()> {
+	tiles: Arc<Mutex<Vec<TileProcessor<'a, T, M>>>>,
+}
+
+impl<'a, T, M> TileDispatch<'a, T, M>
+where
+	T: PixelFormat + ScaleMix,
+	M: PixelFormatAlpha,
+{
+	fn new(tiles: Vec<TileProcessor<'a, T, M>>) -> Self {
+		TileDispatch {
+			tiles: Arc::new(Mutex::new(tiles)),
+		}
+	}
+
+	fn pop(&mut self) -> Option<TileProcessor<'a, T, M>> {
+		if let Ok(ref mut tiles) = self.tiles.lock() {
+			tiles.pop()
+		} else {
+			None
+		}
+	}
+}
+
+impl<'a, T, M> Runnable for TileDispatch<'a, T, M>
+where
+	T: PixelFormat + ScaleMix,
+	M: PixelFormatAlpha,
+{
+	fn run(&mut self, _thread_index: UnsignedInt, _thread_max: UnsignedInt) {
+		while let Some(mut tile) = self.pop() {
+			if tile.do_processing().is_err() {
+				break;
+			};
+		}
+	}
+}
+
+trait ProcessRGBA<'a, T, M> {
+	fn do_processing(&'a mut self) -> Result<()>;
+}
+
+impl<'a, T, M> ProcessRGBA<'a, T, M> for TileProcessor<'a, T, M>
+where
+	T: PixelFormat + ScaleMix,
+	M: PixelFormatAlpha,
+{
+	fn do_processing(&'a mut self) -> Result<()> {
 		let scale = self.scale;
+		let proc_window = self.render_window;
 		for y in self.dst.y1.max(proc_window.y1)..self.dst.y2.min(proc_window.y2) {
 			let dst_row = self
 				.dst
@@ -164,18 +221,19 @@ impl Execute for SimplePlugin {
 				let (sv, sr, sg, sb, sa) = instance_data.get_scale_components(time)?;
 				let (r_scale, g_scale, b_scale, a_scale) = (sv * sr, sv * sg, sv * sb, sv * sa);
 				let mut output_image = output_image.borrow_mut();
-				const NUM_TILES: usize = 10;
+				let num_threads = plugin_context.num_threads()?;
+				let num_tiles = num_threads as usize;
 				macro_rules! tiles {
 					($rgba_format:ty, $mask_format:ty) => {{
 						output_image
-							.get_tiles_mut::<$rgba_format>(NUM_TILES)?
+							.get_tiles_mut::<$rgba_format>(num_tiles)?
 							.into_iter()
 							.map(|tile| {
 								let src = source_image.get_descriptor::<$rgba_format>().unwrap();
 								let mask = mask_image
 									.as_ref()
 									.and_then(|mask| mask.get_descriptor::<$mask_format>().ok());
-								Processor::new(
+								TileProcessor::new(
 									effect.clone(),
 									r_scale,
 									g_scale,
@@ -191,11 +249,11 @@ impl Execute for SimplePlugin {
 				}
 
 				macro_rules! process_tiles {
-					($rgba_format:ty, $mask_format:ty) => {
-						for mut tile in tiles!($rgba_format, $mask_format) {
-							tile.do_processing(render_window)?;
-							}
-					};
+					($rgba_format:ty, $mask_format:ty) => {{
+						let mut queue =
+							TileDispatch::new(tiles!($rgba_format, $mask_format).collect());
+						plugin_context.run_in_threads(num_threads, &mut queue)?;
+						}};
 				}
 				match (
 					output_image.get_pixel_depth()?,

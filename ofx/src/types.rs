@@ -26,6 +26,7 @@ pub type RectI = ofx_sys::OfxRectI;
 pub type RectD = ofx_sys::OfxRectD;
 pub const RECT_ELEMENTS: Int = 4;
 pub type Time = ofx_sys::OfxTime;
+pub type ThreadFunction = ofx_sys::OfxThreadFunctionV1;
 pub type RGBAColourB = ofx_sys::OfxRGBAColourB;
 pub type RGBAColourS = ofx_sys::OfxRGBAColourS;
 pub type RGBAColourF = ofx_sys::OfxRGBAColourF;

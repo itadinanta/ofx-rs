@@ -96,9 +96,47 @@ pub struct PluginContext {
 	suites: Suites,
 }
 
+pub trait Runnable: Sized + Send + Sync {
+	fn run(&mut self, thread_index: UnsignedInt, thread_max: UnsignedInt);
+	unsafe extern "C" fn run_myself(
+		thread_index: UnsignedInt,
+		thread_max: UnsignedInt,
+		me: VoidPtrMut,
+	) {
+		(*(me as *mut Self)).run(thread_index, thread_max)
+	}
+}
+
 impl PluginContext {
 	pub fn get_host(&self) -> HostHandle {
 		self.host.clone()
+	}
+
+	pub fn num_threads(&self) -> Result<u32> {
+		let mut c_num_threads: UnsignedInt = 0;
+		to_result! { suite_call!(multiThreadNumCPUs in self.suites.multi_thread; &mut c_num_threads as *mut UnsignedInt)
+		=> c_num_threads}
+	}
+
+	fn run_in_threads_internal(
+		&self,
+		function: ThreadFunction,
+		n_threads: UnsignedInt,
+		custom_arg: VoidPtrMut,
+	) -> Result<()> {
+		to_result! { suite_call!(multiThread in self.suites.multi_thread; function, n_threads, custom_arg)}
+	}
+
+	pub fn run_in_threads<R>(&self, n_threads: UnsignedInt, runnable: &mut R) -> Result<()>
+	where
+		R: Runnable,
+	{
+		self.run_in_threads_internal(
+			Some(R::run_myself),
+			n_threads,
+			(runnable as *mut R) as VoidPtrMut,
+		)?;
+		Ok(())
 	}
 }
 

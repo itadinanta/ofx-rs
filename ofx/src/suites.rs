@@ -9,7 +9,7 @@ pub struct Suites {
 	property: Rc<OfxPropertySuiteV1>,
 	parameter: Rc<OfxParameterSuiteV1>,
 	memory: Rc<OfxMemorySuiteV1>,
-	multi_thread: Rc<OfxMultiThreadSuiteV1>,
+	pub(crate) multi_thread: Rc<OfxMultiThreadSuiteV1>,
 	message: Rc<OfxMessageSuiteV1>,
 	message_v2: Option<Rc<OfxMessageSuiteV2>>,
 	progress: Rc<OfxProgressSuiteV1>,
