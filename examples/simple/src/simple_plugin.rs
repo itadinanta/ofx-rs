@@ -202,6 +202,7 @@ impl Execute for SimplePlugin {
 		match *action {
 			Render(ref mut effect, ref in_args) => {
 				let time = in_args.get_time()?;
+				// TODO: what happens if render_window < full size?
 				let render_window = in_args.get_render_window()?;
 				let instance_data: &mut MyInstanceData = effect.get_instance_data()?;
 
