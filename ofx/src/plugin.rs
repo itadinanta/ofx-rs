@@ -124,7 +124,7 @@ impl PluginContext {
 		n_threads: UnsignedInt,
 		custom_arg: VoidPtrMut,
 	) -> Result<()> {
-		to_result! { suite_call!(multiThread in self.suites.multi_thread; function, n_threads, custom_arg)}
+		suite_fn!(multiThread in self.suites.multi_thread; function, n_threads, custom_arg)
 	}
 
 	pub fn run_in_threads<R>(&self, n_threads: UnsignedInt, runnable: &mut R) -> Result<()>
