@@ -10,8 +10,14 @@ license = "Apache-2.0"
 # publish = false # insurance against accidents
 
 build = "build/main.rs"
-exclude = ["native/openfx/*"]
-include = ["native/openfx/include/*", "native/openfx/Support/*"]
+
+include = [
+	"Cargo.toml",
+	"src/**",
+	"build/**",
+	"native/openfx/include/**",
+	"native/openfx/Support/**"
+]
 
 [lib]
 name="ofx_sys"
