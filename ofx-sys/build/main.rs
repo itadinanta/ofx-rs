@@ -10,6 +10,7 @@ fn main() {
 	//println!("Bindings generated at {:?}", bindings_path);
 	let bindings = bindgen::Builder::default()
 		.clang_arg("-I../native/openfx/include")
+		.clang_arg("-I../../native/openfx/include")
 		.rust_target(bindgen::RustTarget::Nightly)
 		.rustfmt_bindings(true)
 		.header("build/wrapper.h")
@@ -28,6 +29,8 @@ fn main() {
 		//.clang_arg("-I/usr/include/x86_64-linux-gnu/c++/8")
 		.clang_arg("-I../native/openfx/include")
 		.clang_arg("-I../native/openfx/Support/include")
+		.clang_arg("-I../../native/openfx/include")
+		.clang_arg("-I../../native/openfx/Support/include")
 		.whitelist_recursively(false)
 		.whitelist_type("OFX::.*Enum")
 		.whitelist_type("OFX::.*Param")
@@ -62,7 +65,7 @@ fn main() {
 	bindings
 		.write_to_file(out_path.join("bindings.rs"))
 		.expect("Couldn't write bindings!");
-
+	
 	support_bindings
 		.write_to_file(out_path.join("support_bindings.rs"))
 		.expect("Couldn't write support bindings!");
