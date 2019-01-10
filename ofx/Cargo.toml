@@ -19,5 +19,5 @@ libc = "0.2"
 log="0.4"
 log4rs = "0.8"
 #ofx_sys = { path = "../ofx-sys" }
-ofx_sys = "0.1.0"
+ofx_sys = "0.1.1"
 phf = "0.7"
