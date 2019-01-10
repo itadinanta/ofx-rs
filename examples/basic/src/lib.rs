@@ -1,4 +1,3 @@
-extern crate boolinator;
 extern crate log;
 extern crate log4rs;
 extern crate ofx;
