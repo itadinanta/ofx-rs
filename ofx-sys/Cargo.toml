@@ -1,6 +1,6 @@
 [package]
 name = "ofx_sys"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Nicola Orru <nigu.orru@gmail.com>"]
 keywords = ["ofx", "openfx", "effects", "natron", "nuke"]
 #edition = "2018"
