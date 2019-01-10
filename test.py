@@ -4,7 +4,7 @@ write = app1.createWriter("target/filtered_test_####.png")
 source = app1.createNode("net.sf.openfx.CheckerBoardPlugin")
 mask = app1.createNode("net.sf.openfx.Radial")
 
-under_test = app1.createNode("net.itadinanta.ofx-rs.simple_plugin_1")
+under_test = app1.createNode("net.itadinanta.ofx-rs.basic")
 under_test.connectInput(0, source)
 under_test.connectInput(1, mask)
 

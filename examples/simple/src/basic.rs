@@ -2,7 +2,7 @@ use ofx::*;
 use std::sync::{Arc, Mutex};
 
 plugin_module!(
-	"net.itadinanta.ofx-rs.simple_plugin_1",
+	"net.itadinanta.ofx-rs.basic",
 	ApiVersion(1),
 	PluginVersion(1, 0),
 	SimplePlugin::new

@@ -310,7 +310,7 @@ impl ImageHandle {
 	}
 
 	fn drop_image(&mut self) -> Result<()> {
-		info!("Image handle out of scope, releasing data");
+		debug!("Releasing data for ImageHandle {:?}", self.inner);
 		suite_fn!(clipReleaseImage in self.image_effect; self.inner)
 	}
 }
