@@ -8,4 +8,4 @@ pub struct std_string {
 }
 pub struct std_basic_string {}
 
-include!(concat!(env!("OUT_DIR"), "/support_bindings.rs"));
+//include!(concat!(env!("OUT_DIR"), "/support_bindings.rs"));
