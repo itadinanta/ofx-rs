@@ -495,8 +495,9 @@ pub mod image_effect {
 	property!(ImageEffectPropPixelDepth as PixelDepth: () -> CString);
 
 	property!(ImageEffectPropSupportsOverlays as SupportsOverlays: () -> Bool);
-	property!(ImageEffectPropSupportsMultiResolution as SupportsMultiResolution: () -> Bool);
-	property!(ImageEffectPropSupportsTiles as SupportsTiles: () -> Bool);
+	property!(ImageEffectPropSupportsMultiResolution as SupportsMultiResolution: Bool);
+	property!(ImageEffectPropSupportsTiles as SupportsTiles: Bool);
+
 	property!(ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths: () -> Bool);
 	property!(ImageEffectPropSupportsMultipleClipPARs as SupportsMultipleClipPARs: () -> Bool);
 
@@ -694,6 +695,12 @@ set_property!(CanSetSupportedContexts => set_supported_contexts, image_effect::S
 
 get_property!(CanGetSupportsMultipleClipDepths => get_supports_multiple_clip_depths, image_effect::SupportsMultipleClipDepths);
 
+get_property!(CanGetSupportsTiles => get_supports_tiles, image_effect::SupportsTiles);
+set_property!(CanSetSupportsTiles => set_supports_tiles, image_effect::SupportsTiles);
+
+get_property!(CanGetSupportsMultiResolution => get_supports_multi_resolution, image_effect::SupportsMultiResolution);
+set_property!(CanSetSupportsMultiResolution => set_supports_multi_resolution, image_effect::SupportsMultiResolution);
+
 get_property!(CanGetSupportedComponents => get_supported_components, image_effect::SupportedComponents);
 set_property!(CanSetSupportedComponents => set_supported_components, image_effect::SupportedComponents, &[enum ImageComponent]);
 
@@ -792,6 +799,8 @@ capabilities! { ImageEffectProperties =>
 	CanGetGrouping, CanSetGrouping,
 	CanSetLabel, CanSetLabels, CanGetLabel,
 	CanGetContext, CanSetSupportedContexts,
+	CanGetSupportsTiles, CanSetSupportsTiles,
+	CanGetSupportsMultiResolution, CanSetSupportsMultiResolution,
 	CanSetSupportedPixelDepths
 }
 
