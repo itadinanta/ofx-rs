@@ -677,6 +677,6 @@ mod tests {
 		let mut handle = ImageEffectProperties(PropertySetHandle::empty());
 
 		handle.get::<property::Type>();
-		handle.get::<property::image_effect_host::IsBackground>();
+		handle.get::<property::IsBackground>();
 	}
 }
