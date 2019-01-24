@@ -1,7 +1,7 @@
 #![feature(concat_idents)]
 
 use enums::{
-	BitDepth, Change, IdentifiedEnum, ImageComponent, ImageEffectContext, ImageEffectRender, ImageField,
+	BitDepth, Change, IdentifiedEnum, ImageComponent, ImageEffectContext, ImageEffectRender, ImageField, HostNativeOrigin,
 	ParamDoubleType, Type as EType,
 };
 use handle::*;
@@ -632,7 +632,7 @@ mod_property! { PropChangeReason as ChangeReason { get_change_reason() -> CStrin
 mod_property! { PropHostOSHandle as HostOSHandle { get_host_os_handle() -> VoidPtrMut } }
 
 mod_property! { ImageEffectHostPropIsBackground as IsBackground { get_is_background() -> Bool } }
-mod_property! { ImageEffectHostPropNativeOrigin as NativeOrigin { get_native_origin() -> Bool } }
+mod_property! { ImageEffectHostPropNativeOrigin as NativeOrigin { get_native_origin() -> CString as enum HostNativeOrigin } }
 
 mod_property! { ParamHostPropSupportsCustomInteract as SupportsCustomInteract { get_supports_custom_interact() -> Bool } }
 mod_property! { ParamHostPropSupportsCustomAnimation as SupportsCustomAnimation { get_supports_custom_animation() -> Bool } }
@@ -647,7 +647,7 @@ mod_property! { ParamHostPropMaxPages as MaxPages { get_max_pages() -> Int } }
 mod_property! { ParamHostPropPageRowColumnCount as PageRowColumnCount { get_page_row_column_count() -> RectI } }
 
 mod_property! { ImageEffectPluginPropGrouping as Grouping { get_grouping() -> String; set_grouping(&str) } }
-mod_property! { ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways { get_field_render_twice_always() -> Bool; set_field_render_twice_always(Bool)  } }
+mod_property! { ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways { get_field_render_twice_always() -> Bool; set_field_render_twice_always(Bool) } }
 mod_property! { ImageEffectPluginPropSingleInstance as SingleInstance { get_single_instance() -> Bool; set_single_instance(Bool) } }
 mod_property! { ImageEffectPluginPropHostFrameThreading as HostFrameThreading { get_host_frame_threading() -> Bool; set_host_frame_threading(Bool) } }
 mod_property! { ImageEffectPluginRenderThreadSafety as RenderThreadSafety { get_render_thread_safety() -> CString as enum ImageEffectRender; set_render_thread_safety(&[u8] as enum ImageEffectRender) } }
@@ -655,13 +655,21 @@ mod_property! { ImageEffectPluginRenderThreadSafety as RenderThreadSafety { get_
 mod_property! { ImageEffectPropContext as Context { get_context() -> CString as enum ImageEffectContext} }
 mod_property! { ImageEffectPropComponents as Components { get_components() -> CString as enum ImageComponent } }
 mod_property! { ImageEffectPropPixelDepth as PixelDepth { get_pixel_depth() -> CString as enum BitDepth } }
-mod_property! { ImageEffectPropSupportsOverlays as SupportsOverlays { get_supports_overlays() -> Bool} }
+
+mod_property! { ImageEffectPropProjectSize  as ProjectSize { get_project_size() -> PointD; set_project_size(PointD) } }
+mod_property! { ImageEffectPropProjectOffset as ProjectOffset { get_project_offset() -> PointD; set_project_offset(PointD) } }
+mod_property! { ImageEffectPropProjectExtent as ProjectExtent { get_project_extent() -> PointD; set_project_extent(PointD) } }
+mod_property! { ImageEffectPropProjectPixelAspectRatio as ProjectPixelAspectRatio { get_project_pixel_aspect_ratio() -> Double; set_project_pixel_aspect_ratio(Double) } }
+mod_property! { ImageEffectPropFrameRate as FrameRate { get_frame_rate() -> Double; set_frame_rate(Double) } }
+
+mod_property! { ImageEffectPropSupportsOverlays as SupportsOverlays { get_supports_overlays() -> Bool } }
 mod_property! { ImageEffectPropSupportsMultiResolution as SupportsMultiResolution { get_supports_multi_resolution() -> Bool; set_supports_multi_resolution(&Bool) } }
 mod_property! { ImageEffectPropSupportsTiles as SupportsTiles { get_supports_tiles() -> Bool; set_supports_tiles(Bool) } }
 mod_property! { ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths { get_supports_multiple_clip_depths() -> Bool; set_supports_multiple_clip_depths(Bool) } }
 mod_property! { ImageEffectPropSupportsMultipleClipPARs as SupportsMultipleClipPARs { get_supports_multiple_clip_pars() -> Bool; set_supports_multiple_clip_pars(Bool) } }
-mod_property! { ImageEffectPropSetableFrameRate as SetableFrameRate { get_setable_frame_rate() -> Bool} }
-mod_property! { ImageEffectPropSetableFielding as SetableFielding { get_setable_fielding() -> Bool} }
+mod_property! { ImageEffectPropSetableFrameRate as SetableFrameRate { get_setable_frame_rate() -> Bool } }
+mod_property! { ImageEffectPropSetableFielding as SetableFielding { get_setable_fielding() -> Bool } }
+// TODO: allow multiple returns
 mod_property! { ImageEffectPropSupportedContexts as SupportedContexts { get_supported_contexts() -> CString; set_supported_contexts(&[u8] as &[enum ImageEffectContext]) } }
 mod_property! { ImageEffectPropSupportedPixelDepths as SupportedPixelDepths { get_supported_pixel_depths() -> CString; set_supported_pixel_depths(&[u8] as &[enum BitDepth]) } }
 mod_property! { ImageEffectPropSupportedComponents as SupportedComponents { get_supported_components() -> CString; set_supported_components(&[u8] as &[enum ImageComponent]) } }
@@ -672,21 +680,23 @@ mod_property! { ImageEffectPropRegionOfInterest as RegionOfInterest { get_region
 // there are two RegionOfDefinition, one for clips and one for images,
 mod_property! { ImageEffectPropRegionOfDefinition as EffectRegionOfDefinition{ get_effect_region_of_definition() -> RectD; set_effect_region_of_definition(RectD) } }
 mod_property! { ImageEffectPropFrameRange as FrameRange { get_frame_range() -> RangeD; set_frame_range(RangeD) } }
-mod_property! { ImageEffectPropFrameStep as FrameStep { get_frame_step() -> Double} }
-mod_property! { ImageEffectPropFieldToRender as FieldToRender { get_field_to_render() -> CString as enum ImageField} }
+mod_property! { ImageEffectPropFrameStep as FrameStep { get_frame_step() -> Double } }
+mod_property! { ImageEffectPropFieldToRender as FieldToRender { get_field_to_render() -> CString as enum ImageField } }
 mod_property! { ImageEffectPropTemporalClipAccess as TemporalClipAccess { get_temporal_clip_access() -> Bool; set_temporal_clip_access(Bool) } }
-mod_property! { ImageEffectPropSequentialRenderStatus as SequentialRenderStatus { get_sequential_render_status() -> Bool} }
-mod_property! { ImageEffectPropInteractiveRenderStatus as InteractiveRenderStatus { get_interactive_render_status() -> Bool} }
+// todo: return multiple strings
+mod_property! { ImageEffectPropClipPreferencesSlaveParam as ClipPreferencesSlaveParam { get_clip_preferences_slave_param() -> String; set_clip_preferences_slave_param(&str) } }
+mod_property! { ImageEffectPropSequentialRenderStatus as SequentialRenderStatus { get_sequential_render_status() -> Bool } }
+mod_property! { ImageEffectPropInteractiveRenderStatus as InteractiveRenderStatus { get_interactive_render_status() -> Bool } }
 mod_property! { ImageEffectPropOpenGLRenderSupported as OpenGLRenderSupported { get_opengl_render_supported() -> Bool; set_opengl_render_supported(Bool) } }
 mod_property! { ImageEffectPropRenderQualityDraft as RenderQualityDraft { get_render_quality_draft() -> Bool } }
 
-mod_property! { ImageEffectInstancePropSequentialRender as SequentialRender { get_sequential_render() -> Bool } }
+mod_property! { ImageEffectInstancePropEffectDuration as EffectDuration { get_effect_duration() -> Double; set_effect_duration(Double) } }
+mod_property! { ImageEffectInstancePropSequentialRender as SequentialRender { get_sequential_render() -> Bool; set_sequential_render(Bool) } }
 
 mod_property! { ImageClipPropConnected as Connected { get_connected() -> Bool }}
 mod_property! { ImageClipPropUnmappedComponents as UnmappedComponents { get_unmapped_components() -> CString as enum ImageComponent} }
 mod_property! { ImageClipPropUnmappedPixelDepth as UnmappedPixelDepth { get_unmapped_pixel_depth() -> CString as enum BitDepth } }
 mod_property! { ImageClipPropOptional as Optional { get_optional() -> Bool; set_optional(Bool) } }
-
 
 mod_property! { ImagePropRowBytes as RowBytes { get_row_bytes() -> Int } }
 mod_property! { ImagePropBounds as Bounds { get_bounds() -> RectI } }
@@ -785,9 +795,10 @@ macro_rules! capability_group {
 		*
 	}
 }
-
+// https://openfx.readthedocs.io/en/doc/Reference/ofxPropertiesByObject.html#properties-on-an-effect-descriptor
 capabilities! { HostHandle =>
 	Name::CanGet,
+	Label::CanGet,
 	Version::CanGet,
 	VersionLabel::CanGet,
 	IsBackground::CanGet,
@@ -796,6 +807,7 @@ capabilities! { HostHandle =>
 	SupportsTiles::CanGet,
 	TemporalClipAccess::CanGet,
 	SupportedComponents::CanGet,
+	SupportedContexts::CanGet,
 	SupportsMultipleClipDepths::CanGet,
 	SupportsMultipleClipPARs::CanGet,
 	SetableFrameRate::CanGet,
@@ -816,12 +828,13 @@ capabilities! { HostHandle =>
 	NativeOrigin::CanGet
 }
 
+// TODO: canset should be only exposed in the "Describe" action
+// Effect Descriptor
 capabilities! { EffectDescriptorProperties =>
 	Type::CanGet,
 	Label::CanGet, Label::CanSet, 
-	LongLabel::CanGet, LongLabel::CanSet, 
 	ShortLabel::CanGet, ShortLabel::CanSet, 
-	Labels::CanSet,
+	LongLabel::CanGet, LongLabel::CanSet, 
 	Version::CanGet,
 	VersionLabel::CanGet,
 	PluginDescription::CanGet, PluginDescription::CanSet,
@@ -830,33 +843,38 @@ capabilities! { EffectDescriptorProperties =>
 	SingleInstance::CanGet, SingleInstance::CanSet,
 	RenderThreadSafety::CanGet, RenderThreadSafety::CanSet,
 	HostFrameThreading::CanGet, HostFrameThreading::CanSet,
+//	TODO: missing yet
 //  OverlayInteractV1::CanGet, OverlayInteractV1::CanSet,
-	SupportsTiles::CanGet, SupportsTiles::CanSet,
 	SupportsMultiResolution::CanGet, SupportsMultiResolution::CanSet,
+	SupportsTiles::CanGet, SupportsTiles::CanSet,
 	TemporalClipAccess::CanGet, TemporalClipAccess::CanSet,
 	SupportedPixelDepths::CanSet, SupportedPixelDepths::CanGet,
 	FieldRenderTwiceAlways::CanSet, FieldRenderTwiceAlways::CanGet,
 	SupportsMultipleClipDepths::CanGet, SupportsMultipleClipDepths::CanSet,
 	SupportsMultipleClipPARs::CanGet, SupportsMultipleClipPARs::CanSet,	
 	OpenGLRenderSupported::CanGet, OpenGLRenderSupported::CanSet,	
-//	ClipPreferencesSlaveParam,	
-	FilePath::CanGet
+	ClipPreferencesSlaveParam::CanGet, ClipPreferencesSlaveParam::CanSet,
+	FilePath::CanGet,
+	Labels::CanSet
 }
 
+// Image Effect Instance
 capabilities! { ImageEffectProperties =>
 	Type::CanGet,
-	Label::CanGet, Label::CanSet, 
-	LongLabel::CanGet, LongLabel::CanSet, 
-	ShortLabel::CanGet, ShortLabel::CanSet, 
-	Labels::CanSet,
-	Version::CanGet,
-	VersionLabel::CanGet,
-	Grouping::CanGet, Grouping::CanSet,
 	Context::CanGet,
-	SupportedContexts::CanSet,
+	Label::CanGet, 
+	ProjectSize::CanGet,
+	ProjectOffset::CanGet,
+	ProjectExtent::CanGet,
+	ProjectPixelAspectRatio::CanGet,	
+	EffectDuration::CanGet,
+	SequentialRender::CanGet, SequentialRender::CanSet,	
 	SupportsTiles::CanGet, SupportsTiles::CanSet,
 	SupportsMultiResolution::CanGet, SupportsMultiResolution::CanSet,
-	SupportedPixelDepths::CanSet
+	OpenGLRenderSupported::CanGet, OpenGLRenderSupported::CanSet,	
+	FrameRate::CanGet,
+	SupportedPixelDepths::CanSet,
+	IsInteractive::CanGet
 }
 
 // Clip Descriptor

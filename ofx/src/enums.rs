@@ -196,13 +196,20 @@ identified_enum! {
 }
 
 identified_enum! {
+	pub enum HostNativeOrigin {
+		BottomLeft,
+		TopLeft,
+		Center
+	}
+}
+
+identified_enum! {
 	pub enum ImageEffectRender {
 		Unsafe,
 		InstanceSafe,
 		FullySafe
 	}
 }
-
 
 identified_enum! {
 	pub enum Change {
