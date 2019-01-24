@@ -317,7 +317,7 @@ impl Execute for SimplePlugin {
 					.get_instance_data::<MyInstanceData>()?
 					.source_clip
 					.get_region_of_definition(time)?;
-				out_args.set_region_of_definition(rod)?;
+				out_args.set_effect_region_of_definition(rod)?;
 
 				OK
 			}
@@ -388,7 +388,7 @@ impl Execute for SimplePlugin {
 			}
 
 			CreateInstance(ref mut effect) => {
-				let mut effect_props = effect.properties()?;
+				let mut effect_props: ImageEffectProperties = effect.properties()?;
 				let mut param_set = effect.parameter_set()?;
 
 				let is_general_effect = effect_props.get_context()?.is_general();
@@ -542,7 +542,7 @@ impl Execute for SimplePlugin {
 					.get_host()
 					.get_supports_multiple_clip_depths()?;
 
-				let mut effect_properties = effect.properties()?;
+				let mut effect_properties: EffectDescriptorProperties = effect.properties()?;
 				effect_properties.set_grouping("Ofx-rs")?;
 
 				effect_properties.set_label("Ofx-rs simple_plugin sample")?;

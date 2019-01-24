@@ -1,7 +1,7 @@
 #![feature(concat_idents)]
 
 use enums::{
-	BitDepth, Change, IdentifiedEnum, ImageComponent, ImageEffectContext, ImageField,
+	BitDepth, Change, IdentifiedEnum, ImageComponent, ImageEffectContext, ImageEffectRender, ImageField,
 	ParamDoubleType, Type as EType,
 };
 use handle::*;
@@ -587,6 +587,14 @@ macro_rules! mod_property {
 			set_property!(CanSet => $set_name, Property, $($tail)*);
 		}
 	};
+	
+	($prop_name:ident as $name:ident { $get_name:ident () -> $get_type:ty as enum $enum_get:ident ; $set_name:ident (&$set_type:ty as enum $enum_set:ty) }) => {
+		mod_property! { $name, $get_name, $set_name =>
+			property!($prop_name as Property: (&$set_type) -> $get_type);
+			get_property!(CanGet => $get_name, Property, enum $enum_get);
+			set_property!(CanSet => $set_name, Property, enum $enum_set);
+		}
+	};
 
 	($prop_name:ident as $name:ident { $get_name:ident () -> $get_type:ty as $($tail:tt)* } ) => {
 		mod_property! { $name, $get_name =>
@@ -604,8 +612,10 @@ macro_rules! mod_property {
 
 }
 
-mod_property! { PropName as Name { get_name() -> String; set_name(&str) } }
+mod_property! { PluginPropFilePath as FilePath { get_file_path() -> String } }
+
 mod_property! { PropType as Type { get_type() -> CString as enum EType } }
+mod_property! { PropName as Name { get_name() -> String; set_name(&str) } }
 mod_property! { PropLabel as Label { get_label() -> String; set_label(&str) } }
 mod_property! { PropShortLabel as ShortLabel { get_short_label() -> String; set_short_label(&str) }}
 mod_property! { PropLongLabel as LongLabel { get_long_label() -> String; set_long_label(&str)}}
@@ -637,92 +647,90 @@ mod_property! { ParamHostPropMaxPages as MaxPages { get_max_pages() -> Int } }
 mod_property! { ParamHostPropPageRowColumnCount as PageRowColumnCount { get_page_row_column_count() -> RectI } }
 
 mod_property! { ImageEffectPluginPropGrouping as Grouping { get_grouping() -> String; set_grouping(&str) } }
-mod_property! { ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways { get_field_render_twice_always() -> Bool } }
+mod_property! { ImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways { get_field_render_twice_always() -> Bool; set_field_render_twice_always(Bool)  } }
+mod_property! { ImageEffectPluginPropSingleInstance as SingleInstance { get_single_instance() -> Bool; set_single_instance(Bool) } }
+mod_property! { ImageEffectPluginPropHostFrameThreading as HostFrameThreading { get_host_frame_threading() -> Bool; set_host_frame_threading(Bool) } }
+mod_property! { ImageEffectPluginRenderThreadSafety as RenderThreadSafety { get_render_thread_safety() -> CString as enum ImageEffectRender; set_render_thread_safety(&[u8] as enum ImageEffectRender) } }
 
-mod_property! {ImageEffectPropContext as Context { get_context() -> CString as enum ImageEffectContext} }
-mod_property! {ImageEffectPropComponents as Components { get_components() -> CString as enum ImageComponent } }
-mod_property! {ImageEffectPropPixelDepth as PixelDepth { get_pixel_depth() -> CString as enum BitDepth } }
-mod_property! {ImageEffectPropSupportsOverlays as SupportsOverlays { get_supports_overlays() -> Bool} }
-mod_property! {ImageEffectPropSupportsMultiResolution as SupportsMultiResolution { get_supports_multi_resolution() -> Bool; set_supports_multi_resolution(&Bool) } }
-mod_property! {ImageEffectPropSupportsTiles as SupportsTiles { get_supports_tiles() -> Bool; set_supports_tiles(Bool) } }
-mod_property! {ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths { get_supports_multiple_clip_depths() -> Bool} }
-mod_property! {ImageEffectPropSupportsMultipleClipPARs as SupportsMultipleClipPARs { get_supports_multiple_clip_pars() -> Bool} }
-mod_property! {ImageEffectPropSetableFrameRate as SetableFrameRate { get_setable_frame_rate() -> Bool} }
-mod_property! {ImageEffectPropSetableFielding as SetableFielding { get_setable_fielding() -> Bool} }
-mod_property! {ImageEffectPropSupportedContexts as SupportedContexts { get_supported_contexts() -> CString; set_supported_contexts(&[u8] as &[enum ImageEffectContext]) } }
-mod_property! {ImageEffectPropSupportedPixelDepths as SupportedPixelDepths { get_supported_pixel_depths() -> CString; set_supported_pixel_depths(&[u8] as &[enum BitDepth]) } }
-mod_property! {ImageEffectPropSupportedComponents as SupportedComponents { get_supported_components() -> CString; set_supported_components(&[u8] as &[enum ImageComponent]) } }
-mod_property! {ImageEffectPropPreMultiplication as PreMultiplication { get_pre_multiplication() -> Bool; set_pre_multiplication(Bool) } }
-mod_property! {ImageEffectPropRenderWindow as RenderWindow { get_render_window() -> RectI; set_render_window(RectI) } }
-mod_property! {ImageEffectPropRenderScale as RenderScale { get_render_scale() -> PointD; set_render_scale(PointD) } }
-mod_property! {ImageEffectPropRegionOfInterest as RegionOfInterest { get_region_of_interest() -> RectD; set_region_of_interest(RectD) } }
-mod_property! {ImageEffectPropRegionOfDefinition as RegionOfDefinition{ get_region_of_definition() -> RectD; set_region_of_definition(RectD) } }
-mod_property! {ImageEffectPropFrameRange as FrameRange { get_frame_range() -> RangeD; set_frame_range(RangeD) } }
-mod_property! {ImageEffectPropFrameStep as FrameStep { get_frame_step() -> Double} }
-mod_property! {ImageEffectPropFieldToRender as FieldToRender { get_field_to_render() -> CString as enum ImageField} }
-mod_property! {ImageEffectPropTemporalClipAccess as TemporalClipAccess { get_temporal_clip_access() -> Bool; set_temporal_clip_access(Bool) } }
-mod_property! {ImageEffectPropSequentialRenderStatus as SequentialRenderStatus { get_sequential_render_status() -> Bool} }
-mod_property! {ImageEffectPropInteractiveRenderStatus as InteractiveRenderStatus { get_interactive_render_status() -> Bool} }
-mod_property! {ImageEffectPropOpenGLRenderSupported as OpenGLRenderSupported { get_opengl_render_supported() -> Bool} }
-mod_property! {ImageEffectPropRenderQualityDraft as RenderQualityDraft { get_render_quality_draft() -> Bool} }
+mod_property! { ImageEffectPropContext as Context { get_context() -> CString as enum ImageEffectContext} }
+mod_property! { ImageEffectPropComponents as Components { get_components() -> CString as enum ImageComponent } }
+mod_property! { ImageEffectPropPixelDepth as PixelDepth { get_pixel_depth() -> CString as enum BitDepth } }
+mod_property! { ImageEffectPropSupportsOverlays as SupportsOverlays { get_supports_overlays() -> Bool} }
+mod_property! { ImageEffectPropSupportsMultiResolution as SupportsMultiResolution { get_supports_multi_resolution() -> Bool; set_supports_multi_resolution(&Bool) } }
+mod_property! { ImageEffectPropSupportsTiles as SupportsTiles { get_supports_tiles() -> Bool; set_supports_tiles(Bool) } }
+mod_property! { ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths { get_supports_multiple_clip_depths() -> Bool; set_supports_multiple_clip_depths(Bool) } }
+mod_property! { ImageEffectPropSupportsMultipleClipPARs as SupportsMultipleClipPARs { get_supports_multiple_clip_pars() -> Bool; set_supports_multiple_clip_pars(Bool) } }
+mod_property! { ImageEffectPropSetableFrameRate as SetableFrameRate { get_setable_frame_rate() -> Bool} }
+mod_property! { ImageEffectPropSetableFielding as SetableFielding { get_setable_fielding() -> Bool} }
+mod_property! { ImageEffectPropSupportedContexts as SupportedContexts { get_supported_contexts() -> CString; set_supported_contexts(&[u8] as &[enum ImageEffectContext]) } }
+mod_property! { ImageEffectPropSupportedPixelDepths as SupportedPixelDepths { get_supported_pixel_depths() -> CString; set_supported_pixel_depths(&[u8] as &[enum BitDepth]) } }
+mod_property! { ImageEffectPropSupportedComponents as SupportedComponents { get_supported_components() -> CString; set_supported_components(&[u8] as &[enum ImageComponent]) } }
+mod_property! { ImageEffectPropPreMultiplication as PreMultiplication { get_pre_multiplication() -> Bool; set_pre_multiplication(Bool) } }
+mod_property! { ImageEffectPropRenderWindow as RenderWindow { get_render_window() -> RectI; set_render_window(RectI) } }
+mod_property! { ImageEffectPropRenderScale as RenderScale { get_render_scale() -> PointD; set_render_scale(PointD) } }
+mod_property! { ImageEffectPropRegionOfInterest as RegionOfInterest { get_region_of_interest() -> RectD; set_region_of_interest(RectD) } }
+// there are two RegionOfDefinition, one for clips and one for images,
+mod_property! { ImageEffectPropRegionOfDefinition as EffectRegionOfDefinition{ get_effect_region_of_definition() -> RectD; set_effect_region_of_definition(RectD) } }
+mod_property! { ImageEffectPropFrameRange as FrameRange { get_frame_range() -> RangeD; set_frame_range(RangeD) } }
+mod_property! { ImageEffectPropFrameStep as FrameStep { get_frame_step() -> Double} }
+mod_property! { ImageEffectPropFieldToRender as FieldToRender { get_field_to_render() -> CString as enum ImageField} }
+mod_property! { ImageEffectPropTemporalClipAccess as TemporalClipAccess { get_temporal_clip_access() -> Bool; set_temporal_clip_access(Bool) } }
+mod_property! { ImageEffectPropSequentialRenderStatus as SequentialRenderStatus { get_sequential_render_status() -> Bool} }
+mod_property! { ImageEffectPropInteractiveRenderStatus as InteractiveRenderStatus { get_interactive_render_status() -> Bool} }
+mod_property! { ImageEffectPropOpenGLRenderSupported as OpenGLRenderSupported { get_opengl_render_supported() -> Bool; set_opengl_render_supported(Bool) } }
+mod_property! { ImageEffectPropRenderQualityDraft as RenderQualityDraft { get_render_quality_draft() -> Bool } }
 
-pub mod image_effect_instance {
+mod_property! { ImageEffectInstancePropSequentialRender as SequentialRender { get_sequential_render() -> Bool } }
+
+mod_property! { ImageClipPropConnected as Connected { get_connected() -> Bool }}
+mod_property! { ImageClipPropUnmappedComponents as UnmappedComponents { get_unmapped_components() -> CString as enum ImageComponent} }
+mod_property! { ImageClipPropUnmappedPixelDepth as UnmappedPixelDepth { get_unmapped_pixel_depth() -> CString as enum BitDepth } }
+mod_property! { ImageClipPropOptional as Optional { get_optional() -> Bool; set_optional(Bool) } }
+
+
+mod_property! { ImagePropRowBytes as RowBytes { get_row_bytes() -> Int } }
+mod_property! { ImagePropBounds as Bounds { get_bounds() -> RectI } }
+mod_property! { ImagePropData as Data { get_data() -> VoidPtrMut } }
+mod_property! { ImagePropField as Field { get_field() -> CString as enum ImageField } }
+mod_property! { ImagePropPixelAspectRatio as PixelAspectRatio { get_pixel_aspect_ratio() -> Double } }
+// there are two RegionOfDefinition, one for clips and one for images,
+mod_property! { ImagePropRegionOfDefinition as RegionOfDefinition { get_region_of_definition() -> RectI } }
+mod_property! { ImagePropUniqueIdentifier as UniqueIdentifier { get_unique_identifier() -> String } }
+
+mod_property! { ParamPropEnabled as Enabled { get_enabled() -> Bool; set_enabled(Bool) } }
+mod_property! { ParamPropHint as Hint { get_hint() -> String; set_hint(&str) } }
+mod_property! { ParamPropParent as Parent { get_parent() -> String; set_parent(&str) } }
+mod_property! { ParamPropScriptName as ScriptName { get_script_name() -> String; set_script_name(&str) } }
+
+pub mod double {
 	use super::*;
-	property!(ImageEffectInstancePropSequentialRender as SequentialRender: () -> Bool);
+	property!(ParamPropDoubleType as DoubleType: (&[u8]) -> CString);
+	property!(ParamPropDefault as Default: Double);
+	property!(ParamPropDisplayMax as DisplayMax: Double);
+	property!(ParamPropDisplayMin as DisplayMin: Double);
 }
 
-pub mod image_clip {
+pub mod boolean {
 	use super::*;
-	property!(ImageClipPropConnected as Connected: () -> Bool);
-	property!(ImageClipPropUnmappedComponents as UnmappedComponents: () -> CString);
-	property!(ImageClipPropUnmappedPixelDepth as UnmappedPixelDepth: () -> CString);
-
-	property!(ImageClipPropOptional as Optional: Bool);
+	property!(ParamPropDefault as Default: Bool);
 }
 
-get_property!(CanGetUnmappedComponents => get_unmapped_components, image_clip::UnmappedComponents, enum ImageComponent);
-get_property!(CanGetUnmappedPixelDepth => get_unmapped_pixel_depth, image_clip::UnmappedPixelDepth, enum BitDepth);
-
-pub mod image {
+pub mod page {
 	use super::*;
-	property!(ImagePropRowBytes as RowBytes: () -> Int);
-	property!(ImagePropBounds as Bounds: () -> RectI);
-	property!(ImagePropData as Data: () -> VoidPtrMut);
-	property!(ImagePropField as Field: () -> CString);
-	property!(ImagePropPixelAspectRatio as PixelAspectRatio: () -> Double);
-	property!(ImagePropRegionOfDefinition as RegionOfDefinition: () -> RectI);
-	property!(ImagePropUniqueIdentifier as UniqueIdentifier: () -> String);
+	property!(ParamPropPageChild as Child: (&str) -> String);
 }
 
-pub mod param {
+#[allow(non_snake_case)]
+pub mod Children {
 	use super::*;
-	property!(ParamPropEnabled as Enabled: Bool);
-	property!(ParamPropHint as Hint: (&str) -> String);
-	property!(ParamPropParent as Parent: (&str) -> String);
-	property!(ParamPropScriptName as ScriptName: (&str) -> String);
-	pub mod double {
-		use super::super::*;
-		property!(ParamPropDoubleType as DoubleType: (&[u8]) -> CString);
-		property!(ParamPropDefault as Default: Double);
-		property!(ParamPropDisplayMax as DisplayMax: Double);
-		property!(ParamPropDisplayMin as DisplayMin: Double);
-	}
-	pub mod boolean {
-		use super::super::*;
-		property!(ParamPropDefault as Default: Bool);
-	}
-	pub mod page {
-		use super::super::*;
-		property!(ParamPropPageChild as Child: (&str) -> String);
-	}
+	set_property!(CanSet => set_children, page::Child, &seq[&str]);
 }
+pub use Children::CanSet as CanSetChildren;
 
 #[allow(non_snake_case)]
 pub mod Labels {
 	use super::*;
-	pub trait CanSet: Label::CanSet {
-		set_property!(set_short_label, &ShortLabel::Property);
-		set_property!(set_long_label, &LongLabel::Property);
+	pub trait CanSet: Label::CanSet + ShortLabel::CanSet + LongLabel::CanSet {
 		fn set_labels(&mut self, label: &str, short: &str, long: &str) -> Result<()> {
 			self.set_label(label)?;
 			self.set_short_label(short)?;
@@ -730,13 +738,9 @@ pub mod Labels {
 			Ok(())
 		}
 	}
-	pub trait CanGet: Label::CanGet {
-		get_property!(get_short_label, ShortLabel::Property);
-		get_property!(get_long_label, LongLabel::Property);
-	}
 }
-pub use Labels::CanGet as CanGetLabels;
-pub use Labels::CanSet as CanSetLabels;
+
+impl <T> Labels::CanSet for T where T: Label::CanSet + ShortLabel::CanSet + LongLabel::CanSet {}
 
 #[allow(non_snake_case)]
 pub mod NameRaw {
@@ -749,34 +753,19 @@ pub mod NameRaw {
 }
 pub use NameRaw::CanSet as CanSetNameRaw;
 
-
-
-set_property!(CanSetOptional => set_optional, image_clip::Optional);
-
-get_property!(CanGetEnabled => get_enabled, param::Enabled);
-set_property!(CanSetEnabled => set_enabled, param::Enabled);
-get_property!(CanGetConnected => get_connected, image_clip::Connected);
-set_property!(CanSetHint => set_hint, &param::Hint);
-set_property!(CanSetParent => set_parent, &param::Parent);
-set_property!(CanSetScriptName => set_script_name, &param::ScriptName);
-set_property!(CanSetChildren => set_children, param::page::Child, &seq[&str]);
-
-
-get_property!(CanGetBounds => get_bounds, image::Bounds);
-get_property!(CanGetData => get_data, image::Data);
-// there are two RegionOfDefinition, one for clips and one for images,
-get_property!(CanGetPixelAspectRatio => get_region_of_definition, image::PixelAspectRatio);
-get_property!(CanGetImageRegionOfDefinition => get_region_of_definition, image::RegionOfDefinition);
-get_property!(CanGetRowBytes => get_row_bytes, image::RowBytes);
-
-pub trait CanSetDoubleParams: Writable {
-	set_property!(set_double_type, param::double::DoubleType, enum ParamDoubleType);
-	set_property!(set_default, param::double::Default);
-	set_property!(set_display_max, param::double::DisplayMax);
-	set_property!(set_display_min, param::double::DisplayMin);
+#[allow(non_snake_case)]
+pub mod DoubleParams {
+	use super::*;
+pub trait CanSet: Writable {
+	set_property!(set_double_type, double::DoubleType, enum ParamDoubleType);
+	set_property!(set_default, double::Default);
+	set_property!(set_display_max, double::DisplayMax);
+	set_property!(set_display_min, double::DisplayMin);
 }
+}
+pub use DoubleParams::CanSet as CanSetDoubleParams;
 
-set_property!(CanSetBooleanParams => set_default, param::boolean::Default);
+set_property!(CanSetBooleanParams => set_default, boolean::Default);
 
 macro_rules! capabilities {
 	($trait:ty => $($capability:ty),*) => {
@@ -801,13 +790,65 @@ capabilities! { HostHandle =>
 	Name::CanGet,
 	Version::CanGet,
 	VersionLabel::CanGet,
+	IsBackground::CanGet,
+	SupportsOverlays::CanGet,
+	SupportsMultiResolution::CanGet,
+	SupportsTiles::CanGet,
+	TemporalClipAccess::CanGet,
+	SupportedComponents::CanGet,
 	SupportsMultipleClipDepths::CanGet,
-	TemporalClipAccess::CanGet
+	SupportsMultipleClipPARs::CanGet,
+	SetableFrameRate::CanGet,
+	SetableFielding::CanGet,
+	SupportsCustomInteract::CanGet,
+	SupportsStringAnimation::CanGet,
+	SupportsChoiceAnimation::CanGet,
+	SupportsBooleanAnimation::CanGet,
+	SupportsCustomAnimation::CanGet,
+	MaxParameters::CanGet,
+	MaxPages::CanGet,
+	PageRowColumnCount::CanGet,
+	HostOSHandle::CanGet,
+	SupportsParametricAnimation::CanGet,
+	SequentialRender::CanGet,
+	OpenGLRenderSupported::CanGet,
+	RenderQualityDraft::CanGet,
+	NativeOrigin::CanGet
+}
+
+capabilities! { EffectDescriptorProperties =>
+	Type::CanGet,
+	Label::CanGet, Label::CanSet, 
+	LongLabel::CanGet, LongLabel::CanSet, 
+	ShortLabel::CanGet, ShortLabel::CanSet, 
+	Labels::CanSet,
+	Version::CanGet,
+	VersionLabel::CanGet,
+	PluginDescription::CanGet, PluginDescription::CanSet,
+	SupportedContexts::CanGet, SupportedContexts::CanSet,
+	Grouping::CanGet, Grouping::CanSet,
+	SingleInstance::CanGet, SingleInstance::CanSet,
+	RenderThreadSafety::CanGet, RenderThreadSafety::CanSet,
+	HostFrameThreading::CanGet, HostFrameThreading::CanSet,
+//  OverlayInteractV1::CanGet, OverlayInteractV1::CanSet,
+	SupportsTiles::CanGet, SupportsTiles::CanSet,
+	SupportsMultiResolution::CanGet, SupportsMultiResolution::CanSet,
+	TemporalClipAccess::CanGet, TemporalClipAccess::CanSet,
+	SupportedPixelDepths::CanSet, SupportedPixelDepths::CanGet,
+	FieldRenderTwiceAlways::CanSet, FieldRenderTwiceAlways::CanGet,
+	SupportsMultipleClipDepths::CanGet, SupportsMultipleClipDepths::CanSet,
+	SupportsMultipleClipPARs::CanGet, SupportsMultipleClipPARs::CanSet,	
+	OpenGLRenderSupported::CanGet, OpenGLRenderSupported::CanSet,	
+//	ClipPreferencesSlaveParam,	
+	FilePath::CanGet
 }
 
 capabilities! { ImageEffectProperties =>
 	Type::CanGet,
-	Label::CanGet, Label::CanSet, Labels::CanSet,
+	Label::CanGet, Label::CanSet, 
+	LongLabel::CanGet, LongLabel::CanSet, 
+	ShortLabel::CanGet, ShortLabel::CanSet, 
+	Labels::CanSet,
 	Version::CanGet,
 	VersionLabel::CanGet,
 	Grouping::CanGet, Grouping::CanSet,
@@ -822,41 +863,41 @@ capabilities! { ImageEffectProperties =>
 capabilities! { ClipProperties =>
 	Type::CanGet,
 	SupportedComponents::CanGet, SupportedComponents::CanSet,
-	CanSetOptional, CanGetConnected,
+	Optional::CanSet, Connected::CanGet,
 	TemporalClipAccess::CanGet, TemporalClipAccess::CanSet
 }
 
 // Clip Instance
 capabilities! { ImageClipHandle =>
 	Type::CanGet,
-	CanGetConnected, FrameRange::CanGet,
-	Components::CanGet, CanGetUnmappedComponents,
-	PixelDepth::CanGet, CanGetUnmappedPixelDepth
+	Connected::CanGet, FrameRange::CanGet,
+	Components::CanGet, UnmappedComponents::CanGet,
+	PixelDepth::CanGet, UnmappedPixelDepth::CanGet
 }
 
 capabilities! { ImageHandle =>
 	Type::CanGet,
-	CanGetBounds,
-	CanGetData,
-	CanGetRowBytes,
-	CanGetImageRegionOfDefinition,
-	CanGetPixelAspectRatio,
+	Bounds::CanGet,
+	Data::CanGet,
+	RowBytes::CanGet,
+	RegionOfDefinition::CanGet,
+	PixelAspectRatio::CanGet,
 	PixelDepth::CanGet,
 	PreMultiplication::CanGet,
 	Components::CanGet,
-	CanGetUnmappedPixelDepth,
-	CanGetUnmappedComponents
+	UnmappedPixelDepth::CanGet,
+	UnmappedComponents::CanGet
 }
 
 capability_group! { BaseParam =>
-	Label::CanSet, CanSetHint, CanSetParent, CanSetScriptName, CanSetEnabled, CanGetEnabled
+	Label::CanSet, Hint::CanSet, Parent::CanSet, ScriptName::CanSet, Enabled::CanSet, Enabled::CanGet
 }
 
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
 
-capabilities! { ParamDoubleProperties => BaseParam, CanSetDoubleParams }
+capabilities! { ParamDoubleProperties => BaseParam, DoubleParams::CanSet }
 capabilities! { ParamBooleanProperties => BaseParam, CanSetBooleanParams }
-capabilities! { ParamPageProperties => BaseParam, CanSetChildren }
+capabilities! { ParamPageProperties => BaseParam, Children::CanSet }
 capabilities! { ParamGroupProperties => BaseParam }
 
 capabilities! { DescribeInContextInArgs => Context::CanGet }
@@ -865,7 +906,7 @@ capabilities! { IsIdentityInArgs => Time::CanGet, FieldToRender::CanGet, RenderW
 capabilities! { IsIdentityOutArgs => Name::CanSet, Time::CanSet }
 
 capabilities! { GetRegionOfDefinitionInArgs => Time::CanGet, RegionOfDefinition::CanGet }
-capabilities! { GetRegionOfDefinitionOutArgs => RegionOfDefinition::CanSet }
+capabilities! { GetRegionOfDefinitionOutArgs => EffectRegionOfDefinition::CanSet }
 
 capabilities! { GetRegionsOfInterestInArgs => RegionOfInterest::CanGet }
 capabilities! { GetRegionsOfInterestOutArgs => RawWritable, RegionOfInterest::CanSet }
@@ -879,7 +920,9 @@ capabilities! { EndInstanceChangedInArgs => ChangeReason::CanGet}
 
 capabilities! { RenderInArgs =>
 	Time::CanGet,
-	FieldToRender::CanGet, RenderWindow::CanGet, RenderScale::CanGet,
+	FieldToRender::CanGet, 
+	RenderWindow::CanGet,
+	RenderScale::CanGet,
 	SequentialRenderStatus::CanGet,
 	InteractiveRenderStatus::CanGet,
 	RenderQualityDraft::CanGet

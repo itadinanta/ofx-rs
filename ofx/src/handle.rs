@@ -377,6 +377,7 @@ macro_rules! properties_newtype {
 }
 
 properties_newtype!(HostProperties);
+properties_newtype!(EffectDescriptorProperties);
 properties_newtype!(ImageEffectProperties);
 properties_newtype!(ClipProperties);
 
@@ -430,6 +431,23 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 		)))
 	}
 }
+
+impl HasProperties<EffectDescriptorProperties> for ImageEffectHandle {
+	fn properties(&self) -> Result<EffectDescriptorProperties> {
+		let property_set_handle = {
+			let mut property_set_handle = std::ptr::null_mut();
+
+			suite_fn!(getPropertySet in self.image_effect; self.inner, &mut property_set_handle as *mut _)?;
+
+			property_set_handle
+		};
+		Ok(EffectDescriptorProperties(PropertySetHandle::new(
+			property_set_handle,
+			self.property.clone(),
+		)))
+	}
+}
+
 
 impl ImageEffectHandle {
 	fn clip_define(&self, clip_name: &[u8]) -> Result<ClipProperties> {
@@ -512,7 +530,7 @@ impl ImageEffectHandle {
 	where
 		T: Sized,
 	{
-		let mut effect_props = self.properties()?;
+		let mut effect_props: ImageEffectProperties = self.properties()?;
 		let data_box = Box::new(data);
 		let data_ptr = Box::into_raw(data_box);
 		let status = suite_fn!(propSetPointer in self.property;
@@ -526,7 +544,7 @@ impl ImageEffectHandle {
 	}
 
 	fn get_instance_data_ptr(&self) -> Result<VoidPtrMut> {
-		let mut effect_props = self.properties()?;
+		let mut effect_props: ImageEffectProperties = self.properties()?;
 		let mut data_ptr = std::ptr::null_mut();
 		to_result! { suite_call!(propGetPointer in self.property;
 		   effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0, &mut data_ptr)
