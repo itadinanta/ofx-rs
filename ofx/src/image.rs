@@ -387,14 +387,21 @@ pixel_format_yuva!(YUVAColourS, u16);
 pixel_format_yuva!(YUVAColourF, f32);
 
 #[derive(Clone)]
-pub struct ImageBuffer<'a, T> {
+pub struct ImageBuffer<T>
+where
+	T: PixelFormat,
+{
 	bounds: RectI,
 	row_bytes: isize,
 	t_size: usize,
 	data: VoidPtrMut,
+	pixel_type: PhantomData<T>,
 }
 
-impl<'a, T> ImageBuffer<'a, T> {
+impl<T> ImageBuffer<T>
+where
+	T: PixelFormat,
+{
 	fn new(bounds: RectI, row_bytes: Int, data: VoidPtrMut) -> Self {
 		let t_size = std::mem::size_of::<T>();
 		ImageBuffer {
@@ -402,6 +409,7 @@ impl<'a, T> ImageBuffer<'a, T> {
 			row_bytes: row_bytes as isize,
 			t_size,
 			data,
+			pixel_type: PhantomData,
 		}
 	}
 
@@ -464,28 +472,35 @@ impl<'a, T> ImageBuffer<'a, T> {
 			row_bytes: self.row_bytes,
 			t_size: self.t_size,
 			data: self.data.offset(self.byte_offset(self.bounds.x1, y1)),
+			pixel_type: PhantomData,
 		}
+	}
+	
+	fn chunks_mut(&self, y1: Int, y2: Int) -> Vec<ImageBuffer<T>> {
+		
+		
 	}
 }
 
-pub struct RowWalk<'a, T>
+pub struct RowWalk<T>
 where
 	T: PixelFormat,
 {
-	src: ImageBuffer<'a, T>,
+	src: ImageBuffer<T>,
 	current_y: Int,
 	last_y: Int,
 }
 
-impl<'a, T> RowWalk<'a, T> where T: PixelFormat {}
+impl<T> RowWalk<T> where T: PixelFormat {}
 
-impl<'a, T> Iterator for RowWalk<'a, T>
+impl<'a, T> Iterator for RowWalk<T>
 where
-	T: PixelFormat + 'a,
+	T: PixelFormat,
+	Self: 'a,
 {
 	type Item = &'a mut [T];
 
-	fn next(&'a mut self) -> Option<&'a [T]> {
+	fn next(&mut self) -> Option<&[T]> {
 		if self.current_y < self.last_y {
 			let row = self.src.row(self.current_y);
 			self.current_y = 1;
@@ -501,23 +516,23 @@ pub struct ImageDescriptor<'a, T>
 where
 	T: PixelFormat,
 {
-	data: ImageBuffer<'a, T>,
+	data: ImageBuffer<T>,
 }
 
-pub struct ImageDescriptorMut<'a, T>
+pub struct ImageDescriptorMut<T>
 where
 	T: PixelFormat,
 {
-	data: ImageBuffer<'a, T>,
+	data: ImageBuffer<T>,
 }
 
-pub struct ImageTileMut<'a, T>
+pub struct ImageTileMut<T>
 where
 	T: PixelFormat,
 {
 	pub y1: Int,
 	pub y2: Int,
-	data: ImageBuffer<'a, T>,
+	data: ImageBuffer<T>,
 }
 
 impl<'a, T> ImageDescriptor<'a, T>
@@ -525,8 +540,9 @@ where
 	T: PixelFormat,
 {
 	pub fn new(bounds: RectI, row_bytes: Int, ptr: VoidPtrMut) -> Self {
-		let data = ImageBuffer::new(bounds, row_bytes, ptr);
-		ImageDescriptor { data }
+		ImageDescriptor {
+			data: ImageBuffer::new(bounds, row_bytes, ptr),
+		}
 	}
 
 	pub fn row(&self, y: Int) -> &[T] {
@@ -534,21 +550,28 @@ where
 	}
 
 	pub fn row_range<'s>(&self, x1: Int, x2: Int, y: Int) -> &[T] {
-		self.row()[x1 - self.data.bounds.x1..x2 - self.data.bounds.x1]
+		let slice = self.row(y);
+		&slice[(x1 - self.data.bounds.x1) as usize..(x2 - self.data.bounds.x1) as usize]
 	}
 }
 
-impl<'a, T> ImageDescriptorMut<'a, T>
+impl<T> ImageDescriptorMut<T>
 where
 	T: PixelFormat,
 {
 	pub fn new(bounds: RectI, row_bytes: Int, ptr: VoidPtrMut) -> Self {
-		let metrics = ImageMetrics::new(bounds, row_bytes, std::mem::size_of::<T>());
-		let length = metrics.length();
 		ImageDescriptorMut {
-			metrics,
-			data: unsafe { std::slice::from_raw_parts_mut(ptr as *mut T, length) },
+			data: ImageBuffer::new(bounds, row_bytes, ptr),
 		}
+	}
+
+	pub fn row(&self, y: Int) -> &mut [T] {
+		self.data.row_mut(y)
+	}
+
+	pub fn row_range<'s>(&self, x1: Int, x2: Int, y: Int) -> &mut [T] {
+		let slice = self.row(y);
+		&mut slice[(x1 - self.data.bounds.x1) as usize..(x2 - self.data.bounds.x1) as usize]
 	}
 
 	pub fn into_tiles(self, count: usize) -> Vec<ImageTileMut<'a, T>> {
