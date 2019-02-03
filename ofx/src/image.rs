@@ -1,4 +1,5 @@
 use enums::{BitDepth, ImageComponent};
+use std::marker::PhantomData;
 use types::*;
 
 pub trait ChannelFormat {
@@ -385,51 +386,184 @@ pixel_format_yuva!(YUVAColourB, u8);
 pixel_format_yuva!(YUVAColourS, u16);
 pixel_format_yuva!(YUVAColourF, f32);
 
-#[derive(Clone)]
-pub struct ImageMetrics {
+pub struct ImageBuffer<'a, T>
+where
+	T: PixelFormat,
+{
 	bounds: RectI,
 	row_bytes: isize,
-	stride: isize,
-	width: usize,
-	height: usize,
-	length: usize,
 	t_size: usize,
+	data: &'a mut u8,
+	pixel_type: PhantomData<T>,
 }
 
-impl ImageMetrics {
-	pub fn new(bounds: RectI, row_bytes: Int, t_size: usize) -> Self {
-		let row_bytes = row_bytes as isize;
-		let width = (bounds.x2 - bounds.x1).abs() as usize;
-		let height = (bounds.y2 - bounds.y1).abs() as usize;
-		let stride = (row_bytes as usize / t_size) as isize;
-		let length = stride.abs() as usize * height;
-		ImageMetrics {
-			bounds,
-			row_bytes,
-			stride,
-			t_size,
-			width,
-			height,
-			length,
+impl<'a, T> Clone for ImageBuffer<'a, T>
+where
+	T: PixelFormat,
+{
+	fn clone(&self) -> Self {
+		// TODO: possibly unsound
+		let data = self.data as *const u8;
+		ImageBuffer {
+			bounds: self.bounds,
+			row_bytes: self.row_bytes,
+			t_size: self.t_size,
+			data: unsafe { &mut *(data as *mut u8) },
+			pixel_type: PhantomData,
 		}
 	}
-	pub fn bounds(&self) -> RectI {
+}
+
+impl<'a, T> ImageBuffer<'a, T>
+where
+	T: PixelFormat,
+{
+	fn new(bounds: RectI, row_bytes: Int, data: *mut u8) -> Self {
+		let t_size = std::mem::size_of::<T>();
+		ImageBuffer {
+			bounds,
+			row_bytes: row_bytes as isize,
+			t_size,
+			data: unsafe { &mut *data },
+			pixel_type: PhantomData,
+		}
+	}
+
+	#[inline]
+	fn byte_offset(&self, x: Int, y: Int) -> isize {
+		(y - self.bounds.y1) as isize * self.row_bytes + (x - self.bounds.x1) as isize
+	}
+
+	fn bounds(&self) -> RectI {
 		self.bounds
 	}
 
-	#[inline]
-	pub fn length(&self) -> usize {
-		self.length
+	fn bytes(&self) -> usize {
+		self.row_bytes.abs() as usize * (self.bounds.y2 - self.bounds.y1) as usize
 	}
 
-	#[inline]
-	pub fn dimensions(&self) -> (usize, usize) {
-		(self.width, self.height)
+	fn dimensions(&self) -> (u32, u32) {
+		(
+			(self.bounds.x2 - self.bounds.x1) as u32,
+			(self.bounds.y2 - self.bounds.y1) as u32,
+		)
 	}
 
-	#[inline]
-	pub fn pixel_offset(&self, x: Int, y: Int) -> isize {
-		(y - self.bounds.y1) as isize * self.stride + (x - self.bounds.x1) as isize
+	fn pixel_bytes(&self) -> usize {
+		self.t_size
+	}
+
+	fn ptr(&self, offset: isize) -> *const u8 {
+		unsafe {
+			let ptr: *const u8 = &*self.data;
+			ptr.offset(offset)
+		}
+	}
+
+	fn ptr_mut(&mut self, offset: isize) -> *mut u8 {
+		unsafe {
+			let ptr: *mut u8 = &mut *self.data;
+			ptr.offset(offset)
+		}
+	}
+
+	fn make_slice(&self, x: Int, y: Int, length: usize) -> &[T] {
+		let start = self.byte_offset(x, y);
+		unsafe { std::slice::from_raw_parts(self.ptr(start) as *const T, length) }
+	}
+
+	fn make_slice_mut(&mut self, x: Int, y: Int, length: usize) -> &mut [T] {
+		let start = self.byte_offset(x, y);
+		unsafe { std::slice::from_raw_parts_mut(self.ptr_mut(start) as *mut T, length) }
+	}
+
+	fn row(&self, y: Int) -> &[T] {
+		self.make_slice(
+			self.bounds.x1,
+			y,
+			(self.bounds.x2 - self.bounds.x1) as usize,
+		)
+	}
+
+	fn row_mut(&mut self, y: Int) -> &mut [T] {
+		let x1 = self.bounds.x1;
+		let x2 = self.bounds.x2;
+		self.make_slice_mut(x1, y, (x2 - x1) as usize)
+	}
+
+	fn chunk(&mut self, y1: Int, y2: Int) -> Self {
+		let y1 = y1.max(self.bounds.y1);
+		let y2 = y2.min(self.bounds.y2);
+		let bounds = RectI {
+			x1: self.bounds.x1,
+			y1,
+			x2: self.bounds.x2,
+			y2,
+		};
+		debug!("Chunk {}-{}", y1, y2);
+		// TODO: potentially unsound
+		let offset = self.byte_offset(self.bounds.x1, y1);
+		let ptr_mut = self.ptr_mut(offset);
+		let data = unsafe { &mut *ptr_mut };
+		ImageBuffer {
+			bounds,
+			row_bytes: self.row_bytes,
+			t_size: self.t_size,
+			data,
+			pixel_type: PhantomData,
+		}
+	}
+
+	pub fn chunks_mut(mut self, chunk_size: usize) -> impl Iterator<Item = ImageBuffer<'a, T>> {
+		let rows = (self.bounds.y2 - self.bounds.y1) as usize;
+		let n_chunks = (rows + chunk_size - 1) / chunk_size;
+		let rows_per_chunk = chunk_size;
+		let y1 = self.bounds.y1;
+		(0..n_chunks).map(move |chunk| {
+			self.chunk(
+				y1 + (chunk * rows_per_chunk) as Int,
+				y1 + ((chunk + 1) * rows_per_chunk) as Int,
+			)
+		})
+	}
+}
+
+pub struct Row<'a, T>
+where
+	T: PixelFormat,
+{
+	y: Int,
+	data: ImageBuffer<'a, T>,
+}
+
+pub struct RowWalk<'a, T>
+where
+	T: PixelFormat,
+{
+	data: ImageBuffer<'a, T>,
+	y: Int,
+	last_y: Int,
+}
+
+impl<'a, T> RowWalk<'a, T> where T: PixelFormat {}
+
+impl<'a, T> Iterator for RowWalk<'a, T>
+where
+	T: PixelFormat,
+{
+	type Item = Row<'a, T>;
+
+	fn next(&mut self) -> Option<Row<'a, T>> {
+		if self.y < self.last_y {
+			let row = Row {
+				data: self.data.clone(),
+				y: self.y,
+			};
+			self.y += 1;
+			Some(row)
+		} else {
+			None
+		}
 	}
 }
 
@@ -438,62 +572,42 @@ pub struct ImageDescriptor<'a, T>
 where
 	T: PixelFormat,
 {
-	metrics: ImageMetrics,
-	data: &'a [T],
+	data: ImageBuffer<'a, T>,
 }
 
 pub struct ImageDescriptorMut<'a, T>
 where
 	T: PixelFormat,
 {
-	metrics: ImageMetrics,
-	data: &'a mut [T],
+	data: ImageBuffer<'a, T>,
 }
 
 pub struct ImageTileMut<'a, T>
 where
 	T: PixelFormat,
 {
-	metrics: ImageMetrics,
 	pub y1: Int,
 	pub y2: Int,
-	data: &'a mut [T],
+	data: ImageBuffer<'a, T>,
 }
 
 impl<'a, T> ImageDescriptor<'a, T>
 where
 	T: PixelFormat,
 {
-	pub fn new(bounds: RectI, row_bytes: Int, ptr: VoidPtr) -> Self {
-		let metrics = ImageMetrics::new(bounds, row_bytes, std::mem::size_of::<T>());
-		let length = metrics.length();
+	pub fn new(bounds: RectI, row_bytes: Int, ptr: VoidPtrMut) -> Self {
 		ImageDescriptor {
-			metrics,
-			data: unsafe { std::slice::from_raw_parts(ptr as *const T, length) },
+			data: ImageBuffer::new(bounds, row_bytes, ptr as *mut u8),
 		}
 	}
 
-	fn make_slice(&self, x: Int, y: Int, width: usize) -> &[T] {
-		let start = self.metrics.pixel_offset(x, y);
-		assert!(start >= 0); // is this the case?
-		&self.data[start as usize..start as usize + width]
+	pub fn row(&self, y: Int) -> &[T] {
+		self.data.row(y)
 	}
 
-	pub fn as_slice(&self) -> &[T] {
-		let x = self.metrics.bounds.x1;
-		let y = self.metrics.bounds.y1;
-		let length = self.metrics.length();
-		self.make_slice(x, y, length)
-	}
-
-	pub fn row_as_slice(&self, y: Int) -> &[T] {
-		let x = self.metrics.bounds.x1;
-		let (width, _) = self.metrics.dimensions();
-		self.make_slice(x, y, width as usize)
-	}
-
-	pub fn row_range_as_slice(&self, x1: Int, x2: Int, y: Int) -> &[T] {
-		self.make_slice(x1, y, (x2 - x1) as usize)
+	pub fn row_range(&self, x1: Int, x2: Int, y: Int) -> &[T] {
+		let slice = self.row(y);
+		&slice[(x1 - self.data.bounds.x1) as usize..(x2 - self.data.bounds.x1) as usize]
 	}
 }
 
@@ -502,31 +616,33 @@ where
 	T: PixelFormat,
 {
 	pub fn new(bounds: RectI, row_bytes: Int, ptr: VoidPtrMut) -> Self {
-		let metrics = ImageMetrics::new(bounds, row_bytes, std::mem::size_of::<T>());
-		let length = metrics.length();
 		ImageDescriptorMut {
-			metrics,
-			data: unsafe { std::slice::from_raw_parts_mut(ptr as *mut T, length) },
+			data: ImageBuffer::new(bounds, row_bytes, ptr as *mut u8),
 		}
 	}
 
-	pub fn into_tiles(self, count: usize) -> Vec<ImageTileMut<'a, T>> {
-		let rows_per_chunk = self.metrics.height / count;
-		let chunk_size = rows_per_chunk * self.metrics.width;
-		let height = self.metrics.height;
-		let metrics = self.metrics.clone();
+	pub fn row(&mut self, y: Int) -> &mut [T] {
+		self.data.row_mut(y)
+	}
+
+	pub fn row_range(&mut self, x1: Int, x2: Int, y: Int) -> &mut [T] {
+		let x0 = self.data.bounds.x1;
+		let slice = self.row(y);
+		let x1 = (x1 - x0) as usize;
+		let x2 = (x2 - x0) as usize;
+		&mut slice[x1..x2]
+	}
+
+	pub fn into_tiles(self, n_chunks: usize) -> Vec<ImageTileMut<'a, T>> {
+		let (width, height) = self.data.dimensions();
+		let rows_per_chunk = height as usize / n_chunks;
 		self.data
-			.chunks_mut(chunk_size)
+			.chunks_mut(rows_per_chunk as usize)
 			.enumerate()
 			.map(|(chunk_index, chunk)| {
-				let y1 = chunk_index * rows_per_chunk;
-				let y2 = height.min(y1 + rows_per_chunk);
-				ImageTileMut {
-					metrics: metrics.clone(),
-					y1: y1 as i32,
-					y2: y2 as i32,
-					data: chunk,
-				}
+				let y1 = (chunk_index * rows_per_chunk) as Int;
+				let y2 = (height as Int).min(y1 + rows_per_chunk as Int);
+				ImageTileMut::new(y1, y2, chunk)
 			})
 			.collect()
 	}
@@ -536,26 +652,19 @@ impl<'a, T> ImageTileMut<'a, T>
 where
 	T: PixelFormat,
 {
-	fn make_slice(&mut self, x: Int, y: Int, length: usize) -> &mut [T] {
-		let start = self.metrics.pixel_offset(x, y - self.y1);
-		assert!(start >= 0); // is this the case?
-		&mut self.data[start as usize..start as usize + length]
+	pub fn new(y1: Int, y2: Int, data: ImageBuffer<'a, T>) -> Self {
+		ImageTileMut { y1, y2, data }
 	}
 
-	pub fn as_slice(&mut self) -> &mut [T] {
-		let x = self.metrics.bounds.x1;
-		let y = self.metrics.bounds.y1;
-		let length = self.metrics.length();
-		self.make_slice(x, y, length)
+	pub fn row(&mut self, y: Int) -> &mut [T] {
+		self.data.row_mut(y)
 	}
 
-	pub fn row_as_slice(&mut self, y: Int) -> &mut [T] {
-		let x = self.metrics.bounds.x1;
-		let (width, _) = self.metrics.dimensions();
-		self.make_slice(x, y, width)
-	}
-
-	pub fn row_range_as_slice(&mut self, x1: Int, x2: Int, y: Int) -> &mut [T] {
-		self.make_slice(x1, y, (x2 - x1) as usize)
+	pub fn row_range(&mut self, x1: Int, x2: Int, y: Int) -> &mut [T] {
+		let x0 = self.data.bounds.x1;
+		let slice = self.row(y);
+		let x1 = (x1 - x0) as usize;
+		let x2 = (x2 - x0) as usize;
+		&mut slice[x1..x2]
 	}
 }

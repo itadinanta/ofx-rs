@@ -150,13 +150,8 @@ where
 		let scale = self.scale;
 		let proc_window = self.render_window;
 		for y in self.dst.y1.max(proc_window.y1)..self.dst.y2.min(proc_window.y2) {
-			let dst_row = self
-				.dst
-				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
-
-			let src_row = self
-				.src
-				.row_range_as_slice(proc_window.x1, proc_window.x2, y);
+			let dst_row = self.dst.row_range(proc_window.x1, proc_window.x2, y);
+			let src_row = self.src.row_range(proc_window.x1, proc_window.x2, y);
 
 			if self.instance.abort()? {
 				break;
@@ -165,7 +160,7 @@ where
 			let src_mask = self
 				.mask
 				.as_ref()
-				.map(|mask| mask.row_range_as_slice(proc_window.x1, proc_window.x2, y));
+				.map(|mask| mask.row_range(proc_window.x1, proc_window.x2, y));
 
 			match src_mask {
 				None => {
@@ -545,9 +540,9 @@ impl Execute for SimplePlugin {
 				let mut effect_properties: EffectDescriptorProperties = effect.properties()?;
 				effect_properties.set_grouping("Ofx-rs")?;
 
-				effect_properties.set_label("Ofx-rs simple_plugin sample")?;
-				effect_properties.set_short_label("Ofx-rs simple_plugin")?;
-				effect_properties.set_long_label("Ofx-rs simple_plugin in examples")?;
+				effect_properties.set_label("Ofx-rs basic")?;
+				effect_properties.set_short_label("Ofx-rs basic")?;
+				effect_properties.set_long_label("Ofx-rs basic examples")?;
 
 				effect_properties.set_supported_pixel_depths(&[
 					BitDepth::Byte,
