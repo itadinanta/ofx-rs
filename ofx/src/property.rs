@@ -663,7 +663,7 @@ mod_property! { ImageEffectPropProjectPixelAspectRatio as ProjectPixelAspectRati
 mod_property! { ImageEffectPropFrameRate as FrameRate { get_frame_rate() -> Double; set_frame_rate(Double) } }
 
 mod_property! { ImageEffectPropSupportsOverlays as SupportsOverlays { get_supports_overlays() -> Bool } }
-mod_property! { ImageEffectPropSupportsMultiResolution as SupportsMultiResolution { get_supports_multi_resolution() -> Bool; set_supports_multi_resolution(&Bool) } }
+mod_property! { ImageEffectPropSupportsMultiResolution as SupportsMultiResolution { get_supports_multi_resolution() -> Bool; set_supports_multi_resolution(Bool) } }
 mod_property! { ImageEffectPropSupportsTiles as SupportsTiles { get_supports_tiles() -> Bool; set_supports_tiles(Bool) } }
 mod_property! { ImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths { get_supports_multiple_clip_depths() -> Bool; set_supports_multiple_clip_depths(Bool) } }
 mod_property! { ImageEffectPropSupportsMultipleClipPARs as SupportsMultipleClipPARs { get_supports_multiple_clip_pars() -> Bool; set_supports_multiple_clip_pars(Bool) } }
