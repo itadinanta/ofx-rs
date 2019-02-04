@@ -1,6 +1,6 @@
 [package]
 name = "ofx"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Nicola Orru <nigu.orru@gmail.com>"]
 keywords = ["ofx", "openfx", "effects", "natron", "nuke"]
 #edition = "2018"
@@ -18,6 +18,6 @@ path="src/lib.rs"
 libc = "0.2"
 log="0.4"
 log4rs = "0.8"
-ofx_sys = "0.1.1"
+ofx_sys = "0.2"
 phf = "0.7"
 
