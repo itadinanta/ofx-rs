@@ -4,6 +4,4 @@
 #![allow(clippy::const_static_lifetime)]
 #![allow(clippy::unreadable_literal)]
 
-pub mod support;
-
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
