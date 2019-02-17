@@ -33,7 +33,7 @@ macro_rules! identified_enum {
 				}
 			}
 
-			fn from_bytes(ofx_name: &'static [u8]) -> Option<Self> {
+			fn from_bytes(ofx_name: &[u8]) -> Option<Self> {
 				$(if ofx_name == $value { Some($name::$key) } else)
 				*
 				{ None }
@@ -168,11 +168,25 @@ identified_enum! {
 identified_enum! {
 	pub enum ImageField {
 		None,
-		Lower,
-		Upper,
 		Both,
-		Single,
-		Doubled
+		Lower,
+		Upper
+	}
+}
+
+identified_enum! {
+	pub enum ImageFieldOrder {
+		None => kOfxImageFieldNone,
+		Lower => kOfxImageFieldLower,
+		Upper => kOfxImageFieldUpper
+	}
+}
+
+identified_enum! {
+	pub enum ImageFieldExtraction {
+		Both => kOfxImageFieldBoth,
+		Single => kOfxImageFieldSingle,
+		Doubled => kOfxImageFieldDoubled
 	}
 }
 
