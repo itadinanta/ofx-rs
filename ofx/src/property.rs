@@ -2,7 +2,8 @@
 
 use enums::{
 	BitDepth, Change, HostNativeOrigin, IdentifiedEnum, ImageComponent, ImageEffectContext,
-	ImageEffectRender, ImageField, ImageFieldExtraction, ImageFieldOrder, ParamDoubleType, Type as EType,
+	ImageEffectRender, ImageField, ImageFieldExtraction, ImageFieldOrder, ParamDoubleType,
+	Type as EType,
 };
 use handle::*;
 use ofx_sys::*;
@@ -612,11 +613,32 @@ macro_rules! mod_property {
 
 }
 
-mod_property! { PluginPropFilePath as FilePath { get_file_path() -> String } }
+mod_property! { 
+	PluginPropFilePath as FilePath {
+		get_file_path() -> String 
+	}
+}
 
-mod_property! { PropType as Type { get_type() -> CString as enum EType } }
-mod_property! { PropName as Name { get_name() -> String; set_name(&str) } }
-mod_property! { PropLabel as Label { get_label() -> String; set_label(&str) } }
+mod_property! {
+	PropType as Type { 
+		get_type() -> CString as enum EType
+	}
+}
+
+mod_property! {
+	PropName as Name {
+		get_name() -> String;
+		set_name(&str)
+	}
+}
+
+mod_property! {
+	PropLabel as Label {
+		get_label() -> String;
+		set_label(&str)
+	}
+}
+
 mod_property! { PropShortLabel as ShortLabel { get_short_label() -> String; set_short_label(&str) }}
 mod_property! { PropLongLabel as LongLabel { get_long_label() -> String; set_long_label(&str)}}
 mod_property! { PropVersion as Version { get_version() -> String } }
@@ -718,6 +740,26 @@ mod_property! { ParamPropHint as Hint { get_hint() -> String; set_hint(&str) } }
 mod_property! { ParamPropParent as Parent { get_parent() -> String; set_parent(&str) } }
 mod_property! { ParamPropScriptName as ScriptName { get_script_name() -> String; set_script_name(&str) } }
 
+macro_rules! capability_group {
+	($trait:ident => $capability_head:path, $($capability_tail:path),*) => {
+		pub trait $trait: $capability_head
+			$(+ $capability_tail)*
+			{}
+
+		impl<T> $capability_head for T where T: $trait {}
+		$(impl<T> $capability_tail for T where T: $trait {})
+		*
+	}
+}
+
+capability_group! { BaseParam =>
+	Label::CanSet,
+	Hint::CanSet,
+	Parent::CanSet,
+	ScriptName::CanSet,
+	Enabled::CanSet, Enabled::CanGet
+}
+
 pub mod double {
 	use super::*;
 	property!(ParamPropDoubleType as DoubleType: (&[u8]) -> CString);
@@ -779,224 +821,308 @@ pub mod DoubleParams {
 		set_property!(set_display_min, double::DisplayMin);
 	}
 }
+
 pub use DoubleParams::CanSet as CanSetDoubleParams;
 
-set_property!(CanSetBooleanParams => set_default, boolean::Default);
+#[allow(non_snake_case)]
+pub mod BooleanParams {
+	use super::*;
+	pub trait CanSet: Writable {
+		set_property!(set_default, boolean::Default);
+	}
+}
+
+pub use BooleanParams::CanSet as CanSetBooleanParams;
 
 macro_rules! capabilities {
-	($trait:ty => $($capability:ty),*) => {
-		$(impl $capability for $trait {})
-		*
-	}
+	(@tail $trait:ty => $property:ident read+write) => {
+		impl $property::CanGet for $trait {}
+		impl $property::CanSet for $trait {}
+	};
+
+	(@tail $trait:ty => $property:ident write) => {
+		impl $property::CanSet for $trait {}
+	};
+
+	(@tail $trait:ty => $property:ident read) => {
+		impl $property::CanGet for $trait {}
+	};
+
+	(@tail $trait:ty => $capability:path) => {
+		impl $capability for $trait {}
+	};
+
+	(@tail $trait:ty => $property:ident read+write, $($tail:tt)*) => {
+		impl $property::CanGet for $trait {}
+		impl $property::CanSet for $trait {}
+		capabilities!(@tail $trait => $($tail)*);
+	};
+
+	(@tail $trait:ty => $property:ident write, $($tail:tt)*) => {
+		impl $property::CanSet for $trait {}
+		capabilities!(@tail $trait => $($tail)*);
+	};
+
+	(@tail $trait:ty => $property:ident read, $($tail:tt)*) => {
+		impl $property::CanGet for $trait {}
+		capabilities!(@tail $trait => $($tail)*);
+	};
+
+	(@tail $trait:ty => $capability:path, $($tail:tt)*) => {
+		impl $capability for $trait {}
+		capabilities!(@tail $trait => $($tail)*);
+	};
+
+	($trait:ty => $($tail:tt)*) => {
+		capabilities!(@tail $trait => $($tail)*);
+	};
 }
 
-macro_rules! capability_group {
-	($trait:ident => $capability_head:path, $($capability_tail:path),*) => {
-		pub trait $trait: $capability_head
-			$(+ $capability_tail)*
-			{}
+impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
 
-		impl<T> $capability_head for T where T: $trait {}
-		$(impl<T> $capability_tail for T where T: $trait {})
-		*
-	}
-}
 // https://openfx.readthedocs.io/en/doc/Reference/ofxPropertiesByObject.html#properties-on-an-effect-descriptor
 capabilities! { HostHandle =>
-	Name::CanGet,
-	Label::CanGet,
-	Version::CanGet,
-	VersionLabel::CanGet,
-	IsBackground::CanGet,
-	SupportsOverlays::CanGet,
-	SupportsMultiResolution::CanGet,
-	SupportsTiles::CanGet,
-	TemporalClipAccess::CanGet,
-	SupportedComponents::CanGet,
-	SupportedContexts::CanGet,
-	SupportsMultipleClipDepths::CanGet,
-	SupportsMultipleClipPARs::CanGet,
-	SetableFrameRate::CanGet,
-	SetableFielding::CanGet,
-	SupportsCustomInteract::CanGet,
-	SupportsStringAnimation::CanGet,
-	SupportsChoiceAnimation::CanGet,
-	SupportsBooleanAnimation::CanGet,
-	SupportsCustomAnimation::CanGet,
-	MaxParameters::CanGet,
-	MaxPages::CanGet,
-	PageRowColumnCount::CanGet,
-	HostOSHandle::CanGet,
-	SupportsParametricAnimation::CanGet,
-	SequentialRender::CanGet,
-	OpenGLRenderSupported::CanGet,
-	RenderQualityDraft::CanGet,
-	NativeOrigin::CanGet
+	Name						read,
+	Label						read,
+	Version						read,
+	VersionLabel				read,
+	IsBackground				read,
+	SupportsOverlays			read,
+	SupportsMultiResolution		read,
+	SupportsTiles				read,
+	TemporalClipAccess			read,
+	SupportedComponents			read,
+	SupportedContexts			read,
+	SupportsMultipleClipDepths	read,
+	SupportsMultipleClipPARs	read,
+	SetableFrameRate			read,
+	SetableFielding				read,
+	SupportsCustomInteract		read,
+	SupportsStringAnimation		read,
+	SupportsChoiceAnimation		read,
+	SupportsBooleanAnimation	read,
+	SupportsCustomAnimation		read,
+	MaxParameters				read,
+	MaxPages					read,
+	PageRowColumnCount			read,
+	HostOSHandle				read,
+	SupportsParametricAnimation	read,
+	SequentialRender			read,
+	OpenGLRenderSupported		read,
+	RenderQualityDraft			read,
+	NativeOrigin				read
 }
 
 // TODO: canset should be only exposed in the "Describe" action
 // Effect Descriptor
 capabilities! { EffectDescriptorProperties =>
-	Type::CanGet,
-	Label::CanGet, Label::CanSet,
-	ShortLabel::CanGet, ShortLabel::CanSet,
-	LongLabel::CanGet, LongLabel::CanSet,
-	Version::CanGet,
-	VersionLabel::CanGet,
-	PluginDescription::CanGet, PluginDescription::CanSet,
-	SupportedContexts::CanGet, SupportedContexts::CanSet,
-	Grouping::CanGet, Grouping::CanSet,
-	SingleInstance::CanGet, SingleInstance::CanSet,
-	RenderThreadSafety::CanGet, RenderThreadSafety::CanSet,
-	HostFrameThreading::CanGet, HostFrameThreading::CanSet,
+	Type						read,
+	Label						read+write,
+	ShortLabel					read+write,
+	LongLabel					read+write,
+	Version						read,
+	VersionLabel				read,
+	PluginDescription			read+write,
+	SupportedContexts			read+write,
+	Grouping					read+write,
+	SingleInstance				read+write,
+	RenderThreadSafety			read+write,
+	HostFrameThreading			read+write,
 //	TODO: missing yet
-//  OverlayInteractV1::CanGet, OverlayInteractV1::CanSet,
-	SupportsMultiResolution::CanGet, SupportsMultiResolution::CanSet,
-	SupportsTiles::CanGet, SupportsTiles::CanSet,
-	TemporalClipAccess::CanGet, TemporalClipAccess::CanSet,
-	SupportedPixelDepths::CanSet, SupportedPixelDepths::CanGet,
-	FieldRenderTwiceAlways::CanSet, FieldRenderTwiceAlways::CanGet,
-	SupportsMultipleClipDepths::CanGet, SupportsMultipleClipDepths::CanSet,
-	SupportsMultipleClipPARs::CanGet, SupportsMultipleClipPARs::CanSet,
-	OpenGLRenderSupported::CanGet, OpenGLRenderSupported::CanSet,
-	ClipPreferencesSlaveParam::CanGet, ClipPreferencesSlaveParam::CanSet,
-	FilePath::CanGet,
-	Labels::CanSet
+//  OverlayInteractV1				read, OverlayInteractV1				read+write,
+	SupportsMultiResolution		read+write,
+	SupportsTiles				read+write,
+	TemporalClipAccess			read+write,
+	SupportedPixelDepths		read+write,
+	FieldRenderTwiceAlways		read,
+	SupportsMultipleClipDepths	read+write,
+	SupportsMultipleClipPARs	read+write,
+	OpenGLRenderSupported		read+write,
+	ClipPreferencesSlaveParam	read+write,
+	FilePath					read,
+	// convenience extras
+	Labels						write
 }
 
 // Image Effect Instance
 capabilities! { ImageEffectProperties =>
-	Type::CanGet,
-	Context::CanGet,
-	Label::CanGet,
-	ProjectSize::CanGet,
-	ProjectOffset::CanGet,
-	ProjectExtent::CanGet,
-	ProjectPixelAspectRatio::CanGet,
-	EffectDuration::CanGet,
-	SequentialRender::CanGet, SequentialRender::CanSet,
-	SupportsTiles::CanGet, SupportsTiles::CanSet,
-	SupportsMultiResolution::CanGet, SupportsMultiResolution::CanSet,
-	OpenGLRenderSupported::CanGet, OpenGLRenderSupported::CanSet,
-	FrameRate::CanGet,
-	SupportedPixelDepths::CanSet,
-	IsInteractive::CanGet
+	Type						read,
+	Context						read,
+	Label						read,
+	ProjectSize					read,
+	ProjectOffset				read,
+	ProjectExtent				read,
+	ProjectPixelAspectRatio		read,
+	EffectDuration				read,
+	SequentialRender			read+write,
+	SupportsTiles				read+write,
+	SupportsMultiResolution		read+write,
+	OpenGLRenderSupported		read+write,
+	FrameRate					read,
+	SupportedPixelDepths		read+write,
+	IsInteractive				read
 }
 
 // Clip Descriptor
 capabilities! { ClipProperties =>
-	Type::CanGet,
-	Name::CanGet,
-	Label::CanGet, Label::CanSet,
-	ShortLabel::CanGet, ShortLabel::CanSet,
-	LongLabel::CanGet, LongLabel::CanSet,
-	SupportedComponents::CanGet, SupportedComponents::CanSet,
-	TemporalClipAccess::CanGet, TemporalClipAccess::CanSet,
-	Optional::CanGet, Optional::CanSet,
-	FieldExtraction::CanGet, FieldExtraction::CanSet,
-	IsMask::CanGet, IsMask::CanSet,
-	SupportsTiles::CanGet, SupportsTiles::CanSet
+	Type						read,
+	Name						read,
+	Label						read+write,
+	ShortLabel					read+write,
+	LongLabel					read+write,
+	SupportedComponents			read+write,
+	TemporalClipAccess			read+write,
+	Optional					read+write,
+	FieldExtraction				read+write,
+	IsMask						read+write,
+	SupportsTiles				read+write
 }
 
 // Clip Instance
 capabilities! { ImageClipHandle =>
-	Type::CanGet,
-	Name::CanGet,
-	Label::CanGet,
-	ShortLabel::CanGet,
-	LongLabel::CanGet,
-	SupportedComponents::CanGet,
-	TemporalClipAccess::CanGet,
-	Optional::CanGet,
-	FieldExtraction::CanGet,
-	IsMask::CanGet,
-	SupportsTiles::CanGet,
-	PixelDepth::CanGet,
-	Components::CanGet,
-	UnmappedPixelDepth::CanGet,
-	UnmappedComponents::CanGet,
-	PreMultiplication::CanGet,
-	PixelAspectRatio::CanGet,
-	FrameRate::CanGet,
-	FrameRange::CanGet,
-	FieldOrder::CanGet,
-	Connected::CanGet,
-	UnmappedFrameRange::CanGet,
-	UnmappedFrameRate::CanGet,
-	ContinuousSamples::CanGet
+	Type						read,
+	Name						read,
+	Label						read,
+	ShortLabel					read,
+	LongLabel					read,
+	SupportedComponents			read,
+	TemporalClipAccess			read,
+	Optional					read,
+	FieldExtraction				read,
+	IsMask						read,
+	SupportsTiles				read,
+	PixelDepth					read,
+	Components					read,
+	UnmappedPixelDepth			read,
+	UnmappedComponents			read,
+	PreMultiplication			read,
+	PixelAspectRatio			read,
+	FrameRate					read,
+	FrameRange					read,
+	FieldOrder					read,
+	Connected					read,
+	UnmappedFrameRange			read,
+	UnmappedFrameRate			read,
+	ContinuousSamples			read
 }
 
 capabilities! { ImageHandle =>
-	Type::CanGet,
-	Bounds::CanGet,
-	Data::CanGet,
-	RowBytes::CanGet,
-	RegionOfDefinition::CanGet,
-	PixelAspectRatio::CanGet,
-	PixelDepth::CanGet,
-	PreMultiplication::CanGet,
-	Components::CanGet,
-	UnmappedPixelDepth::CanGet,
-	UnmappedComponents::CanGet
+	Type						read,
+	Bounds						read,
+	Data						read,
+	RowBytes					read,
+	RegionOfDefinition			read,
+	PixelAspectRatio			read,
+	PixelDepth					read,
+	PreMultiplication			read,
+	Components					read,
+	UnmappedPixelDepth			read,
+	UnmappedComponents			read
 }
 
-capability_group! { BaseParam =>
-	Label::CanSet, Hint::CanSet, Parent::CanSet, ScriptName::CanSet, Enabled::CanSet, Enabled::CanGet
+capabilities! { ParamDoubleProperties =>
+	BaseParam,
+	DoubleParams				write
 }
 
-impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
+capabilities! { ParamBooleanProperties =>
+	BaseParam,
+	BooleanParams				write
+}
 
-capabilities! { ParamDoubleProperties => BaseParam, DoubleParams::CanSet }
-capabilities! { ParamBooleanProperties => BaseParam, CanSetBooleanParams }
-capabilities! { ParamPageProperties => BaseParam, Children::CanSet }
-capabilities! { ParamGroupProperties => BaseParam }
+capabilities! { ParamPageProperties =>
+	BaseParam,
+	Children					write
+}
 
-capabilities! { DescribeInContextInArgs => Context::CanGet }
+capabilities! { ParamGroupProperties =>
+	BaseParam
+}
 
-capabilities! { IsIdentityInArgs => Time::CanGet, FieldToRender::CanGet, RenderWindow::CanGet, RenderScale::CanGet}
-capabilities! { IsIdentityOutArgs => Name::CanSet, Time::CanSet }
+capabilities! { DescribeInContextInArgs =>
+	Context						read
+}
 
-capabilities! { GetRegionOfDefinitionInArgs => Time::CanGet, RegionOfDefinition::CanGet }
-capabilities! { GetRegionOfDefinitionOutArgs => EffectRegionOfDefinition::CanSet }
+capabilities! { IsIdentityInArgs =>
+	Time						read,
+	FieldToRender				read,
+	RenderWindow				read,
+	RenderScale					read
+}
 
-capabilities! { GetRegionsOfInterestInArgs => RegionOfInterest::CanGet }
-capabilities! { GetRegionsOfInterestOutArgs => RawWritable, RegionOfInterest::CanSet }
+capabilities! { IsIdentityOutArgs =>
+	Name						write,
+	Time						write
+}
 
-capabilities! { GetClipPreferencesOutArgs => RawWritable }
+capabilities! { GetRegionOfDefinitionInArgs =>
+	Time						read,
+	RegionOfDefinition			read
+}
 
-capabilities! { InstanceChangedInArgs => Type::CanGet, Name::CanGet, Time::CanGet, ChangeReason::CanGet, RenderScale::CanGet }
+capabilities! { GetRegionOfDefinitionOutArgs =>
+	EffectRegionOfDefinition	write
+}
 
-capabilities! { BeginInstanceChangedInArgs => ChangeReason::CanGet}
-capabilities! { EndInstanceChangedInArgs => ChangeReason::CanGet}
+capabilities! { GetRegionsOfInterestInArgs =>
+	RegionOfInterest			read
+}
+
+capabilities! { GetRegionsOfInterestOutArgs =>
+	RawWritable,
+	RegionOfInterest			write
+}
+
+capabilities! { GetClipPreferencesOutArgs =>
+	RawWritable
+}
+
+capabilities! { InstanceChangedInArgs =>
+	Type						read,
+	Name						read,
+	Time						read,
+	ChangeReason				read,
+	RenderScale					read
+}
+
+capabilities! { BeginInstanceChangedInArgs =>
+	ChangeReason				read
+}
+
+capabilities! { EndInstanceChangedInArgs =>
+	ChangeReason				read
+}
 
 capabilities! { RenderInArgs =>
-	Time::CanGet,
-	FieldToRender::CanGet,
-	RenderWindow::CanGet,
-	RenderScale::CanGet,
-	SequentialRenderStatus::CanGet,
-	InteractiveRenderStatus::CanGet,
-	RenderQualityDraft::CanGet
+	Time						read,
+	FieldToRender				read,
+	RenderWindow				read,
+	RenderScale					read,
+	SequentialRenderStatus		read,
+	InteractiveRenderStatus		read,
+	RenderQualityDraft			read
 }
 
 capabilities! { BeginSequenceRenderInArgs =>
-	FrameRange::CanGet,
-	FrameStep::CanGet,
-	IsInteractive::CanGet,
-	RenderScale::CanGet,
-	SequentialRenderStatus::CanGet,
-	InteractiveRenderStatus::CanGet,
-	RenderQualityDraft::CanGet
+	FrameRange					read,
+	FrameStep					read,
+	IsInteractive				read,
+	RenderScale					read,
+	SequentialRenderStatus		read,
+	InteractiveRenderStatus		read,
+	RenderQualityDraft			read
 }
 
 capabilities! { EndSequenceRenderInArgs =>
-	FrameRange::CanGet,
-	FrameStep::CanGet,
-	IsInteractive::CanGet,
-	RenderScale::CanGet,
-	SequentialRenderStatus::CanGet,
-	InteractiveRenderStatus::CanGet,
-	RenderQualityDraft::CanGet
+	FrameRange					read,
+	FrameStep					read,
+	IsInteractive				read,
+	RenderScale					read,
+	SequentialRenderStatus		read,
+	InteractiveRenderStatus		read,
+	RenderQualityDraft			read
 }
 
-capabilities! { GetTimeDomainOutArgs => FrameRange::CanSet }
+capabilities! { GetTimeDomainOutArgs =>
+	FrameRange					write
+}
