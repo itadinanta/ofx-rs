@@ -1158,7 +1158,7 @@ macro_rules! object_properties {
 		object_properties!(@tail $trait => $($tail)*);
 	};
 
-	($trait:ty => $($tail:tt)*) => {
+	($trait:ty { $($tail:tt)* }) => {
 		object_properties!(@tail $trait => $($tail)*);
 	};
 }
@@ -1166,7 +1166,7 @@ macro_rules! object_properties {
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
 
 // https://openfx.readthedocs.io/en/doc/Reference/ofxPropertiesByObject.html#properties-on-an-effect-descriptor
-object_properties! { HostHandle =>
+object_properties! { HostHandle {
 	Name						read,
 	Label						read,
 	Version						read,
@@ -1196,11 +1196,11 @@ object_properties! { HostHandle =>
 	OpenGLRenderSupported		read,
 	RenderQualityDraft			read,
 	NativeOrigin				read
-}
+}}
 
 // TODO: canset should be only exposed in the "Describe" action
 // Effect Descriptor
-object_properties! { EffectDescriptorProperties =>
+object_properties! { EffectDescriptorProperties {
 	Type						read,
 	Label						read+write,
 	ShortLabel					read+write,
@@ -1227,10 +1227,10 @@ object_properties! { EffectDescriptorProperties =>
 	FilePath					read,
 	// convenience extras
 	Labels						write
-}
+}}
 
 // Image Effect Instance
-object_properties! { ImageEffectProperties =>
+object_properties! { ImageEffectProperties {
 	Type						read,
 	Context						read,
 	Label						read,
@@ -1246,10 +1246,10 @@ object_properties! { ImageEffectProperties =>
 	FrameRate					read,
 	SupportedPixelDepths		read+write,
 	IsInteractive				read
-}
+}}
 
 // Clip Descriptor
-object_properties! { ClipProperties =>
+object_properties! { ClipProperties {
 	Type						read,
 	Name						read,
 	Label						read+write,
@@ -1261,10 +1261,10 @@ object_properties! { ClipProperties =>
 	FieldExtraction				read+write,
 	IsMask						read+write,
 	SupportsTiles				read+write
-}
+}}
 
 // Clip Instance
-object_properties! { ImageClipHandle =>
+object_properties! { ImageClipHandle {
 	Type						read,
 	Name						read,
 	Label						read,
@@ -1289,9 +1289,9 @@ object_properties! { ImageClipHandle =>
 	UnmappedFrameRange			read,
 	UnmappedFrameRate			read,
 	ContinuousSamples			read
-}
+}}
 
-object_properties! { ImageHandle =>
+object_properties! { ImageHandle {
 	Type						read,
 	Bounds						read,
 	Data						read,
@@ -1303,82 +1303,82 @@ object_properties! { ImageHandle =>
 	Components					read,
 	UnmappedPixelDepth			read,
 	UnmappedComponents			read
-}
+}}
 
-object_properties! { ParamDoubleProperties =>
+object_properties! { ParamDoubleProperties {
 	BaseParam					inherit,
 	DoubleParams				write
-}
+}}
 
-object_properties! { ParamBooleanProperties =>
+object_properties! { ParamBooleanProperties {
 	BaseParam					inherit,
 	BooleanParams				write
-}
+}}
 
-object_properties! { ParamPageProperties =>
+object_properties! { ParamPageProperties {
 	BaseParam					inherit,
 	Children					write
-}
+}}
 
-object_properties! { ParamGroupProperties =>
+object_properties! { ParamGroupProperties {
 	BaseParam					inherit
-}
+}}
 
-object_properties! { DescribeInContextInArgs =>
+object_properties! { DescribeInContextInArgs {
 	Context						read
-}
+}}
 
-object_properties! { IsIdentityInArgs =>
+object_properties! { IsIdentityInArgs {
 	Time						read,
 	FieldToRender				read,
 	RenderWindow				read,
 	RenderScale					read
-}
+}}
 
-object_properties! { IsIdentityOutArgs =>
+object_properties! { IsIdentityOutArgs {
 	Name						write,
 	Time						write
-}
+}}
 
-object_properties! { GetRegionOfDefinitionInArgs =>
+object_properties! { GetRegionOfDefinitionInArgs {
 	Time						read,
 	RegionOfDefinition			read
-}
+}}
 
-object_properties! { GetRegionOfDefinitionOutArgs =>
+object_properties! { GetRegionOfDefinitionOutArgs {
 	EffectRegionOfDefinition	write
-}
+}}
 
-object_properties! { GetRegionsOfInterestInArgs =>
+object_properties! { GetRegionsOfInterestInArgs {
 	RegionOfInterest			read
-}
+}}
 
-object_properties! { GetRegionsOfInterestOutArgs =>
+object_properties! { GetRegionsOfInterestOutArgs {
 	RawWritable					inherit,
 	RegionOfInterest			write
-}
+}}
 
-object_properties! { GetClipPreferencesOutArgs =>
+object_properties! { GetClipPreferencesOutArgs {
 	RawWritable					inherit
-}
+}}
 
-object_properties! { InstanceChangedInArgs =>
+object_properties! { InstanceChangedInArgs {
 	Type						read,
 	Name						read,
 	Time						read,
 	ChangeReason				read,
 	RenderScale					read
-}
+}}
 
-object_properties! { BeginInstanceChangedInArgs =>
+object_properties! { BeginInstanceChangedInArgs {
 	ChangeReason				read
-}
+}}
 
-object_properties! { EndInstanceChangedInArgs =>
+object_properties! { EndInstanceChangedInArgs {
 	ChangeReason				read
-}
+}}
 
-object_properties! { RenderInArgs =>
+object_properties! { RenderInArgs {
 	Time						read,
 	FieldToRender				read,
 	RenderWindow				read,
@@ -1386,9 +1386,9 @@ object_properties! { RenderInArgs =>
 	SequentialRenderStatus		read,
 	InteractiveRenderStatus		read,
 	RenderQualityDraft			read
-}
+}}
 
-object_properties! { BeginSequenceRenderInArgs =>
+object_properties! { BeginSequenceRenderInArgs {
 	FrameRange					read,
 	FrameStep					read,
 	IsInteractive				read,
@@ -1396,9 +1396,9 @@ object_properties! { BeginSequenceRenderInArgs =>
 	SequentialRenderStatus		read,
 	InteractiveRenderStatus		read,
 	RenderQualityDraft			read
-}
+}}
 
-object_properties! { EndSequenceRenderInArgs =>
+object_properties! { EndSequenceRenderInArgs {
 	FrameRange					read,
 	FrameStep					read,
 	IsInteractive				read,
@@ -1406,8 +1406,8 @@ object_properties! { EndSequenceRenderInArgs =>
 	SequentialRenderStatus		read,
 	InteractiveRenderStatus		read,
 	RenderQualityDraft			read
-}
+}}
 
-object_properties! { GetTimeDomainOutArgs =>
+object_properties! { GetTimeDomainOutArgs {
 	FrameRange					write
-}
+}}
