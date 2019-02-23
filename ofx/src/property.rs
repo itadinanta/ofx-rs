@@ -430,7 +430,7 @@ mod tests {
 	}
 }
 
-macro_rules! property {
+macro_rules! property_assign_name {
 	($ofx_name:ident as $name:ident : (&$value_type:ty) -> $return_type:ty) => {
 		pub struct $name;
 		impl Get for $name {
@@ -447,7 +447,7 @@ macro_rules! property {
 	};
 
 	($ofx_name:ident as $name:ident : $return_type:ty) => {
-		property!($ofx_name as $name: (&$return_type) -> $return_type);
+		property_assign_name!($ofx_name as $name: (&$return_type) -> $return_type);
 	};
 
 	($ofx_name:ident as $name:ident : () -> $return_type:ty) => {
@@ -463,7 +463,7 @@ macro_rules! property {
 	};
 }
 
-macro_rules! set_property {
+macro_rules! property_define_setter_trait {
 	($function_name: ident, &$property_name:path) => {
 		fn $function_name(&mut self, value: &<$property_name as Set>::ValueType) -> Result<()>{
 			self.set::<$property_name>(value)
@@ -471,7 +471,7 @@ macro_rules! set_property {
 	};
 
 	($function_name: ident, $property_name:path) => {
-		set_property!($function_name, $property_name, <$property_name as Set>::ValueType);
+		property_define_setter_trait!($function_name, $property_name, <$property_name as Set>::ValueType);
 	};
 
 	($function_name: ident, $property_name:path, &[enum $enum_value_type:ty]) => {
@@ -518,12 +518,12 @@ macro_rules! set_property {
 
 	($trait_name:ident => $($tail:tt)*) => {
 		pub trait $trait_name: Writable {
-			set_property!($($tail)*);
+			property_define_setter_trait!($($tail)*);
 		}
 	};
 }
 
-macro_rules! get_property {
+macro_rules! property_define_getter_trait {
 	($function_name: ident, $property_name:path, enum $enum_value_type:ident) => {
 		fn $function_name(&self) -> Result<$enum_value_type> {
 			let str_value = self.get::<$property_name>()?;
@@ -539,12 +539,12 @@ macro_rules! get_property {
 
 	($trait_name:ident => $($tail:tt)*) => {
 		pub trait $trait_name: Readable {
-			get_property!($($tail)*);
+			property_define_getter_trait!($($tail)*);
 		}
 	};
 }
 
-macro_rules! mod_property {
+macro_rules! property {
 	($name:ident, $get_name:ident, $set_name:ident => $($tail:tt)*) => {
 		#[allow(non_snake_case)]
 		pub mod $name {
@@ -569,10 +569,10 @@ macro_rules! mod_property {
 		$get_name:ident () -> $get_type:ty;
 		$set_name:ident (&$set_type:ty);
 	}) => {
-		mod_property! { $name, $get_name, $set_name =>
-			property!($prop_name as Property: (&$set_type) -> $get_type);
-			get_property!(CanGet => $get_name, Property);
-			set_property!(CanSet => $set_name, &Property);
+		property! { $name, $get_name, $set_name =>
+			property_assign_name!($prop_name as Property: (&$set_type) -> $get_type);
+			property_define_getter_trait!(CanGet => $get_name, Property);
+			property_define_setter_trait!(CanSet => $set_name, &Property);
 		}
 	};
 
@@ -580,10 +580,10 @@ macro_rules! mod_property {
 		$get_name:ident () -> $get_type:ty;
 		$set_name:ident ($set_type:ty);
 	}) => {
-		mod_property! { $name, $get_name, $set_name =>
-			property!($prop_name as Property: (&$set_type) -> $get_type);
-			get_property!(CanGet => $get_name, Property);
-			set_property!(CanSet => $set_name, Property);
+		property! { $name, $get_name, $set_name =>
+			property_assign_name!($prop_name as Property: (&$set_type) -> $get_type);
+			property_define_getter_trait!(CanGet => $get_name, Property);
+			property_define_setter_trait!(CanSet => $set_name, Property);
 		}
 	};
 
@@ -591,10 +591,10 @@ macro_rules! mod_property {
 		$get_name:ident () -> $get_type:ty;
 		$set_name:ident (&$set_type:ty as $($tail:tt)*);
 	}) => {
-		mod_property! { $name, $get_name, $set_name =>
-			property!($prop_name as Property: (&$set_type) -> $get_type);
-			get_property!(CanGet => $get_name, Property);
-			set_property!(CanSet => $set_name, Property, $($tail)*);
+		property! { $name, $get_name, $set_name =>
+			property_assign_name!($prop_name as Property: (&$set_type) -> $get_type);
+			property_define_getter_trait!(CanGet => $get_name, Property);
+			property_define_setter_trait!(CanSet => $set_name, Property, $($tail)*);
 		}
 	};
 
@@ -602,208 +602,431 @@ macro_rules! mod_property {
 		$get_name:ident () -> $get_type:ty as enum $enum_get:ident;
 		$set_name:ident (&$set_type:ty as enum $enum_set:ty);
 	}) => {
-		mod_property! { $name, $get_name, $set_name =>
-			property!($prop_name as Property: (&$set_type) -> $get_type);
-			get_property!(CanGet => $get_name, Property, enum $enum_get);
-			set_property!(CanSet => $set_name, Property, enum $enum_set);
+		property! { $name, $get_name, $set_name =>
+			property_assign_name!($prop_name as Property: (&$set_type) -> $get_type);
+			property_define_getter_trait!(CanGet => $get_name, Property, enum $enum_get);
+			property_define_setter_trait!(CanSet => $set_name, Property, enum $enum_set);
 		}
 	};
 
 	($prop_name:ident as $name:ident {
 		$get_name:ident () -> $get_type:ty as enum $enum_get:ident;
 	}) => {
-		mod_property! { $name, $get_name =>
-			property!($prop_name as Property: () -> $get_type);
-			get_property!(CanGet => $get_name, Property, enum $enum_get);
+		property! { $name, $get_name =>
+			property_assign_name!($prop_name as Property: () -> $get_type);
+			property_define_getter_trait!(CanGet => $get_name, Property, enum $enum_get);
 		}
 	};
 
 	($prop_name:ident as $name:ident  {
 		$get_name:ident () -> $get_type:ty;
 	}) => {
-		mod_property! { $name, $get_name =>
-			property!($prop_name as Property: () -> $get_type);
-			get_property!(CanGet => $get_name, Property);
+		property! { $name, $get_name =>
+			property_assign_name!($prop_name as Property: () -> $get_type);
+			property_define_getter_trait!(CanGet => $get_name, Property);
 		}
 	};
 
 	($prop_name:ident as $name:ident {
 		$get_name:ident () -> $get_type:ty as $($tail:tt)*
 	}) => {
-		mod_property! { $name, $get_name =>
-			property!($prop_name as Property: () -> $get_type);
-			get_property!(CanGet => $get_name, Property, $($tail)*);
+		property! { $name, $get_name =>
+			property_assign_name!($prop_name as Property: () -> $get_type);
+			property_define_getter_trait!(CanGet => $get_name, Property, $($tail)*);
 		}
 	};
 }
 
-mod_property! { kOfxPluginPropFilePath as FilePath {
+property! { kOfxPluginPropFilePath as FilePath {
 	get_file_path() -> String;
 }}
 
-mod_property! { kOfxPropType as Type {
+property! { kOfxPropType as Type {
 	get_type() -> CString as enum EType;
 }}
 
-mod_property! { kOfxPropName as Name {
+property! { kOfxPropName as Name {
 	get_name() -> String;
 	set_name(&str);
 }}
 
-mod_property! { kOfxPropLabel as Label {
+property! { kOfxPropLabel as Label {
 	get_label() -> String;
 	set_label(&str);
 }}
 
-mod_property! { kOfxPropShortLabel as ShortLabel {
+property! { kOfxPropShortLabel as ShortLabel {
 	get_short_label() -> String;
 	set_short_label(&str);
 }}
 
-mod_property! { kOfxPropLongLabel as LongLabel {
+property! { kOfxPropLongLabel as LongLabel {
 	get_long_label() -> String;
 	set_long_label(&str);
 }}
 
-mod_property! { kOfxPropVersion as Version {
+property! { kOfxPropVersion as Version {
 	get_version() -> String;
 }}
 
-mod_property! { kOfxPropVersionLabel as VersionLabel {
+property! { kOfxPropVersionLabel as VersionLabel {
 	get_version_label() -> String;
 }}
 
-mod_property! { kOfxPropAPIVersion as APIVersion {
+property! { kOfxPropAPIVersion as APIVersion {
 	get_api_version() -> String;
 }}
 
-mod_property! { kOfxPropTime as Time {
+property! { kOfxPropTime as Time {
 	get_time() -> Double;
-	set_time(&Double);
+	set_time(Double);
 }}
 
-mod_property! { kOfxPropIsInteractive as IsInteractive {
+property! { kOfxPropIsInteractive as IsInteractive {
 	get_is_interactive() -> Bool;
 }}
 
-mod_property! { kOfxPropPluginDescription as PluginDescription {
+property! { kOfxPropPluginDescription as PluginDescription {
 	get_plugin_description() -> String;
 	set_plugin_description(&str);
 }}
 
-mod_property! { kOfxPropChangeReason as ChangeReason {
+property! { kOfxPropChangeReason as ChangeReason {
 	get_change_reason() -> CString as enum Change;
 }}
 
-mod_property! { kOfxPropHostOSHandle as HostOSHandle {
+property! { kOfxPropHostOSHandle as HostOSHandle {
 	get_host_os_handle() -> VoidPtrMut;
 }}
 
-mod_property! { kOfxImageEffectHostPropIsBackground as IsBackground {
+property! { kOfxImageEffectHostPropIsBackground as IsBackground {
 	get_is_background() -> Bool;
 }}
 
-mod_property! { kOfxImageEffectHostPropNativeOrigin as NativeOrigin {
+property! { kOfxImageEffectHostPropNativeOrigin as NativeOrigin {
 	get_native_origin() -> CString as enum HostNativeOrigin;
 }}
 
-mod_property! { kOfxParamHostPropSupportsCustomInteract as SupportsCustomInteract { get_supports_custom_interact() -> Bool ; } }
+property! { kOfxParamHostPropSupportsCustomInteract as SupportsCustomInteract {
+	get_supports_custom_interact() -> Bool;
+}}
 
-mod_property! { kOfxParamHostPropSupportsCustomAnimation as SupportsCustomAnimation { get_supports_custom_animation() -> Bool ; } }
+property! { kOfxParamHostPropSupportsCustomAnimation as SupportsCustomAnimation {
+	get_supports_custom_animation() -> Bool;
+}}
 
-mod_property! { kOfxParamHostPropSupportsStringAnimation as SupportsStringAnimation { get_supports_string_animation() -> Bool ; } }
+property! { kOfxParamHostPropSupportsStringAnimation as SupportsStringAnimation {
+	get_supports_string_animation() -> Bool;
+}}
 
-mod_property! { kOfxParamHostPropSupportsChoiceAnimation as SupportsChoiceAnimation { get_supports_choice_animation() -> Bool ; } }
+property! { kOfxParamHostPropSupportsChoiceAnimation as SupportsChoiceAnimation {
+	get_supports_choice_animation() -> Bool;
+}}
 
-mod_property! { kOfxParamHostPropSupportsBooleanAnimation as SupportsBooleanAnimation { get_supports_boolean_animation() -> Bool ; } }
+property! { kOfxParamHostPropSupportsBooleanAnimation as SupportsBooleanAnimation {
+	get_supports_boolean_animation() -> Bool;
+}}
 
-mod_property! { kOfxParamHostPropSupportsParametricAnimation as SupportsParametricAnimation { get_supports_parametric_animation() -> Bool ; } }
+property! { kOfxParamHostPropSupportsParametricAnimation as SupportsParametricAnimation {
+	get_supports_parametric_animation() -> Bool;
+}}
 
-mod_property! { kOfxParamHostPropMaxParameters as MaxParameters { get_max_parameters() -> Int; } }
+property! { kOfxParamHostPropMaxParameters as MaxParameters {
+	get_max_parameters() -> Int;
+}}
 
-mod_property! { kOfxParamHostPropMaxPages as MaxPages { get_max_pages() -> Int; } }
+property! { kOfxParamHostPropMaxPages as MaxPages {
+	get_max_pages() -> Int;
+}}
 
-mod_property! { kOfxParamHostPropPageRowColumnCount as PageRowColumnCount { get_page_row_column_count() -> RectI; } }
+property! { kOfxParamHostPropPageRowColumnCount as PageRowColumnCount {
+	get_page_row_column_count() -> RectI;
+}}
 
-mod_property! { kOfxImageEffectPluginPropGrouping as Grouping { get_grouping() -> String; set_grouping(&str); } }
+property! { kOfxImageEffectPluginPropGrouping as Grouping {
+	get_grouping() -> String;
+	set_grouping(&str);
+}}
 
-mod_property! { kOfxImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways { get_field_render_twice_always() -> Bool; set_field_render_twice_always(Bool);} }
+property! { kOfxImageEffectPluginPropFieldRenderTwiceAlways as FieldRenderTwiceAlways {
+	get_field_render_twice_always() -> Bool;
+	set_field_render_twice_always(Bool);
+}}
 
-mod_property! { kOfxImageEffectPluginPropSingleInstance as SingleInstance { get_single_instance() -> Bool; set_single_instance(Bool); } }
+property! { kOfxImageEffectPluginPropSingleInstance as SingleInstance {
+	get_single_instance() -> Bool;
+	set_single_instance(Bool);
+}}
 
-mod_property! { kOfxImageEffectPluginPropHostFrameThreading as HostFrameThreading { get_host_frame_threading() -> Bool; set_host_frame_threading(Bool); } }
+property! { kOfxImageEffectPluginPropHostFrameThreading as HostFrameThreading {
+	get_host_frame_threading() -> Bool;
+	set_host_frame_threading(Bool);
+}}
 
-mod_property! { kOfxImageEffectPluginRenderThreadSafety as RenderThreadSafety {
-get_render_thread_safety() -> CString as enum ImageEffectRender;
-set_render_thread_safety(&[u8] as enum ImageEffectRender); } }
+property! { kOfxImageEffectPluginRenderThreadSafety as RenderThreadSafety {
+	get_render_thread_safety() -> CString as enum ImageEffectRender;
+	set_render_thread_safety(&[u8] as enum ImageEffectRender);
+}}
 
-mod_property! { kOfxImageEffectPropContext as Context { get_context() -> CString as enum ImageEffectContext} }
-mod_property! { kOfxImageEffectPropComponents as Components { get_components() -> CString as enum ImageComponent } }
-mod_property! { kOfxImageEffectPropPixelDepth as PixelDepth { get_pixel_depth() -> CString as enum BitDepth } }
+property! { kOfxImageEffectPropContext as Context {
+	get_context() -> CString as enum ImageEffectContext;
+}}
 
-mod_property! { kOfxImageEffectPropProjectSize  as ProjectSize { get_project_size() -> PointD; set_project_size(PointD) ;} }
-mod_property! { kOfxImageEffectPropProjectOffset as ProjectOffset { get_project_offset() -> PointD; set_project_offset(PointD) ;} }
-mod_property! { kOfxImageEffectPropProjectExtent as ProjectExtent { get_project_extent() -> PointD; set_project_extent(PointD) ;} }
-mod_property! { kOfxImageEffectPropProjectPixelAspectRatio as ProjectPixelAspectRatio { get_project_pixel_aspect_ratio() -> Double; set_project_pixel_aspect_ratio(Double) ;} }
-mod_property! { kOfxImageEffectPropFrameRate as FrameRate { get_frame_rate() -> Double; set_frame_rate(Double) ;} }
-mod_property! { kOfxImageEffectPropUnmappedFrameRate as UnmappedFrameRate { get_unmapped_frame_rate() -> Double; set_unmapped_frame_rate(Double) ;} }
+property! { kOfxImageEffectPropComponents as Components {
+	get_components() -> CString as enum ImageComponent;
+}}
 
-mod_property! { kOfxImageEffectPropSupportsOverlays as SupportsOverlays { get_supports_overlays() -> Bool ;} }
-mod_property! { kOfxImageEffectPropSupportsMultiResolution as SupportsMultiResolution { get_supports_multi_resolution() -> Bool; set_supports_multi_resolution(Bool) ;} }
-mod_property! { kOfxImageEffectPropSupportsTiles as SupportsTiles { get_supports_tiles() -> Bool; set_supports_tiles(Bool) ;} }
-mod_property! { kOfxImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths { get_supports_multiple_clip_depths() -> Bool; set_supports_multiple_clip_depths(Bool) ;} }
-mod_property! { kOfxImageEffectPropSupportsMultipleClipPARs as SupportsMultipleClipPARs { get_supports_multiple_clip_pars() -> Bool; set_supports_multiple_clip_pars(Bool) ;} }
-mod_property! { kOfxImageEffectPropSetableFrameRate as SetableFrameRate { get_setable_frame_rate() -> Bool ;} }
-mod_property! { kOfxImageEffectPropSetableFielding as SetableFielding { get_setable_fielding() -> Bool ;} }
+property! { kOfxImageEffectPropPixelDepth as PixelDepth {
+	get_pixel_depth() -> CString as enum BitDepth;
+}}
+
+property! { kOfxImageEffectPropProjectSize  as ProjectSize {
+	get_project_size() -> PointD;
+	set_project_size(PointD);
+}}
+
+property! { kOfxImageEffectPropProjectOffset as ProjectOffset {
+	get_project_offset() -> PointD;
+	set_project_offset(PointD);
+}}
+
+property! { kOfxImageEffectPropProjectExtent as ProjectExtent {
+	get_project_extent() -> PointD;
+	set_project_extent(PointD);
+}}
+
+property! { kOfxImageEffectPropProjectPixelAspectRatio as ProjectPixelAspectRatio {
+	get_project_pixel_aspect_ratio() -> Double;
+	set_project_pixel_aspect_ratio(Double);
+}}
+
+property! { kOfxImageEffectPropFrameRate as FrameRate {
+	get_frame_rate() -> Double;
+	set_frame_rate(Double);
+}}
+
+property! { kOfxImageEffectPropUnmappedFrameRate as UnmappedFrameRate {
+	get_unmapped_frame_rate() -> Double;
+	set_unmapped_frame_rate(Double);
+}}
+
+property! { kOfxImageEffectPropSupportsOverlays as SupportsOverlays {
+	get_supports_overlays() -> Bool;
+}}
+
+property! { kOfxImageEffectPropSupportsMultiResolution as SupportsMultiResolution {
+	get_supports_multi_resolution() -> Bool;
+	set_supports_multi_resolution(Bool);
+}}
+
+property! { kOfxImageEffectPropSupportsTiles as SupportsTiles {
+	get_supports_tiles() -> Bool;
+	set_supports_tiles(Bool);
+}}
+
+property! { kOfxImageEffectPropSupportsMultipleClipDepths as SupportsMultipleClipDepths {
+	get_supports_multiple_clip_depths() -> Bool;
+	set_supports_multiple_clip_depths(Bool);
+}}
+
+property! { kOfxImageEffectPropSupportsMultipleClipPARs as SupportsMultipleClipPARs {
+	get_supports_multiple_clip_pars() -> Bool;
+	set_supports_multiple_clip_pars(Bool);
+}}
+
+property! { kOfxImageEffectPropSetableFrameRate as SetableFrameRate {
+	get_setable_frame_rate() -> Bool;
+}}
+
+property! { kOfxImageEffectPropSetableFielding as SetableFielding {
+	get_setable_fielding() -> Bool;
+}}
+
 // TODO: allow multiple returns
-mod_property! { kOfxImageEffectPropSupportedContexts as SupportedContexts { get_supported_contexts() -> CString; set_supported_contexts(&[u8] as &[enum ImageEffectContext]) ;} }
-mod_property! { kOfxImageEffectPropSupportedPixelDepths as SupportedPixelDepths { get_supported_pixel_depths() -> CString; set_supported_pixel_depths(&[u8] as &[enum BitDepth]) ;} }
-mod_property! { kOfxImageEffectPropSupportedComponents as SupportedComponents { get_supported_components() -> CString; set_supported_components(&[u8] as &[enum ImageComponent]) ;} }
-mod_property! { kOfxImageEffectPropPreMultiplication as PreMultiplication { get_pre_multiplication() -> Bool; set_pre_multiplication(Bool) ;} }
-mod_property! { kOfxImageEffectPropRenderWindow as RenderWindow { get_render_window() -> RectI; set_render_window(RectI) ;} }
-mod_property! { kOfxImageEffectPropRenderScale as RenderScale { get_render_scale() -> PointD; set_render_scale(PointD) ;} }
-mod_property! { kOfxImageEffectPropRegionOfInterest as RegionOfInterest { get_region_of_interest() -> RectD; set_region_of_interest(RectD) ;} }
+property! { kOfxImageEffectPropSupportedContexts as SupportedContexts {
+	get_supported_contexts() -> CString;
+	set_supported_contexts(&[u8] as &[enum ImageEffectContext]);
+}}
+
+property! { kOfxImageEffectPropSupportedPixelDepths as SupportedPixelDepths {
+	get_supported_pixel_depths() -> CString;
+	set_supported_pixel_depths(&[u8] as &[enum BitDepth]);
+}}
+
+property! { kOfxImageEffectPropSupportedComponents as SupportedComponents {
+	get_supported_components() -> CString;
+	set_supported_components(&[u8] as &[enum ImageComponent]);
+}}
+
+property! { kOfxImageEffectPropPreMultiplication as PreMultiplication {
+	get_pre_multiplication() -> Bool;
+	set_pre_multiplication(Bool);
+}}
+
+property! { kOfxImageEffectPropRenderWindow as RenderWindow {
+	get_render_window() -> RectI;
+	set_render_window(RectI);
+}}
+
+property! { kOfxImageEffectPropRenderScale as RenderScale {
+	get_render_scale() -> PointD;
+	set_render_scale(PointD);
+}}
+
+property! { kOfxImageEffectPropRegionOfInterest as RegionOfInterest {
+	get_region_of_interest() -> RectD;
+	set_region_of_interest(RectD);
+}}
+
 // there are two RegionOfDefinition, one for clips and one for images,
-mod_property! { kOfxImageEffectPropRegionOfDefinition as EffectRegionOfDefinition{ get_effect_region_of_definition() -> RectD; set_effect_region_of_definition(RectD) ;} }
-mod_property! { kOfxImageEffectPropFrameRange as FrameRange { get_frame_range() -> RangeD; set_frame_range(RangeD) ;} }
-mod_property! { kOfxImageEffectPropUnmappedFrameRange as UnmappedFrameRange { get_unmapped_frame_range() -> RangeD; set_unmapped_frame_range(RangeD) ;} }
-mod_property! { kOfxImageEffectPropFrameStep as FrameStep { get_frame_step() -> Double ;} }
-mod_property! { kOfxImageEffectPropFieldToRender as FieldToRender { get_field_to_render() -> CString as enum ImageField ;} }
-mod_property! { kOfxImageEffectPropTemporalClipAccess as TemporalClipAccess { get_temporal_clip_access() -> Bool; set_temporal_clip_access(Bool) ;} }
+property! { kOfxImageEffectPropRegionOfDefinition as EffectRegionOfDefinition{
+	get_effect_region_of_definition() -> RectD;
+	set_effect_region_of_definition(RectD);
+}}
+
+property! { kOfxImageEffectPropFrameRange as FrameRange {
+	get_frame_range() -> RangeD;
+	set_frame_range(RangeD);
+}}
+
+property! { kOfxImageEffectPropUnmappedFrameRange as UnmappedFrameRange {
+	get_unmapped_frame_range() -> RangeD;
+	set_unmapped_frame_range(RangeD);
+}}
+
+property! { kOfxImageEffectPropFrameStep as FrameStep {
+	get_frame_step() -> Double;
+}}
+
+property! { kOfxImageEffectPropFieldToRender as FieldToRender {
+	get_field_to_render() -> CString as enum ImageField;
+}}
+
+property! { kOfxImageEffectPropTemporalClipAccess as TemporalClipAccess {
+	get_temporal_clip_access() -> Bool;
+	set_temporal_clip_access(Bool);
+}}
+
 // todo: return multiple strings
-mod_property! { kOfxImageEffectPropClipPreferencesSlaveParam as ClipPreferencesSlaveParam { get_clip_preferences_slave_param() -> String; set_clip_preferences_slave_param(&str) ;} }
-mod_property! { kOfxImageEffectPropSequentialRenderStatus as SequentialRenderStatus { get_sequential_render_status() -> Bool ;} }
-mod_property! { kOfxImageEffectPropInteractiveRenderStatus as InteractiveRenderStatus { get_interactive_render_status() -> Bool ;} }
-mod_property! { kOfxImageEffectPropOpenGLRenderSupported as OpenGLRenderSupported { get_opengl_render_supported() -> Bool; set_opengl_render_supported(Bool) ;} }
-mod_property! { kOfxImageEffectPropRenderQualityDraft as RenderQualityDraft { get_render_quality_draft() -> Bool ;} }
+property! { kOfxImageEffectPropClipPreferencesSlaveParam as ClipPreferencesSlaveParam {
+	get_clip_preferences_slave_param() -> String;
+	set_clip_preferences_slave_param(&str);
+}}
 
-mod_property! { kOfxImageEffectInstancePropEffectDuration as EffectDuration { get_effect_duration() -> Double; set_effect_duration(Double) ;} }
-mod_property! { kOfxImageEffectInstancePropSequentialRender as SequentialRender { get_sequential_render() -> Bool; set_sequential_render(Bool) ;} }
+property! { kOfxImageEffectPropSequentialRenderStatus as SequentialRenderStatus {
+	get_sequential_render_status() -> Bool;
+}}
 
-mod_property! { kOfxImageClipPropConnected as Connected { get_connected() -> Bool; }}
-mod_property! { kOfxImageClipPropUnmappedComponents as UnmappedComponents { get_unmapped_components() -> CString as enum ImageComponent;} }
-mod_property! { kOfxImageClipPropUnmappedPixelDepth as UnmappedPixelDepth { get_unmapped_pixel_depth() -> CString as enum BitDepth ;} }
-mod_property! { kOfxImageClipPropFieldExtraction as FieldExtraction { get_field_extraction() -> CString  as enum ImageFieldExtraction; set_field_extraction(&[u8] as enum ImageFieldExtraction) ;} }
-mod_property! { kOfxImageClipPropFieldOrder as FieldOrder { get_field_order() -> CString  as enum ImageFieldOrder; set_field_order(&[u8] as enum ImageFieldOrder) ;} }
-mod_property! { kOfxImageClipPropOptional as Optional { get_optional() -> Bool; set_optional(Bool) ;} }
-mod_property! { kOfxImageClipPropIsMask as IsMask { get_is_mask() -> Bool; set_is_mask(Bool) ;} }
-mod_property! { kOfxImageClipPropContinuousSamples as ContinuousSamples { get_continuous_samples() -> Bool; set_continuous_samples(Bool) ;} }
+property! { kOfxImageEffectPropInteractiveRenderStatus as InteractiveRenderStatus {
+	get_interactive_render_status() -> Bool;
+}}
 
-mod_property! { kOfxImagePropRowBytes as RowBytes { get_row_bytes() -> Int ;} }
-mod_property! { kOfxImagePropBounds as Bounds { get_bounds() -> RectI ;} }
-mod_property! { kOfxImagePropData as Data { get_data() -> VoidPtrMut ;} }
-mod_property! { kOfxImagePropField as Field { get_field() -> CString as enum ImageField ;} }
-mod_property! { kOfxImagePropPixelAspectRatio as PixelAspectRatio { get_pixel_aspect_ratio() -> Double ;} }
+property! { kOfxImageEffectPropOpenGLRenderSupported as OpenGLRenderSupported {
+	get_opengl_render_supported() -> Bool;
+	set_opengl_render_supported(Bool);
+}}
+
+property! { kOfxImageEffectPropRenderQualityDraft as RenderQualityDraft {
+	get_render_quality_draft() -> Bool;
+}}
+
+property! { kOfxImageEffectInstancePropEffectDuration as EffectDuration {
+	get_effect_duration() -> Double;
+	set_effect_duration(Double);
+}}
+
+property! { kOfxImageEffectInstancePropSequentialRender as SequentialRender {
+	get_sequential_render() -> Bool;
+	set_sequential_render(Bool);
+}}
+
+property! { kOfxImageClipPropConnected as Connected {
+	get_connected() -> Bool;
+}}
+
+property! { kOfxImageClipPropUnmappedComponents as UnmappedComponents {
+	get_unmapped_components() -> CString as enum ImageComponent;
+}}
+
+property! { kOfxImageClipPropUnmappedPixelDepth as UnmappedPixelDepth {
+	get_unmapped_pixel_depth() -> CString as enum BitDepth;
+}}
+
+property! { kOfxImageClipPropFieldExtraction as FieldExtraction {
+	get_field_extraction() -> CString  as enum ImageFieldExtraction;
+	set_field_extraction(&[u8] as enum ImageFieldExtraction);
+}}
+
+property! { kOfxImageClipPropFieldOrder as FieldOrder {
+	get_field_order() -> CString  as enum ImageFieldOrder;
+	set_field_order(&[u8] as enum ImageFieldOrder);
+}}
+
+property! { kOfxImageClipPropOptional as Optional {
+	get_optional() -> Bool;
+	set_optional(Bool);
+}}
+
+property! { kOfxImageClipPropIsMask as IsMask {
+	get_is_mask() -> Bool;
+	set_is_mask(Bool);
+}}
+
+property! { kOfxImageClipPropContinuousSamples as ContinuousSamples {
+	get_continuous_samples() -> Bool;
+	set_continuous_samples(Bool);
+}}
+
+property! { kOfxImagePropRowBytes as RowBytes {
+	get_row_bytes() -> Int;
+}}
+
+property! { kOfxImagePropBounds as Bounds {
+	get_bounds() -> RectI;
+}}
+
+property! { kOfxImagePropData as Data {
+	get_data() -> VoidPtrMut;
+}}
+
+property! { kOfxImagePropField as Field {
+	get_field() -> CString as enum ImageField;
+}}
+
+property! { kOfxImagePropPixelAspectRatio as PixelAspectRatio {
+	get_pixel_aspect_ratio() -> Double;
+}}
+
 // there are two RegionOfDefinition, one for clips and one for images,
-mod_property! { kOfxImagePropRegionOfDefinition as RegionOfDefinition { get_region_of_definition() -> RectI ;} }
-mod_property! { kOfxImagePropUniqueIdentifier as UniqueIdentifier { get_unique_identifier() -> String ;} }
+property! { kOfxImagePropRegionOfDefinition as RegionOfDefinition {
+	get_region_of_definition() -> RectI;
+}}
 
-mod_property! { kOfxParamPropEnabled as Enabled { get_enabled() -> Bool; set_enabled(Bool) ;} }
-mod_property! { kOfxParamPropHint as Hint { get_hint() -> String; set_hint(&str) ;} }
-mod_property! { kOfxParamPropParent as Parent { get_parent() -> String; set_parent(&str) ;} }
-mod_property! { kOfxParamPropScriptName as ScriptName { get_script_name() -> String; set_script_name(&str) ;} }
+property! { kOfxImagePropUniqueIdentifier as UniqueIdentifier {
+	get_unique_identifier() -> String;
+}}
 
-macro_rules! capability_group {
+property! { kOfxParamPropEnabled as Enabled {
+	get_enabled() -> Bool;
+	set_enabled(Bool);
+}}
+
+property! { kOfxParamPropHint as Hint {
+	get_hint() -> String;
+	set_hint(&str);
+}}
+
+property! { kOfxParamPropParent as Parent {
+	get_parent() -> String;
+	set_parent(&str);
+}}
+
+property! { kOfxParamPropScriptName as ScriptName {
+	get_script_name() -> String;
+	set_script_name(&str);
+}}
+
+macro_rules! property_group {
 	($trait:ident => $capability_head:path, $($capability_tail:path),*) => {
 		pub trait $trait: $capability_head
 			$(+ $capability_tail)*
@@ -815,7 +1038,7 @@ macro_rules! capability_group {
 	}
 }
 
-capability_group! { BaseParam =>
+property_group! { BaseParam =>
 	Label::CanSet,
 	Hint::CanSet,
 	Parent::CanSet,
@@ -825,26 +1048,26 @@ capability_group! { BaseParam =>
 
 pub mod double {
 	use super::*;
-	property!(kOfxParamPropDoubleType as DoubleType: (&[u8]) -> CString);
-	property!(kOfxParamPropDefault as Default: Double);
-	property!(kOfxParamPropDisplayMax as DisplayMax: Double);
-	property!(kOfxParamPropDisplayMin as DisplayMin: Double);
+	property_assign_name!(kOfxParamPropDoubleType as DoubleType: (&[u8]) -> CString);
+	property_assign_name!(kOfxParamPropDefault as Default: Double);
+	property_assign_name!(kOfxParamPropDisplayMax as DisplayMax: Double);
+	property_assign_name!(kOfxParamPropDisplayMin as DisplayMin: Double);
 }
 
 pub mod boolean {
 	use super::*;
-	property!(kOfxParamPropDefault as Default: Bool);
+	property_assign_name!(kOfxParamPropDefault as Default: Bool);
 }
 
 pub mod page {
 	use super::*;
-	property!(kOfxParamPropPageChild as Child: (&str) -> String);
+	property_assign_name!(kOfxParamPropPageChild as Child: (&str) -> String);
 }
 
 #[allow(non_snake_case)]
 pub mod Children {
 	use super::*;
-	set_property!(CanSet => set_children, page::Child, &seq[&str]);
+	property_define_setter_trait!(CanSet => set_children, page::Child, &seq[&str]);
 }
 pub use Children::CanSet as CanSetChildren;
 
@@ -878,10 +1101,10 @@ pub use NameRaw::CanSet as CanSetNameRaw;
 pub mod DoubleParams {
 	use super::*;
 	pub trait CanSet: Writable {
-		set_property!(set_double_type, double::DoubleType, enum ParamDoubleType);
-		set_property!(set_default, double::Default);
-		set_property!(set_display_max, double::DisplayMax);
-		set_property!(set_display_min, double::DisplayMin);
+		property_define_setter_trait!(set_double_type, double::DoubleType, enum ParamDoubleType);
+		property_define_setter_trait!(set_default, double::Default);
+		property_define_setter_trait!(set_display_max, double::DisplayMax);
+		property_define_setter_trait!(set_display_min, double::DisplayMin);
 	}
 }
 
@@ -891,13 +1114,13 @@ pub use DoubleParams::CanSet as CanSetDoubleParams;
 pub mod BooleanParams {
 	use super::*;
 	pub trait CanSet: Writable {
-		set_property!(set_default, boolean::Default);
+		property_define_setter_trait!(set_default, boolean::Default);
 	}
 }
 
 pub use BooleanParams::CanSet as CanSetBooleanParams;
 
-macro_rules! capabilities {
+macro_rules! object_properties {
 	(@tail $trait:ty => $property:ident read+write) => {
 		impl $property::CanGet for $trait {}
 		impl $property::CanSet for $trait {}
@@ -918,33 +1141,33 @@ macro_rules! capabilities {
 	(@tail $trait:ty => $property:ident read+write, $($tail:tt)*) => {
 		impl $property::CanGet for $trait {}
 		impl $property::CanSet for $trait {}
-		capabilities!(@tail $trait => $($tail)*);
+		object_properties!(@tail $trait => $($tail)*);
 	};
 
 	(@tail $trait:ty => $property:ident write, $($tail:tt)*) => {
 		impl $property::CanSet for $trait {}
-		capabilities!(@tail $trait => $($tail)*);
+		object_properties!(@tail $trait => $($tail)*);
 	};
 
 	(@tail $trait:ty => $property:ident read, $($tail:tt)*) => {
 		impl $property::CanGet for $trait {}
-		capabilities!(@tail $trait => $($tail)*);
+		object_properties!(@tail $trait => $($tail)*);
 	};
 
 	(@tail $trait:ty => $capability:path, $($tail:tt)*) => {
 		impl $capability for $trait {}
-		capabilities!(@tail $trait => $($tail)*);
+		object_properties!(@tail $trait => $($tail)*);
 	};
 
 	($trait:ty => $($tail:tt)*) => {
-		capabilities!(@tail $trait => $($tail)*);
+		object_properties!(@tail $trait => $($tail)*);
 	};
 }
 
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
 
 // https://openfx.readthedocs.io/en/doc/Reference/ofxPropertiesByObject.html#properties-on-an-effect-descriptor
-capabilities! { HostHandle =>
+object_properties! { HostHandle =>
 	Name						read,
 	Label						read,
 	Version						read,
@@ -978,7 +1201,7 @@ capabilities! { HostHandle =>
 
 // TODO: canset should be only exposed in the "Describe" action
 // Effect Descriptor
-capabilities! { EffectDescriptorProperties =>
+object_properties! { EffectDescriptorProperties =>
 	Type						read,
 	Label						read+write,
 	ShortLabel					read+write,
@@ -992,7 +1215,7 @@ capabilities! { EffectDescriptorProperties =>
 	RenderThreadSafety			read+write,
 	HostFrameThreading			read+write,
 //	TODO: missing yet
-//  OverlayInteractV1				read, OverlayInteractV1				read+write,
+//	OverlayInteractV1			read+write,
 	SupportsMultiResolution		read+write,
 	SupportsTiles				read+write,
 	TemporalClipAccess			read+write,
@@ -1008,7 +1231,7 @@ capabilities! { EffectDescriptorProperties =>
 }
 
 // Image Effect Instance
-capabilities! { ImageEffectProperties =>
+object_properties! { ImageEffectProperties =>
 	Type						read,
 	Context						read,
 	Label						read,
@@ -1027,7 +1250,7 @@ capabilities! { ImageEffectProperties =>
 }
 
 // Clip Descriptor
-capabilities! { ClipProperties =>
+object_properties! { ClipProperties =>
 	Type						read,
 	Name						read,
 	Label						read+write,
@@ -1042,7 +1265,7 @@ capabilities! { ClipProperties =>
 }
 
 // Clip Instance
-capabilities! { ImageClipHandle =>
+object_properties! { ImageClipHandle =>
 	Type						read,
 	Name						read,
 	Label						read,
@@ -1069,7 +1292,7 @@ capabilities! { ImageClipHandle =>
 	ContinuousSamples			read
 }
 
-capabilities! { ImageHandle =>
+object_properties! { ImageHandle =>
 	Type						read,
 	Bounds						read,
 	Data						read,
@@ -1083,64 +1306,64 @@ capabilities! { ImageHandle =>
 	UnmappedComponents			read
 }
 
-capabilities! { ParamDoubleProperties =>
+object_properties! { ParamDoubleProperties =>
 	BaseParam,
 	DoubleParams				write
 }
 
-capabilities! { ParamBooleanProperties =>
+object_properties! { ParamBooleanProperties =>
 	BaseParam,
 	BooleanParams				write
 }
 
-capabilities! { ParamPageProperties =>
+object_properties! { ParamPageProperties =>
 	BaseParam,
 	Children					write
 }
 
-capabilities! { ParamGroupProperties =>
+object_properties! { ParamGroupProperties =>
 	BaseParam
 }
 
-capabilities! { DescribeInContextInArgs =>
+object_properties! { DescribeInContextInArgs =>
 	Context						read
 }
 
-capabilities! { IsIdentityInArgs =>
+object_properties! { IsIdentityInArgs =>
 	Time						read,
 	FieldToRender				read,
 	RenderWindow				read,
 	RenderScale					read
 }
 
-capabilities! { IsIdentityOutArgs =>
+object_properties! { IsIdentityOutArgs =>
 	Name						write,
 	Time						write
 }
 
-capabilities! { GetRegionOfDefinitionInArgs =>
+object_properties! { GetRegionOfDefinitionInArgs =>
 	Time						read,
 	RegionOfDefinition			read
 }
 
-capabilities! { GetRegionOfDefinitionOutArgs =>
+object_properties! { GetRegionOfDefinitionOutArgs =>
 	EffectRegionOfDefinition	write
 }
 
-capabilities! { GetRegionsOfInterestInArgs =>
+object_properties! { GetRegionsOfInterestInArgs =>
 	RegionOfInterest			read
 }
 
-capabilities! { GetRegionsOfInterestOutArgs =>
+object_properties! { GetRegionsOfInterestOutArgs =>
 	RawWritable,
 	RegionOfInterest			write
 }
 
-capabilities! { GetClipPreferencesOutArgs =>
+object_properties! { GetClipPreferencesOutArgs =>
 	RawWritable
 }
 
-capabilities! { InstanceChangedInArgs =>
+object_properties! { InstanceChangedInArgs =>
 	Type						read,
 	Name						read,
 	Time						read,
@@ -1148,15 +1371,15 @@ capabilities! { InstanceChangedInArgs =>
 	RenderScale					read
 }
 
-capabilities! { BeginInstanceChangedInArgs =>
+object_properties! { BeginInstanceChangedInArgs =>
 	ChangeReason				read
 }
 
-capabilities! { EndInstanceChangedInArgs =>
+object_properties! { EndInstanceChangedInArgs =>
 	ChangeReason				read
 }
 
-capabilities! { RenderInArgs =>
+object_properties! { RenderInArgs =>
 	Time						read,
 	FieldToRender				read,
 	RenderWindow				read,
@@ -1166,7 +1389,7 @@ capabilities! { RenderInArgs =>
 	RenderQualityDraft			read
 }
 
-capabilities! { BeginSequenceRenderInArgs =>
+object_properties! { BeginSequenceRenderInArgs =>
 	FrameRange					read,
 	FrameStep					read,
 	IsInteractive				read,
@@ -1176,7 +1399,7 @@ capabilities! { BeginSequenceRenderInArgs =>
 	RenderQualityDraft			read
 }
 
-capabilities! { EndSequenceRenderInArgs =>
+object_properties! { EndSequenceRenderInArgs =>
 	FrameRange					read,
 	FrameStep					read,
 	IsInteractive				read,
@@ -1186,6 +1409,6 @@ capabilities! { EndSequenceRenderInArgs =>
 	RenderQualityDraft			read
 }
 
-capabilities! { GetTimeDomainOutArgs =>
+object_properties! { GetTimeDomainOutArgs =>
 	FrameRange					write
 }
