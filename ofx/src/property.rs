@@ -550,7 +550,6 @@ macro_rules! property {
 		pub mod $name {
 			use super::*;
 			$($tail)*
-
 		}
 		pub use self::$name::CanGet as $get_name;
 		pub use self::$name::CanSet as $set_name;
@@ -1134,7 +1133,7 @@ macro_rules! object_properties {
 		impl $property::CanGet for $trait {}
 	};
 
-	(@tail $trait:ty => $capability:path) => {
+	(@tail $trait:ty => $capability:ident inherit) => {
 		impl $capability for $trait {}
 	};
 
@@ -1154,7 +1153,7 @@ macro_rules! object_properties {
 		object_properties!(@tail $trait => $($tail)*);
 	};
 
-	(@tail $trait:ty => $capability:path, $($tail:tt)*) => {
+	(@tail $trait:ty => $capability:ident inherit, $($tail:tt)*) => {
 		impl $capability for $trait {}
 		object_properties!(@tail $trait => $($tail)*);
 	};
@@ -1307,22 +1306,22 @@ object_properties! { ImageHandle =>
 }
 
 object_properties! { ParamDoubleProperties =>
-	BaseParam,
+	BaseParam					inherit,
 	DoubleParams				write
 }
 
 object_properties! { ParamBooleanProperties =>
-	BaseParam,
+	BaseParam					inherit,
 	BooleanParams				write
 }
 
 object_properties! { ParamPageProperties =>
-	BaseParam,
+	BaseParam					inherit,
 	Children					write
 }
 
 object_properties! { ParamGroupProperties =>
-	BaseParam
+	BaseParam					inherit
 }
 
 object_properties! { DescribeInContextInArgs =>
@@ -1355,12 +1354,12 @@ object_properties! { GetRegionsOfInterestInArgs =>
 }
 
 object_properties! { GetRegionsOfInterestOutArgs =>
-	RawWritable,
+	RawWritable					inherit,
 	RegionOfInterest			write
 }
 
 object_properties! { GetClipPreferencesOutArgs =>
-	RawWritable
+	RawWritable					inherit
 }
 
 object_properties! { InstanceChangedInArgs =>
