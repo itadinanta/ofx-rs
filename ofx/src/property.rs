@@ -14,158 +14,6 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use types::*;
 
-pub trait AsProperties {
-	fn handle(&self) -> OfxPropertySetHandle;
-	fn suite(&self) -> *const OfxPropertySuiteV1;
-}
-
-pub trait HasProperties<T>
-where
-	T: AsProperties + Sized + Clone,
-{
-	fn properties(&self) -> Result<T>;
-}
-
-pub trait Readable: AsProperties + Sized + Clone {
-	fn get<P>(&self) -> Result<P::ReturnType>
-	where
-		P: Named + Get,
-		P::ReturnType: ValueType + Sized + Getter<Self, P>,
-	{
-		self.get_at::<P>(0)
-	}
-
-	fn get_at<P>(&self, index: usize) -> Result<P::ReturnType>
-	where
-		P: Named + Get,
-		P::ReturnType: ValueType + Sized + Getter<Self, P>,
-	{
-		<P::ReturnType as Getter<Self, P>>::get_at(self, index)
-	}
-}
-
-pub trait RawReadable: AsProperties + Sized + Clone {
-	#[inline]
-	fn get_raw<R, I>(&self, id: I) -> Result<R>
-	where
-		I: StringId,
-		R: ValueType + Sized + RawGetter<Self>,
-	{
-		self.get_raw_at(id, 0)
-	}
-
-	fn get_raw_at<R, I>(&self, id: I, index: usize) -> Result<R>
-	where
-		I: StringId,
-		R: ValueType + Sized + RawGetter<Self>,
-	{
-		let c_buf = id.c_string()?;
-		let c_name = c_buf.as_ptr();
-		<R as RawGetter<Self>>::get_at(&self, c_name, index)
-	}
-}
-
-pub trait Writable: AsProperties + Sized + Clone {
-	#[inline]
-	fn set<P>(&mut self, new_value: &P::ValueType) -> Result<()>
-	where
-		P: Named + Set,
-		P::ValueType: ValueType + Setter<Self, P>,
-	{
-		self.set_at::<P>(0, new_value)
-	}
-
-	fn set_at<P>(&mut self, index: usize, new_value: &P::ValueType) -> Result<()>
-	where
-		P: Named + Set,
-		P::ValueType: ValueType + Setter<Self, P>,
-	{
-		<P::ValueType as Setter<Self, P>>::set_at(self, index, new_value)
-	}
-}
-
-pub trait RawWritable: AsProperties + Sized + Clone {
-	#[inline]
-	fn set_raw<V, I>(&mut self, id: I, new_value: &V) -> Result<()>
-	where
-		I: StringId,
-		V: ValueType + RawSetter<Self> + ?Sized + Debug,
-	{
-		self.set_raw_at(id, 0, new_value)
-	}
-
-	fn set_raw_at<V, I>(&mut self, id: I, index: usize, new_value: &V) -> Result<()>
-	where
-		I: StringId,
-		V: ValueType + RawSetter<Self> + ?Sized + Debug,
-	{
-		let buf = id.c_string()?;
-		let c_name = buf.as_ptr();
-		<V as RawSetter<_>>::set_at(self, c_name, index, new_value)
-	}
-}
-
-impl<R> Readable for R where R: AsProperties + Clone {}
-
-impl<W> Writable for W where W: AsProperties + ?Sized + Clone {}
-
-pub trait StringId {
-	fn c_string(self) -> Result<CString>;
-}
-
-impl StringId for &str {
-	fn c_string(self) -> Result<CString> {
-		Ok(CString::new(self)?)
-	}
-}
-
-impl StringId for &[u8] {
-	fn c_string(self) -> Result<CString> {
-		Ok(CStr::from_bytes_with_nul(self)
-			.map_err(|_| Error::InvalidNameEncoding)?
-			.to_owned())
-	}
-}
-
-pub trait ValueType {}
-impl ValueType for Bool {}
-impl ValueType for Int {}
-impl ValueType for Double {}
-impl ValueType for PointI {}
-impl ValueType for PointD {}
-impl ValueType for RangeI {}
-impl ValueType for RangeD {}
-impl ValueType for RectI {}
-impl ValueType for RectD {}
-impl ValueType for String {}
-impl ValueType for str {}
-impl ValueType for [u8] {}
-impl ValueType for CharPtr {}
-impl ValueType for VoidPtr {}
-impl ValueType for VoidPtrMut {}
-impl ValueType for CString {}
-
-type StaticName = &'static [u8];
-pub trait Named {
-	fn name() -> StaticName;
-}
-
-pub trait Get: Named {
-	type ReturnType: ValueType;
-}
-
-pub trait Set: Named {
-	type ValueType: ValueType + ?Sized;
-}
-
-pub trait RawGetter<R>
-where
-	Self: ValueType + Sized,
-	R: Readable + AsProperties,
-{
-	fn get_at(readable: &R, name: CharPtr, index: usize) -> Result<Self>;
-}
-
 macro_rules! raw_getter_impl {
 	(|$readable:ident, $c_name:ident, $index:ident| -> $value_type: ty $stmt:block) => {
 		/// Adds the capability to set arbitrary properties to $value_type
@@ -186,112 +34,6 @@ macro_rules! raw_getter_impl {
 			}
 		}
 	};
-}
-
-raw_getter_impl! { |readable, c_name, index| -> Bool {
-	let mut c_int_out: Int = 0;
-	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut Int)
-	=> c_int_out != 0 }
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> VoidPtr {
-	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
-	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut VoidPtrMut)
-	=> c_ptr_out as VoidPtr }
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> VoidPtrMut {
-	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
-	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut VoidPtrMut)
-	=> c_ptr_out as VoidPtrMut }
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> Int {
-	let mut c_int_out: Int = 0;
-	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut Int)
-	=> c_int_out }
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> PointI {
-	let mut c_struct_out: PointI = unsafe { std::mem::zeroed() };
-	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, POINT_ELEMENTS, &mut c_struct_out.x as *mut Int)
-	=> c_struct_out}
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> RangeI {
-	let mut c_struct_out: RangeI = unsafe { std::mem::zeroed() };
-	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, RANGE_ELEMENTS, &mut c_struct_out.min as *mut Int)
-	=> c_struct_out}
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> RectI {
-	let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
-	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, RECT_ELEMENTS, &mut c_struct_out.x1 as *mut Int)
-	=> c_struct_out}
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> Double {
-	let mut c_double_out: Double = 0.0;
-	to_result! { suite_call!(propGetDouble in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_double_out as *mut Double)
-	=> c_double_out}
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> PointD {
-	let mut c_struct_out: PointD = unsafe { std::mem::zeroed() };
-	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, POINT_ELEMENTS, &mut c_struct_out.x as *mut Double)
-	=> c_struct_out}
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> RangeD {
-	let mut c_struct_out: RangeD = unsafe { std::mem::zeroed() };
-	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, RANGE_ELEMENTS, &mut c_struct_out.min as *mut Double)
-	=> c_struct_out}
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> RectD {
-	let mut c_struct_out: RectD = unsafe { std::mem::zeroed() };
-	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, RECT_ELEMENTS, &mut c_struct_out.x1 as *mut Double)
-	=> c_struct_out}
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> CString {
-	let mut c_ptr_out: CharPtr = std::ptr::null();
-	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut CharPtr)
-	=> unsafe { CStr::from_ptr(c_ptr_out).to_owned() }}
-}}
-
-raw_getter_impl! { |readable, c_name, index| -> String {
-	let mut c_ptr_out: CharPtr = std::ptr::null();
-	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut CharPtr)
-	=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }}
-}}
-
-pub trait Getter<R, P>: RawGetter<R>
-where
-	Self: ValueType + Sized,
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-	fn get_at(readable: &R, index: usize) -> Result<Self> {
-		let c_name = P::name().as_ptr();
-		RawGetter::get_at(readable, c_name as CharPtr, index)
-	}
-}
-
-impl<R, P, T> Getter<R, P> for T
-where
-	T: RawGetter<R>,
-	R: Readable + AsProperties,
-	P: Named + Get<ReturnType = Self>,
-{
-}
-
-pub trait RawSetter<W>
-where
-	Self: ValueType,
-	W: Writable + AsProperties,
-{
-	fn set_at(writable: &mut W, name: CharPtr, index: usize, value: &Self) -> Result<()>;
 }
 
 macro_rules! raw_setter_impl {
@@ -326,108 +68,6 @@ macro_rules! trace_setter {
 			$value
 			)
 	};
-}
-
-raw_setter_impl! { |writable, c_name, index, value: &str| {
-	let c_str_in = CString::new(value)?;
-	let c_ptr_in = c_str_in.as_c_str().as_ptr();
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as CharPtrMut)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &[u8]| {
-	trace_setter!(writable.handle(), c_name, index, str value);
-	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, value.as_ptr() as CharPtrMut)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, *value as VoidPtrMut)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &Int| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, *value)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &PointI| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, POINT_ELEMENTS,  &value.x as *const Int)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &RangeI| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, RANGE_ELEMENTS,  &value.min as *const Int)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &RectI| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, RECT_ELEMENTS,  &value.x1 as *const Int)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &Bool| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, if *value { 1 } else { 0 })
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &Double| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetDouble in *writable.suite(); writable.handle(), c_name, index as Int, *value)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &PointD| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, POINT_ELEMENTS,  &value.x as *const Double)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &RangeD| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, RANGE_ELEMENTS,  &value.min as *const Double)
-}}
-
-raw_setter_impl! { |writable, c_name, index, value: &RectD| {
-	trace_setter!(writable.handle(), c_name, index, value);
-	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, RECT_ELEMENTS,  &value.x1 as *const Double)
-}}
-
-pub trait Setter<W, P>: RawSetter<W>
-where
-	Self: ValueType + Debug,
-	W: Writable + AsProperties,
-	P: Named + Set<ValueType = Self>,
-{
-	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
-		let property_name = P::name();
-		let c_name = property_name.as_ptr();
-		RawSetter::set_at(writable, c_name as CharPtr, index, value)
-	}
-}
-
-impl<W, P, T> Setter<W, P> for T
-where
-	T: RawSetter<W> + ?Sized + Debug,
-	W: Writable + AsProperties,
-	P: Named + Set<ValueType = Self>,
-{
-}
-
-mod tests {
-	// just compiling
-	use super::*;
-	pub struct DummyProperty;
-	impl Set for DummyProperty {
-		type ValueType = [u8];
-	}
-	impl Named for DummyProperty {
-		fn name() -> &'static [u8] {
-			b"kOfxDummyProperty\0"
-		}
-	}
-	pub trait CanSetDummyProperty: Writable {
-		fn set_dummy_property<'a>(&mut self, value: &'a [u8]) -> Result<()> {
-			self.set::<DummyProperty>(value)
-		}
-	}
 }
 
 macro_rules! property_assign_name {
@@ -634,6 +274,422 @@ macro_rules! property {
 			property_define_getter_trait!(CanGet => $get_name, Property, $($tail)*);
 		}
 	};
+}
+
+macro_rules! property_group {
+	($trait:ident => $capability_head:path, $($capability_tail:path),*) => {
+		pub trait $trait: $capability_head
+			$(+ $capability_tail)*
+			{}
+
+		impl<T> $capability_head for T where T: $trait {}
+		$(impl<T> $capability_tail for T where T: $trait {})
+		*
+	}
+}
+
+macro_rules! object_properties {
+	(@tail $trait:ty => $property:ident read+write) => {
+		impl $property::CanGet for $trait {}
+		impl $property::CanSet for $trait {}
+	};
+
+	(@tail $trait:ty => $property:ident write) => {
+		impl $property::CanSet for $trait {}
+	};
+
+	(@tail $trait:ty => $property:ident read) => {
+		impl $property::CanGet for $trait {}
+	};
+
+	(@tail $trait:ty => $capability:ident inherit) => {
+		impl $capability for $trait {}
+	};
+
+	(@tail $trait:ty => $property:ident read+write, $($tail:tt)*) => {
+		impl $property::CanGet for $trait {}
+		impl $property::CanSet for $trait {}
+		object_properties!(@tail $trait => $($tail)*);
+	};
+
+	(@tail $trait:ty => $property:ident write, $($tail:tt)*) => {
+		impl $property::CanSet for $trait {}
+		object_properties!(@tail $trait => $($tail)*);
+	};
+
+	(@tail $trait:ty => $property:ident read, $($tail:tt)*) => {
+		impl $property::CanGet for $trait {}
+		object_properties!(@tail $trait => $($tail)*);
+	};
+
+	(@tail $trait:ty => $capability:ident inherit, $($tail:tt)*) => {
+		impl $capability for $trait {}
+		object_properties!(@tail $trait => $($tail)*);
+	};
+
+	($trait:ty { $($tail:tt)* }) => {
+		object_properties!(@tail $trait => $($tail)*);
+	};
+}
+
+pub trait AsProperties {
+	fn handle(&self) -> OfxPropertySetHandle;
+	fn suite(&self) -> *const OfxPropertySuiteV1;
+}
+
+pub trait HasProperties<T>
+where
+	T: AsProperties + Sized + Clone,
+{
+	fn properties(&self) -> Result<T>;
+}
+
+pub trait Readable: AsProperties + Sized + Clone {
+	fn get<P>(&self) -> Result<P::ReturnType>
+	where
+		P: Named + Get,
+		P::ReturnType: ValueType + Sized + Getter<Self, P>,
+	{
+		self.get_at::<P>(0)
+	}
+
+	fn get_at<P>(&self, index: usize) -> Result<P::ReturnType>
+	where
+		P: Named + Get,
+		P::ReturnType: ValueType + Sized + Getter<Self, P>,
+	{
+		<P::ReturnType as Getter<Self, P>>::get_at(self, index)
+	}
+}
+
+pub trait RawReadable: AsProperties + Sized + Clone {
+	#[inline]
+	fn get_raw<R, I>(&self, id: I) -> Result<R>
+	where
+		I: StringId,
+		R: ValueType + Sized + RawGetter<Self>,
+	{
+		self.get_raw_at(id, 0)
+	}
+
+	fn get_raw_at<R, I>(&self, id: I, index: usize) -> Result<R>
+	where
+		I: StringId,
+		R: ValueType + Sized + RawGetter<Self>,
+	{
+		let c_buf = id.c_string()?;
+		let c_name = c_buf.as_ptr();
+		<R as RawGetter<Self>>::get_at(&self, c_name, index)
+	}
+}
+
+pub trait Writable: AsProperties + Sized + Clone {
+	#[inline]
+	fn set<P>(&mut self, new_value: &P::ValueType) -> Result<()>
+	where
+		P: Named + Set,
+		P::ValueType: ValueType + Setter<Self, P>,
+	{
+		self.set_at::<P>(0, new_value)
+	}
+
+	fn set_at<P>(&mut self, index: usize, new_value: &P::ValueType) -> Result<()>
+	where
+		P: Named + Set,
+		P::ValueType: ValueType + Setter<Self, P>,
+	{
+		<P::ValueType as Setter<Self, P>>::set_at(self, index, new_value)
+	}
+}
+
+pub trait RawWritable: AsProperties + Sized + Clone {
+	#[inline]
+	fn set_raw<V, I>(&mut self, id: I, new_value: &V) -> Result<()>
+	where
+		I: StringId,
+		V: ValueType + RawSetter<Self> + ?Sized + Debug,
+	{
+		self.set_raw_at(id, 0, new_value)
+	}
+
+	fn set_raw_at<V, I>(&mut self, id: I, index: usize, new_value: &V) -> Result<()>
+	where
+		I: StringId,
+		V: ValueType + RawSetter<Self> + ?Sized + Debug,
+	{
+		let buf = id.c_string()?;
+		let c_name = buf.as_ptr();
+		<V as RawSetter<_>>::set_at(self, c_name, index, new_value)
+	}
+}
+
+impl<R> Readable for R where R: AsProperties + Clone {}
+
+impl<W> Writable for W where W: AsProperties + ?Sized + Clone {}
+
+pub trait StringId {
+	fn c_string(self) -> Result<CString>;
+}
+
+impl StringId for &str {
+	fn c_string(self) -> Result<CString> {
+		Ok(CString::new(self)?)
+	}
+}
+
+impl StringId for &[u8] {
+	fn c_string(self) -> Result<CString> {
+		Ok(CStr::from_bytes_with_nul(self)
+			.map_err(|_| Error::InvalidNameEncoding)?
+			.to_owned())
+	}
+}
+
+pub trait ValueType {}
+impl ValueType for Bool {}
+impl ValueType for Int {}
+impl ValueType for Double {}
+impl ValueType for PointI {}
+impl ValueType for PointD {}
+impl ValueType for RangeI {}
+impl ValueType for RangeD {}
+impl ValueType for RectI {}
+impl ValueType for RectD {}
+impl ValueType for String {}
+impl ValueType for str {}
+impl ValueType for [u8] {}
+impl ValueType for CharPtr {}
+impl ValueType for VoidPtr {}
+impl ValueType for VoidPtrMut {}
+impl ValueType for CString {}
+
+type StaticName = &'static [u8];
+pub trait Named {
+	fn name() -> StaticName;
+}
+
+pub trait Get: Named {
+	type ReturnType: ValueType;
+}
+
+pub trait Set: Named {
+	type ValueType: ValueType + ?Sized;
+}
+
+pub trait RawGetter<R>
+where
+	Self: ValueType + Sized,
+	R: Readable + AsProperties,
+{
+	fn get_at(readable: &R, name: CharPtr, index: usize) -> Result<Self>;
+}
+
+raw_getter_impl! { |readable, c_name, index| -> Bool {
+	let mut c_int_out: Int = 0;
+	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut Int)
+	=> c_int_out != 0 }
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> VoidPtr {
+	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
+	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut VoidPtrMut)
+	=> c_ptr_out as VoidPtr }
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> VoidPtrMut {
+	let mut c_ptr_out: *mut std::ffi::c_void = std::ptr::null_mut();
+	to_result! { suite_call!(propGetPointer in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut VoidPtrMut)
+	=> c_ptr_out as VoidPtrMut }
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> Int {
+	let mut c_int_out: Int = 0;
+	to_result! { suite_call!(propGetInt in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_int_out as *mut Int)
+	=> c_int_out }
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> PointI {
+	let mut c_struct_out: PointI = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, POINT_ELEMENTS, &mut c_struct_out.x as *mut Int)
+	=> c_struct_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> RangeI {
+	let mut c_struct_out: RangeI = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, RANGE_ELEMENTS, &mut c_struct_out.min as *mut Int)
+	=> c_struct_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> RectI {
+	let mut c_struct_out: RectI = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetIntN in *readable.suite(); readable.handle(), c_name, RECT_ELEMENTS, &mut c_struct_out.x1 as *mut Int)
+	=> c_struct_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> Double {
+	let mut c_double_out: Double = 0.0;
+	to_result! { suite_call!(propGetDouble in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_double_out as *mut Double)
+	=> c_double_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> PointD {
+	let mut c_struct_out: PointD = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, POINT_ELEMENTS, &mut c_struct_out.x as *mut Double)
+	=> c_struct_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> RangeD {
+	let mut c_struct_out: RangeD = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, RANGE_ELEMENTS, &mut c_struct_out.min as *mut Double)
+	=> c_struct_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> RectD {
+	let mut c_struct_out: RectD = unsafe { std::mem::zeroed() };
+	to_result! { suite_call!(propGetDoubleN in *readable.suite(); readable.handle(), c_name, RECT_ELEMENTS, &mut c_struct_out.x1 as *mut Double)
+	=> c_struct_out}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> CString {
+	let mut c_ptr_out: CharPtr = std::ptr::null();
+	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut CharPtr)
+	=> unsafe { CStr::from_ptr(c_ptr_out).to_owned() }}
+}}
+
+raw_getter_impl! { |readable, c_name, index| -> String {
+	let mut c_ptr_out: CharPtr = std::ptr::null();
+	to_result! { suite_call!(propGetString in *readable.suite(); readable.handle(), c_name, index as Int, &mut c_ptr_out as *mut CharPtr)
+	=> unsafe { CStr::from_ptr(c_ptr_out).to_str()?.to_owned() }}
+}}
+
+pub trait Getter<R, P>: RawGetter<R>
+where
+	Self: ValueType + Sized,
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
+	fn get_at(readable: &R, index: usize) -> Result<Self> {
+		let c_name = P::name().as_ptr();
+		RawGetter::get_at(readable, c_name as CharPtr, index)
+	}
+}
+
+impl<R, P, T> Getter<R, P> for T
+where
+	T: RawGetter<R>,
+	R: Readable + AsProperties,
+	P: Named + Get<ReturnType = Self>,
+{
+}
+
+pub trait RawSetter<W>
+where
+	Self: ValueType,
+	W: Writable + AsProperties,
+{
+	fn set_at(writable: &mut W, name: CharPtr, index: usize, value: &Self) -> Result<()>;
+}
+
+raw_setter_impl! { |writable, c_name, index, value: &str| {
+	let c_str_in = CString::new(value)?;
+	let c_ptr_in = c_str_in.as_c_str().as_ptr();
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, c_ptr_in as CharPtrMut)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &[u8]| {
+	trace_setter!(writable.handle(), c_name, index, str value);
+	suite_fn!(propSetString in *writable.suite(); writable.handle(), c_name, index as Int, value.as_ptr() as CharPtrMut)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &VoidPtr| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetPointer in *writable.suite(); writable.handle(), c_name, index as Int, *value as VoidPtrMut)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &Int| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, *value)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &PointI| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, POINT_ELEMENTS,  &value.x as *const Int)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &RangeI| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, RANGE_ELEMENTS,  &value.min as *const Int)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &RectI| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetIntN in *writable.suite(); writable.handle(), c_name, RECT_ELEMENTS,  &value.x1 as *const Int)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &Bool| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetInt in *writable.suite(); writable.handle(), c_name, index as Int, if *value { 1 } else { 0 })
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &Double| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetDouble in *writable.suite(); writable.handle(), c_name, index as Int, *value)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &PointD| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, POINT_ELEMENTS,  &value.x as *const Double)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &RangeD| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, RANGE_ELEMENTS,  &value.min as *const Double)
+}}
+
+raw_setter_impl! { |writable, c_name, index, value: &RectD| {
+	trace_setter!(writable.handle(), c_name, index, value);
+	suite_fn!(propSetDoubleN in *writable.suite(); writable.handle(), c_name, RECT_ELEMENTS,  &value.x1 as *const Double)
+}}
+
+pub trait Setter<W, P>: RawSetter<W>
+where
+	Self: ValueType + Debug,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+	fn set_at(writable: &mut W, index: usize, value: &Self) -> Result<()> {
+		let property_name = P::name();
+		let c_name = property_name.as_ptr();
+		RawSetter::set_at(writable, c_name as CharPtr, index, value)
+	}
+}
+
+impl<W, P, T> Setter<W, P> for T
+where
+	T: RawSetter<W> + ?Sized + Debug,
+	W: Writable + AsProperties,
+	P: Named + Set<ValueType = Self>,
+{
+}
+
+mod tests {
+	// just compiling
+	use super::*;
+	pub struct DummyProperty;
+	impl Set for DummyProperty {
+		type ValueType = [u8];
+	}
+	impl Named for DummyProperty {
+		fn name() -> &'static [u8] {
+			b"kOfxDummyProperty\0"
+		}
+	}
+	pub trait CanSetDummyProperty: Writable {
+		fn set_dummy_property<'a>(&mut self, value: &'a [u8]) -> Result<()> {
+			self.set::<DummyProperty>(value)
+		}
+	}
 }
 
 property! { kOfxPluginPropFilePath as FilePath {
@@ -1025,18 +1081,7 @@ property! { kOfxParamPropScriptName as ScriptName {
 	set_script_name(&str);
 }}
 
-macro_rules! property_group {
-	($trait:ident => $capability_head:path, $($capability_tail:path),*) => {
-		pub trait $trait: $capability_head
-			$(+ $capability_tail)*
-			{}
-
-		impl<T> $capability_head for T where T: $trait {}
-		$(impl<T> $capability_tail for T where T: $trait {})
-		*
-	}
-}
-
+// TODO - should have the same syntax of object_property
 property_group! { BaseParam =>
 	Label::CanSet,
 	Hint::CanSet,
@@ -1118,50 +1163,6 @@ pub mod BooleanParams {
 }
 
 pub use BooleanParams::CanSet as CanSetBooleanParams;
-
-macro_rules! object_properties {
-	(@tail $trait:ty => $property:ident read+write) => {
-		impl $property::CanGet for $trait {}
-		impl $property::CanSet for $trait {}
-	};
-
-	(@tail $trait:ty => $property:ident write) => {
-		impl $property::CanSet for $trait {}
-	};
-
-	(@tail $trait:ty => $property:ident read) => {
-		impl $property::CanGet for $trait {}
-	};
-
-	(@tail $trait:ty => $capability:ident inherit) => {
-		impl $capability for $trait {}
-	};
-
-	(@tail $trait:ty => $property:ident read+write, $($tail:tt)*) => {
-		impl $property::CanGet for $trait {}
-		impl $property::CanSet for $trait {}
-		object_properties!(@tail $trait => $($tail)*);
-	};
-
-	(@tail $trait:ty => $property:ident write, $($tail:tt)*) => {
-		impl $property::CanSet for $trait {}
-		object_properties!(@tail $trait => $($tail)*);
-	};
-
-	(@tail $trait:ty => $property:ident read, $($tail:tt)*) => {
-		impl $property::CanGet for $trait {}
-		object_properties!(@tail $trait => $($tail)*);
-	};
-
-	(@tail $trait:ty => $capability:ident inherit, $($tail:tt)*) => {
-		impl $capability for $trait {}
-		object_properties!(@tail $trait => $($tail)*);
-	};
-
-	($trait:ty { $($tail:tt)* }) => {
-		object_properties!(@tail $trait => $($tail)*);
-	};
-}
 
 impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
 
