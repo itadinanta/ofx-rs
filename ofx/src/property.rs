@@ -289,21 +289,7 @@ macro_rules! property_group {
 }
 
 macro_rules! object_properties {
-	(@tail $trait:ty => $property:ident read+write) => {
-		impl $property::CanGet for $trait {}
-		impl $property::CanSet for $trait {}
-	};
-
-	(@tail $trait:ty => $property:ident write) => {
-		impl $property::CanSet for $trait {}
-	};
-
-	(@tail $trait:ty => $property:ident read) => {
-		impl $property::CanGet for $trait {}
-	};
-
-	(@tail $trait:ty => $capability:ident inherit) => {
-		impl $capability for $trait {}
+	(@tail $trait:ty => ) => {
 	};
 
 	(@tail $trait:ty => $property:ident read+write, $($tail:tt)*) => {
@@ -1196,7 +1182,7 @@ object_properties! { HostHandle {
 	SequentialRender			read,
 	OpenGLRenderSupported		read,
 	RenderQualityDraft			read,
-	NativeOrigin				read
+	NativeOrigin				read,
 }}
 
 // TODO: canset should be only exposed in the "Describe" action
@@ -1227,7 +1213,7 @@ object_properties! { EffectDescriptorProperties {
 	ClipPreferencesSlaveParam	read+write,
 	FilePath					read,
 	// convenience extras
-	Labels						write
+	Labels						write,
 }}
 
 // Image Effect Instance
@@ -1246,7 +1232,7 @@ object_properties! { ImageEffectProperties {
 	OpenGLRenderSupported		read+write,
 	FrameRate					read,
 	SupportedPixelDepths		read+write,
-	IsInteractive				read
+	IsInteractive				read,
 }}
 
 // Clip Descriptor
@@ -1261,7 +1247,7 @@ object_properties! { ClipProperties {
 	Optional					read+write,
 	FieldExtraction				read+write,
 	IsMask						read+write,
-	SupportsTiles				read+write
+	SupportsTiles				read+write,
 }}
 
 // Clip Instance
@@ -1289,7 +1275,7 @@ object_properties! { ImageClipHandle {
 	Connected					read,
 	UnmappedFrameRange			read,
 	UnmappedFrameRate			read,
-	ContinuousSamples			read
+	ContinuousSamples			read,
 }}
 
 object_properties! { ImageHandle {
@@ -1303,64 +1289,64 @@ object_properties! { ImageHandle {
 	PreMultiplication			read,
 	Components					read,
 	UnmappedPixelDepth			read,
-	UnmappedComponents			read
+	UnmappedComponents			read,
 }}
 
 object_properties! { ParamDoubleProperties {
 	BaseParam					inherit,
-	DoubleParams				write
+	DoubleParams				write,
 }}
 
 object_properties! { ParamBooleanProperties {
 	BaseParam					inherit,
-	BooleanParams				write
+	BooleanParams				write,
 }}
 
 object_properties! { ParamPageProperties {
 	BaseParam					inherit,
-	Children					write
+	Children					write,
 }}
 
 object_properties! { ParamGroupProperties {
-	BaseParam					inherit
+	BaseParam					inherit,
 }}
 
 object_properties! { DescribeInContextInArgs {
-	Context						read
+	Context						read,
 }}
 
 object_properties! { IsIdentityInArgs {
 	Time						read,
 	FieldToRender				read,
 	RenderWindow				read,
-	RenderScale					read
+	RenderScale					read,
 }}
 
 object_properties! { IsIdentityOutArgs {
 	Name						write,
-	Time						write
+	Time						write,
 }}
 
 object_properties! { GetRegionOfDefinitionInArgs {
 	Time						read,
-	RegionOfDefinition			read
+	RegionOfDefinition			read,
 }}
 
 object_properties! { GetRegionOfDefinitionOutArgs {
-	EffectRegionOfDefinition	write
+	EffectRegionOfDefinition	write,
 }}
 
 object_properties! { GetRegionsOfInterestInArgs {
-	RegionOfInterest			read
+	RegionOfInterest			read,
 }}
 
 object_properties! { GetRegionsOfInterestOutArgs {
 	RawWritable					inherit,
-	RegionOfInterest			write
+	RegionOfInterest			write,
 }}
 
 object_properties! { GetClipPreferencesOutArgs {
-	RawWritable					inherit
+	RawWritable					inherit,
 }}
 
 object_properties! { InstanceChangedInArgs {
@@ -1368,15 +1354,15 @@ object_properties! { InstanceChangedInArgs {
 	Name						read,
 	Time						read,
 	ChangeReason				read,
-	RenderScale					read
+	RenderScale					read,
 }}
 
 object_properties! { BeginInstanceChangedInArgs {
-	ChangeReason				read
+	ChangeReason				read,
 }}
 
 object_properties! { EndInstanceChangedInArgs {
-	ChangeReason				read
+	ChangeReason				read,
 }}
 
 object_properties! { RenderInArgs {
@@ -1386,7 +1372,7 @@ object_properties! { RenderInArgs {
 	RenderScale					read,
 	SequentialRenderStatus		read,
 	InteractiveRenderStatus		read,
-	RenderQualityDraft			read
+	RenderQualityDraft			read,
 }}
 
 object_properties! { BeginSequenceRenderInArgs {
@@ -1396,7 +1382,7 @@ object_properties! { BeginSequenceRenderInArgs {
 	RenderScale					read,
 	SequentialRenderStatus		read,
 	InteractiveRenderStatus		read,
-	RenderQualityDraft			read
+	RenderQualityDraft			read,
 }}
 
 object_properties! { EndSequenceRenderInArgs {
@@ -1406,9 +1392,9 @@ object_properties! { EndSequenceRenderInArgs {
 	RenderScale					read,
 	SequentialRenderStatus		read,
 	InteractiveRenderStatus		read,
-	RenderQualityDraft			read
+	RenderQualityDraft			read,
 }}
 
 object_properties! { GetTimeDomainOutArgs {
-	FrameRange					write
+	FrameRange					write,
 }}
