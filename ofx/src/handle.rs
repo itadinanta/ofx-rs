@@ -38,14 +38,14 @@ pub struct GenericPluginHandle {
 }
 
 #[derive(Clone)]
-pub struct HostHandle {
+pub struct ImageEffectHost {
 	inner: OfxPropertySetHandle,
 	property: Rc<OfxPropertySuiteV1>,
 }
 
-impl HostHandle {
+impl ImageEffectHost {
 	pub fn new(host: OfxPropertySetHandle, property: Rc<OfxPropertySuiteV1>) -> Self {
-		HostHandle {
+		ImageEffectHost {
 			inner: host,
 			property,
 		}
@@ -61,7 +61,7 @@ pub struct ImageEffectHandle {
 }
 
 #[derive(Clone)]
-pub struct ImageClipHandle {
+pub struct ClipInstance {
 	inner: OfxImageClipHandle,
 	inner_properties: OfxPropertySetHandle,
 	property: Rc<OfxPropertySuiteV1>,
@@ -69,7 +69,7 @@ pub struct ImageClipHandle {
 }
 
 #[derive(Clone)]
-pub struct ImageHandle {
+pub struct Image {
 	inner: OfxPropertySetHandle,
 	property: Rc<OfxPropertySuiteV1>,
 	image_effect: Rc<OfxImageEffectSuiteV1>,
@@ -116,10 +116,10 @@ macro_rules! trivial_debug {
 }
 
 trivial_debug!(
-	ImageClipHandle,
+	ClipInstance,
 	ImageEffectHandle,
 	GenericPluginHandle,
-	HostHandle
+	ImageEffectHost
 );
 
 impl ImageEffectHandle {
@@ -189,14 +189,14 @@ impl ParamHandle<Bool> {
 	}
 }
 
-impl ImageClipHandle {
+impl ClipInstance {
 	pub fn new(
 		inner: OfxImageClipHandle,
 		inner_properties: OfxPropertySetHandle,
 		property: Rc<OfxPropertySuiteV1>,
 		image_effect: Rc<OfxImageEffectSuiteV1>,
 	) -> Self {
-		ImageClipHandle {
+		ClipInstance {
 			inner,
 			inner_properties,
 			property,
@@ -215,22 +215,22 @@ impl ImageClipHandle {
 		Ok(value)
 	}
 
-	pub fn get_image_mut(&mut self, time: Time) -> Result<Rc<RefCell<ImageHandle>>> {
+	pub fn get_image_mut(&mut self, time: Time) -> Result<Rc<RefCell<Image>>> {
 		self.get_image_rect_mut(time, None)
 	}
 
-	pub fn get_image(&self, time: Time) -> Result<Rc<ImageHandle>> {
+	pub fn get_image(&self, time: Time) -> Result<Rc<Image>> {
 		self.get_image_rect(time, None)
 	}
 
-	pub fn get_image_rect(&self, time: Time, region: Option<RectD>) -> Result<Rc<ImageHandle>> {
+	pub fn get_image_rect(&self, time: Time, region: Option<RectD>) -> Result<Rc<Image>> {
 		let mut image: OfxPropertySetHandle = std::ptr::null_mut();
 		let region_ptr = region
 			.as_ref()
 			.map(|m| m as *const RectD)
 			.unwrap_or(std::ptr::null());
 		suite_fn!(clipGetImage in self.image_effect; self.inner, time, region_ptr, &mut image as *mut OfxPropertySetHandle)?;
-		Ok(Rc::new(ImageHandle::new(
+		Ok(Rc::new(Image::new(
 			image,
 			self.property.clone(),
 			self.image_effect.clone(),
@@ -241,14 +241,14 @@ impl ImageClipHandle {
 		&mut self,
 		time: Time,
 		region: Option<RectD>,
-	) -> Result<Rc<RefCell<ImageHandle>>> {
+	) -> Result<Rc<RefCell<Image>>> {
 		let mut image: OfxPropertySetHandle = std::ptr::null_mut();
 		let region_ptr = region
 			.as_ref()
 			.map(|m| m as *const RectD)
 			.unwrap_or(std::ptr::null());
 		suite_fn!(clipGetImage in self.image_effect; self.inner, time, region_ptr, &mut image as *mut OfxPropertySetHandle)?;
-		Ok(Rc::new(RefCell::new(ImageHandle::new(
+		Ok(Rc::new(RefCell::new(Image::new(
 			image,
 			self.property.clone(),
 			self.image_effect.clone(),
@@ -256,20 +256,20 @@ impl ImageClipHandle {
 	}
 }
 
-impl Drop for ImageHandle {
+impl Drop for Image {
 	fn drop(&mut self) {
 		self.drop_image()
 			.expect("Unable to drop image handle. This is likely a bug");
 	}
 }
 
-impl ImageHandle {
+impl Image {
 	pub fn new(
 		inner: OfxPropertySetHandle,
 		property: Rc<OfxPropertySuiteV1>,
 		image_effect: Rc<OfxImageEffectSuiteV1>,
 	) -> Self {
-		ImageHandle {
+		Image {
 			inner,
 			property,
 			image_effect,
@@ -315,9 +315,9 @@ impl ImageHandle {
 	}
 }
 
-impl HasProperties<ClipProperties> for ImageClipHandle {
-	fn properties(&self) -> Result<ClipProperties> {
-		Ok(ClipProperties::new(
+impl HasProperties<ClipDescriptor> for ClipInstance {
+	fn properties(&self) -> Result<ClipDescriptor> {
+		Ok(ClipDescriptor::new(
 			self.inner_properties,
 			self.property.clone(),
 		))
@@ -377,9 +377,9 @@ macro_rules! properties_newtype {
 }
 
 properties_newtype!(HostProperties);
-properties_newtype!(EffectDescriptorProperties);
-properties_newtype!(ImageEffectProperties);
-properties_newtype!(ClipProperties);
+properties_newtype!(EffectDescriptor);
+properties_newtype!(EffectInstance);
+properties_newtype!(ClipDescriptor);
 
 properties_newtype!(DescribeInContextInArgs);
 
@@ -408,16 +408,18 @@ properties_newtype!(BeginSequenceRenderInArgs);
 properties_newtype!(RenderInArgs);
 properties_newtype!(EndSequenceRenderInArgs);
 
-properties_newtype!(ParamDoubleProperties);
-properties_newtype!(ParamIntProperties);
-properties_newtype!(ParamBooleanProperties);
-properties_newtype!(ParamPageProperties);
-properties_newtype!(ParamGroupProperties);
+properties_newtype!(ParamDouble);
+properties_newtype!(ParamInt);
+properties_newtype!(ParamBoolean);
+properties_newtype!(ParamPage);
+properties_newtype!(ParamGroup);
+
+properties_newtype!(ParameterSet);
 
 impl DescribeInContextInArgs {}
 
-impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
-	fn properties(&self) -> Result<ImageEffectProperties> {
+impl HasProperties<EffectInstance> for ImageEffectHandle {
+	fn properties(&self) -> Result<EffectInstance> {
 		let property_set_handle = {
 			let mut property_set_handle = std::ptr::null_mut();
 
@@ -425,15 +427,15 @@ impl HasProperties<ImageEffectProperties> for ImageEffectHandle {
 
 			property_set_handle
 		};
-		Ok(ImageEffectProperties(PropertySetHandle::new(
+		Ok(EffectInstance(PropertySetHandle::new(
 			property_set_handle,
 			self.property.clone(),
 		)))
 	}
 }
 
-impl HasProperties<EffectDescriptorProperties> for ImageEffectHandle {
-	fn properties(&self) -> Result<EffectDescriptorProperties> {
+impl HasProperties<EffectDescriptor> for ImageEffectHandle {
+	fn properties(&self) -> Result<EffectDescriptor> {
 		let property_set_handle = {
 			let mut property_set_handle = std::ptr::null_mut();
 
@@ -441,7 +443,7 @@ impl HasProperties<EffectDescriptorProperties> for ImageEffectHandle {
 
 			property_set_handle
 		};
-		Ok(EffectDescriptorProperties(PropertySetHandle::new(
+		Ok(EffectDescriptor(PropertySetHandle::new(
 			property_set_handle,
 			self.property.clone(),
 		)))
@@ -450,20 +452,20 @@ impl HasProperties<EffectDescriptorProperties> for ImageEffectHandle {
 
 
 impl ImageEffectHandle {
-	fn clip_define(&self, clip_name: &[u8]) -> Result<ClipProperties> {
+	fn clip_define(&self, clip_name: &[u8]) -> Result<ClipDescriptor> {
 		let property_set_handle = {
 			let mut property_set_handle = std::ptr::null_mut();
 			suite_fn!(clipDefine in self.image_effect;
 				self.inner, clip_name.as_ptr() as *const i8, &mut property_set_handle as *mut _)?;
 			property_set_handle
 		};
-		Ok(ClipProperties(PropertySetHandle::new(
+		Ok(ClipDescriptor(PropertySetHandle::new(
 			property_set_handle,
 			self.property.clone(),
 		)))
 	}
 
-	fn clip_get_handle(&self, clip_name: &[u8]) -> Result<ImageClipHandle> {
+	fn clip_get_handle(&self, clip_name: &[u8]) -> Result<ClipInstance> {
 		let (clip_handle, clip_properties) = {
 			let mut clip_handle = std::ptr::null_mut();
 			let mut clip_properties = std::ptr::null_mut();
@@ -471,7 +473,7 @@ impl ImageEffectHandle {
 				self.inner, clip_name.as_ptr() as *const i8, &mut clip_handle as *mut _, &mut clip_properties as *mut _)?;
 			(clip_handle, clip_properties)
 		};
-		Ok(ImageClipHandle::new(
+		Ok(ClipInstance::new(
 			clip_handle,
 			clip_properties,
 			self.property.clone(),
@@ -496,28 +498,28 @@ impl ImageEffectHandle {
 		))
 	}
 
-	pub fn get_output_clip(&self) -> Result<ImageClipHandle> {
+	pub fn get_output_clip(&self) -> Result<ClipInstance> {
 		self.clip_get_handle(ofx_sys::kOfxImageEffectOutputClipName)
 	}
 
-	pub fn get_simple_input_clip(&self) -> Result<ImageClipHandle> {
+	pub fn get_simple_input_clip(&self) -> Result<ClipInstance> {
 		self.clip_get_handle(ofx_sys::kOfxImageEffectSimpleSourceClipName)
 	}
 
-	pub fn get_clip(&self, name: &str) -> Result<ImageClipHandle> {
+	pub fn get_clip(&self, name: &str) -> Result<ClipInstance> {
 		let str_buf = CString::new(name)?.into_bytes_with_nul();
 		self.clip_get_handle(&str_buf)
 	}
 
-	pub fn new_output_clip(&self) -> Result<ClipProperties> {
+	pub fn new_output_clip(&self) -> Result<ClipDescriptor> {
 		self.clip_define(ofx_sys::kOfxImageEffectOutputClipName)
 	}
 
-	pub fn new_simple_input_clip(&self) -> Result<ClipProperties> {
+	pub fn new_simple_input_clip(&self) -> Result<ClipDescriptor> {
 		self.clip_define(ofx_sys::kOfxImageEffectSimpleSourceClipName)
 	}
 
-	pub fn new_clip(&self, name: &str) -> Result<ClipProperties> {
+	pub fn new_clip(&self, name: &str) -> Result<ClipDescriptor> {
 		let str_buf = CString::new(name)?.into_bytes_with_nul();
 		self.clip_define(&str_buf)
 	}
@@ -530,7 +532,7 @@ impl ImageEffectHandle {
 	where
 		T: Sized,
 	{
-		let mut effect_props: ImageEffectProperties = self.properties()?;
+		let mut effect_props: EffectInstance = self.properties()?;
 		let data_box = Box::new(data);
 		let data_ptr = Box::into_raw(data_box);
 		let status = suite_fn!(propSetPointer in self.property;
@@ -544,7 +546,7 @@ impl ImageEffectHandle {
 	}
 
 	fn get_instance_data_ptr(&self) -> Result<VoidPtrMut> {
-		let mut effect_props: ImageEffectProperties = self.properties()?;
+		let mut effect_props: EffectInstance = self.properties()?;
 		let mut data_ptr = std::ptr::null_mut();
 		to_result! { suite_call!(propGetPointer in self.property;
 		   effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0, &mut data_ptr)
@@ -625,28 +627,28 @@ impl ParamSetHandle {
 		))
 	}
 
-	pub fn param_define_double(&mut self, name: &str) -> Result<ParamDoubleProperties> {
+	pub fn param_define_double(&mut self, name: &str) -> Result<ParamDouble> {
 		self.param_define(ParamType::Double, name)
 	}
 
-	pub fn param_define_int(&mut self, name: &str) -> Result<ParamIntProperties> {
+	pub fn param_define_int(&mut self, name: &str) -> Result<ParamInt> {
 		self.param_define(ParamType::Integer, name)
 	}
 
-	pub fn param_define_boolean(&mut self, name: &str) -> Result<ParamBooleanProperties> {
+	pub fn param_define_boolean(&mut self, name: &str) -> Result<ParamBoolean> {
 		self.param_define(ParamType::Boolean, name)
 	}
 
-	pub fn param_define_group(&mut self, name: &str) -> Result<ParamGroupProperties> {
+	pub fn param_define_group(&mut self, name: &str) -> Result<ParamGroup> {
 		self.param_define(ParamType::Group, name)
 	}
 
-	pub fn param_define_page(&mut self, name: &str) -> Result<ParamPageProperties> {
+	pub fn param_define_page(&mut self, name: &str) -> Result<ParamPage> {
 		self.param_define(ParamType::Page, name)
 	}
 }
 
-impl AsProperties for HostHandle {
+impl AsProperties for ImageEffectHost {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner
 	}
@@ -655,7 +657,7 @@ impl AsProperties for HostHandle {
 	}
 }
 
-impl AsProperties for ImageClipHandle {
+impl AsProperties for ClipInstance {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner_properties
 	}
@@ -664,7 +666,7 @@ impl AsProperties for ImageClipHandle {
 	}
 }
 
-impl AsProperties for ImageHandle {
+impl AsProperties for Image {
 	fn handle(&self) -> OfxPropertySetHandle {
 		self.inner
 	}
@@ -692,7 +694,7 @@ mod tests {
 
 	// do not run, just compile!
 	fn prop_host() {
-		let mut handle = ImageEffectProperties(PropertySetHandle::empty());
+		let mut handle = EffectInstance(PropertySetHandle::empty());
 
 		handle.get::<property::Type::Property>();
 		handle.get::<property::IsBackground::Property>();

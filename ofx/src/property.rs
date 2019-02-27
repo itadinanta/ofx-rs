@@ -5,6 +5,7 @@ use enums::{
 	ImageEffectRender, ImageField, ImageFieldExtraction, ImageFieldOrder, ParamDoubleType,
 	Type as EType,
 };
+use handle::Image;
 use handle::*;
 use ofx_sys::*;
 use result;
@@ -277,15 +278,59 @@ macro_rules! property {
 }
 
 macro_rules! property_group {
-	($trait:ident => $capability_head:path, $($capability_tail:path),*) => {
-		pub trait $trait: $capability_head
-			$(+ $capability_tail)*
-			{}
+	
+	(@impl $trait:ty => ) => {};
+	(@trait_cont $trait:ty => ) => {};
 
-		impl<T> $capability_head for T where T: $trait {}
-		$(impl<T> $capability_tail for T where T: $trait {})
-		*
-	}
+	(@impl $trait:ty => $property:ident read+write, $($tail:tt)*) => {
+		impl $property::CanGet for T where T: $trait {}
+		impl $property::CanSet for T where T: $trait {}
+		property_group!(@tail $trait => $($tail)*);
+	};
+
+	(@impl $trait:ty => $property:ident write, $($tail:tt)*) => {
+		impl $property::CanSet for T where T: $trait {}
+		property_group!(@tail $trait => $($tail)*);
+	};
+
+	(@impl $trait:ty => $property:ident read, $($tail:tt)*) => {
+		impl $property::CanGet for T where T: $trait {}
+		property_group!(@tail $trait => $($tail)*);
+	};
+
+	(@trait_start $property:ident read+write) => {
+		$property::CanGet + $property::CanSet
+	};
+
+	(@trait_start $property:ident read) => {
+		$property::CanGet
+	};
+
+	(@trait_start $property:ident write) => {
+		$property::CanSet
+	};
+
+	(@trait_cont $head1:tt $head2:tt, $($tail:tt)*) => {
+		+ property_group!(@trait_start );
+		property_group!(@trait_cont $($tail)*);
+	};
+
+	($trait:ident { $head1:tt $head2:tt, $($tail:tt)* }) => {
+		pub trait $trait: property_group!(@trait_start $head1 $head2)
+			property_group(@trait_cont $($tail)*)
+			{}
+		property_group!(@impl $trait => $head1 $head2, $($tail)*);
+	};
+	
+//	($trait:ident => $capability_head:path, $($capability_tail:path),*) => {
+//		pub trait $trait: $capability_head
+//			$(+ $capability_tail)*
+//			{}
+//
+//		impl<T> $capability_head for T where T: $trait {}
+//		$(impl<T> $capability_tail for T where T: $trait {})
+//		*
+//	};	
 }
 
 macro_rules! object_properties {
@@ -1052,6 +1097,10 @@ property! { kOfxParamPropEnabled as Enabled {
 	set_enabled(Bool);
 }}
 
+property! { kOfxPropParamSetNeedsSyncing as NeedsSyncing {
+	get_needs_syncing() -> Bool;
+}}
+
 property! { kOfxParamPropHint as Hint {
 	get_hint() -> String;
 	set_hint(&str);
@@ -1067,14 +1116,14 @@ property! { kOfxParamPropScriptName as ScriptName {
 	set_script_name(&str);
 }}
 
-// TODO - should have the same syntax of object_property
-property_group! { BaseParam =>
-	Label::CanSet,
-	Hint::CanSet,
-	Parent::CanSet,
-	ScriptName::CanSet,
-	Enabled::CanSet, Enabled::CanGet
-}
+property_group! { CommonParameters {
+	Type				read,
+	Label				read,
+	Hint				read+write,
+	Parent				read+write,
+	ScriptName			read+write,
+	Enabled				read+write,
+}}
 
 pub mod double {
 	use super::*;
@@ -1150,10 +1199,10 @@ pub mod BooleanParams {
 
 pub use BooleanParams::CanSet as CanSetBooleanParams;
 
-impl<T> BaseParam for ParamHandle<T> where T: ParamHandleValue + Clone {}
+impl<T> CommonParameters for ParamHandle<T> where T: ParamHandleValue + Clone {}
 
 // https://openfx.readthedocs.io/en/doc/Reference/ofxPropertiesByObject.html#properties-on-an-effect-descriptor
-object_properties! { HostHandle {
+object_properties! { ImageEffectHost {
 	Name						read,
 	Label						read,
 	Version						read,
@@ -1186,8 +1235,7 @@ object_properties! { HostHandle {
 }}
 
 // TODO: canset should be only exposed in the "Describe" action
-// Effect Descriptor
-object_properties! { EffectDescriptorProperties {
+object_properties! { EffectDescriptor {
 	Type						read,
 	Label						read+write,
 	ShortLabel					read+write,
@@ -1217,7 +1265,7 @@ object_properties! { EffectDescriptorProperties {
 }}
 
 // Image Effect Instance
-object_properties! { ImageEffectProperties {
+object_properties! { EffectInstance {
 	Type						read,
 	Context						read,
 	Label						read,
@@ -1236,7 +1284,7 @@ object_properties! { ImageEffectProperties {
 }}
 
 // Clip Descriptor
-object_properties! { ClipProperties {
+object_properties! { ClipDescriptor {
 	Type						read,
 	Name						read,
 	Label						read+write,
@@ -1251,7 +1299,7 @@ object_properties! { ClipProperties {
 }}
 
 // Clip Instance
-object_properties! { ImageClipHandle {
+object_properties! { ClipInstance {
 	Type						read,
 	Name						read,
 	Label						read,
@@ -1278,37 +1326,42 @@ object_properties! { ImageClipHandle {
 	ContinuousSamples			read,
 }}
 
-object_properties! { ImageHandle {
+object_properties! { Image {
 	Type						read,
-	Bounds						read,
-	Data						read,
-	RowBytes					read,
-	RegionOfDefinition			read,
-	PixelAspectRatio			read,
 	PixelDepth					read,
-	PreMultiplication			read,
 	Components					read,
-	UnmappedPixelDepth			read,
-	UnmappedComponents			read,
+	PreMultiplication			read,
+	RenderScale					read,
+	PixelAspectRatio			read,
+	Data						read,
+	Bounds						read,
+	RegionOfDefinition			read,
+	RowBytes					read,
+	Field						read,
+	UniqueIdentifier			read,
 }}
 
-object_properties! { ParamDoubleProperties {
-	BaseParam					inherit,
+object_properties! { ParamDouble {
+	CommonParameters			inherit,
 	DoubleParams				write,
 }}
 
-object_properties! { ParamBooleanProperties {
-	BaseParam					inherit,
+object_properties! { ParamBoolean {
+	CommonParameters			inherit,
 	BooleanParams				write,
 }}
 
-object_properties! { ParamPageProperties {
-	BaseParam					inherit,
+object_properties! { ParamPage {
+	CommonParameters			inherit,
 	Children					write,
 }}
 
-object_properties! { ParamGroupProperties {
-	BaseParam					inherit,
+object_properties! { ParamGroup {
+	CommonParameters			inherit,
+}}
+
+object_properties! { ParameterSet {
+	NeedsSyncing				read,
 }}
 
 object_properties! { DescribeInContextInArgs {

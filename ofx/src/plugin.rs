@@ -92,7 +92,7 @@ pub struct PluginDescriptor {
 }
 
 pub struct PluginContext {
-	host: HostHandle,
+	host: ImageEffectHost,
 	suites: Suites,
 }
 
@@ -108,7 +108,7 @@ pub trait Runnable: Sized + Send + Sync {
 }
 
 impl PluginContext {
-	pub fn get_host(&self) -> HostHandle {
+	pub fn get_host(&self) -> ImageEffectHost {
 		self.host.clone()
 	}
 
@@ -274,7 +274,7 @@ impl Dispatch for PluginDescriptor {
 
 				if let (Some(host), Some(suites)) = (self.host, self.suites.clone()) {
 					let plugin_context = PluginContext {
-						host: HostHandle::new(host.host, suites.property()),
+						host: ImageEffectHost::new(host.host, suites.property()),
 						suites,
 					};
 					let status = self.execute(&plugin_context, &mut mapped_action);
