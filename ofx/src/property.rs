@@ -278,64 +278,32 @@ macro_rules! property {
 }
 
 macro_rules! property_group {
-	
-	(@impl $trait:ty => ) => {};
-	(@trait_cont $trait:ty => ) => {};
+	(@impl $trait:ident => ) => {};
 
-	(@impl $trait:ty => $property:ident read+write, $($tail:tt)*) => {
-		impl $property::CanGet for T where T: $trait {}
-		impl $property::CanSet for T where T: $trait {}
-		property_group!(@tail $trait => $($tail)*);
+	(@impl $trait:ident => $property:ident read+write, $($tail:tt)*) => {
+		impl <T> $property::CanGet for T where T: $trait {}
+		impl <T> $property::CanSet for T where T: $trait {}
+		property_group!(@impl $trait => $($tail)*);
 	};
 
 	(@impl $trait:ty => $property:ident write, $($tail:tt)*) => {
-		impl $property::CanSet for T where T: $trait {}
-		property_group!(@tail $trait => $($tail)*);
+		impl <T> $property::CanSet for T where T: $trait {}
+		property_group!(@impl $trait => $($tail)*);
 	};
 
-	(@impl $trait:ty => $property:ident read, $($tail:tt)*) => {
-		impl $property::CanGet for T where T: $trait {}
-		property_group!(@tail $trait => $($tail)*);
-	};
-
-	(@trait_start $property:ident read+write) => {
-		$property::CanGet + $property::CanSet
-	};
-
-	(@trait_start $property:ident read) => {
-		$property::CanGet
-	};
-
-	(@trait_start $property:ident write) => {
-		$property::CanSet
-	};
-
-	(@trait_cont $head1:tt $head2:tt, $($tail:tt)*) => {
-		+ property_group!(@trait_start );
-		property_group!(@trait_cont $($tail)*);
+	(@impl $trait:ident => $property:ident read, $($tail:tt)*) => {
+		impl <T> $property::CanGet for T where T: $trait {}
+		property_group!(@impl $trait => $($tail)*);
 	};
 
 	($trait:ident { $head1:tt $head2:tt, $($tail:tt)* }) => {
-		pub trait $trait: property_group!(@trait_start $head1 $head2)
-			property_group(@trait_cont $($tail)*)
-			{}
+		pub trait $trait: AsProperties + Clone {}
 		property_group!(@impl $trait => $head1 $head2, $($tail)*);
 	};
-	
-//	($trait:ident => $capability_head:path, $($capability_tail:path),*) => {
-//		pub trait $trait: $capability_head
-//			$(+ $capability_tail)*
-//			{}
-//
-//		impl<T> $capability_head for T where T: $trait {}
-//		$(impl<T> $capability_tail for T where T: $trait {})
-//		*
-//	};	
 }
 
 macro_rules! object_properties {
-	(@tail $trait:ty => ) => {
-	};
+	(@tail $trait:ty => ) => {};
 
 	(@tail $trait:ty => $property:ident read+write, $($tail:tt)*) => {
 		impl $property::CanGet for $trait {}
@@ -1118,7 +1086,7 @@ property! { kOfxParamPropScriptName as ScriptName {
 
 property_group! { CommonParameters {
 	Type				read,
-	Label				read,
+	Label				read+write,
 	Hint				read+write,
 	Parent				read+write,
 	ScriptName			read+write,
