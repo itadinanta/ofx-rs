@@ -18,6 +18,6 @@ path="src/lib.rs"
 libc = "0.2"
 log="0.4"
 log4rs = "0.8"
-ofx_sys = "0.2"
+ofx_sys = { path = "../ofx-sys" }
 phf = "0.7"
 
