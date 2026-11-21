@@ -1,7 +1,8 @@
 [package]
 name = "ofx_rs_basic"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Nicola Orru <nigu.orru@gmail.com>"]
+edition = "2018"
 keywords = ["ofx", "openfx", "effects", "natron", "nuke"]
 description = "Bindings for OpenFX 1.4"
 repository = "https://github.com/itadinanta/ofx-rs"
