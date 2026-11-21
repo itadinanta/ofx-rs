@@ -9,7 +9,6 @@ extern crate log4rs;
 extern crate paste;
 
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
 use std::fmt;
 use std::fmt::Display;
 use std::marker::PhantomData;
@@ -34,6 +33,7 @@ pub use action::*;
 pub use enums::Type;
 pub use enums::*;
 pub use handle::*;
+pub use handle::Image;
 pub use image::*;
 pub use plugin::*;
 pub use property::*;

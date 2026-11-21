@@ -204,7 +204,7 @@ pub trait PixelFormat: Sized + Copy + Clone {
 }
 
 macro_rules! pixel_format_rgba {
-	($rgba:ty, $channel_value:ty) => {
+	($rgba:ident, $channel_value:ty) => {
 		impl PixelFormat for $rgba {
 			type ChannelValue = $channel_value;
 			fn channel(&self, i: usize) -> &Self::ChannelValue {
@@ -261,12 +261,7 @@ macro_rules! pixel_format_rgba {
 				b: Self::ChannelValue,
 				a: Self::ChannelValue,
 			) -> Self {
-				let mut instance: $rgba = unsafe { std::mem::uninitialized() };
-				instance.r = r;
-				instance.g = g;
-				instance.b = b;
-				instance.a = a;
-				instance
+				$rgba { r, g, b, a }
 			}
 
 			#[inline]

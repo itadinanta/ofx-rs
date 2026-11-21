@@ -4,6 +4,7 @@ use crate::plugin::*;
 use crate::result::*;
 use crate::types::*;
 use ofx_sys::*;
+use std::cell::UnsafeCell;
 use std::collections::HashMap;
 
 #[derive(Default)]
@@ -83,7 +84,14 @@ pub unsafe fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
 	}
 }
 
-static mut _GLOBAL_REGISTRY: Option<Registry> = None;
+// Interior-mutable global: `get_registry`/`get_registry_mut` hand out
+// `&'static` and `&'static mut` references, so the cell must not be
+// synchronized. Same (unchecked) access discipline as the previous
+// `static mut Option<Registry>`.
+struct GlobalRegistry(UnsafeCell<Option<Registry>>);
+// SAFETY: identical to the previous `static mut` - no concurrent access guarantee.
+unsafe impl Sync for GlobalRegistry {}
+static _GLOBAL_REGISTRY: GlobalRegistry = GlobalRegistry(UnsafeCell::new(None));
 
 pub fn main_entry_for_plugin(
 	plugin_module: &str,
@@ -113,7 +121,7 @@ where
 	F: Fn(&mut Registry),
 {
 	unsafe {
-		if _GLOBAL_REGISTRY.is_none() {
+		if (*_GLOBAL_REGISTRY.0.get()).is_none() {
 			use log4rs::append::console::*;
 			use log4rs::config::*;
 
@@ -136,17 +144,17 @@ where
 			for plugin in &registry.plugins {
 				info!("Registered plugin {}", plugin);
 			}
-			_GLOBAL_REGISTRY = Some(registry);
+			*_GLOBAL_REGISTRY.0.get() = Some(registry);
 		}
 	}
 }
 
 fn get_registry_mut() -> &'static mut Registry {
-	unsafe { _GLOBAL_REGISTRY.as_mut().unwrap() }
+	unsafe { (*_GLOBAL_REGISTRY.0.get()).as_mut().unwrap() }
 }
 
 pub fn get_registry() -> &'static Registry {
-	unsafe { _GLOBAL_REGISTRY.as_ref().unwrap() }
+	unsafe { (*_GLOBAL_REGISTRY.0.get()).as_ref().unwrap() }
 }
 
 #[macro_export]
