@@ -7,10 +7,10 @@ use std::marker::PhantomData;
 
 use crate::enums::*;
 use crate::handle::*;
-use ofx_sys::*;
 use crate::plugin::PluginContext;
 use crate::result::*;
 use crate::types::*;
+use ofx_sys::*;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum GlobalAction {

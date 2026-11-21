@@ -7,13 +7,13 @@ use crate::enums::{
 };
 use crate::handle::Image;
 use crate::handle::*;
-use ofx_sys::*;
 use crate::result;
 use crate::result::*;
+use crate::types::*;
+use ofx_sys::*;
 use std::ffi::{CStr, CString};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use crate::types::*;
 
 macro_rules! raw_getter_impl {
 	(|$readable:ident, $c_name:ident, $index:ident| -> $value_type: ty $stmt:block) => {

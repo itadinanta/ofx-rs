@@ -1,17 +1,17 @@
 // Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use crate::enums::*;
 use crate::image::*;
-use ofx_sys::*;
 use crate::property::*;
 use crate::result::*;
+use crate::types::Time;
+use crate::types::*;
+use ofx_sys::*;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use crate::types::Time;
-use crate::types::*;
 
 #[derive(Debug, Clone)]
 pub struct PropertySetHandle {

@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
+use crate::types::*;
 use ofx_sys::*;
 use std::fmt;
 use std::fmt::Display;
-use crate::types::*;
 
 pub use ofx_sys::eOfxStatus_ErrBadHandle;
 pub use ofx_sys::eOfxStatus_ErrBadIndex;

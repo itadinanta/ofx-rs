@@ -4,16 +4,16 @@
 use crate::action::*;
 use crate::enums::*;
 use crate::handle::*;
-use ofx_sys::*;
 use crate::property::*;
 use crate::result::*;
+use crate::suites::*;
+use crate::types::*;
+use ofx_sys::*;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
-use crate::suites::*;
-use crate::types::*;
 
 pub struct ApiVersion(pub Int);
 pub struct PluginVersion(pub UnsignedInt, pub UnsignedInt);

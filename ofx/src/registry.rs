@@ -1,10 +1,10 @@
 // Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use crate::action::*;
-use ofx_sys::*;
 use crate::plugin::*;
 use crate::result::*;
-use std::collections::HashMap;
 use crate::types::*;
+use ofx_sys::*;
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct Registry {

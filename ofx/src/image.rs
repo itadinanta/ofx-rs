@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use crate::enums::{BitDepth, ImageComponent};
-use std::marker::PhantomData;
 use crate::types::*;
+use std::marker::PhantomData;
 
 pub trait ChannelFormat {
 	fn range_max() -> f32;
