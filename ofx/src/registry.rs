@@ -76,6 +76,9 @@ impl Registry {
 	}
 }
 
+/// # Safety
+/// This function is called directly by the host.
+/// It's the caller's responsibility to ensure `host` points at a valid OfxHost
 pub unsafe fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
 	unsafe {
 		get_registry_mut()

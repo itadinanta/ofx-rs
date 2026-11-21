@@ -550,8 +550,18 @@ impl ImageEffectHandle {
 		=> data_ptr }
 	}
 
-	// TODO: this is not safe enough
-	pub fn get_instance_data<T>(&self) -> Result<&mut T>
+	pub fn get_instance_data<T>(&self) -> Result<&T>
+	where
+		T: Sized,
+	{
+		unsafe {
+			let ptr = self.get_instance_data_ptr()?;
+			let reference = ptr as *const T;
+			Ok(&*reference)
+		}
+	}
+
+	pub fn get_instance_data_mut<T>(&mut self) -> Result<&mut T>
 	where
 		T: Sized,
 	{
@@ -562,12 +572,24 @@ impl ImageEffectHandle {
 		}
 	}
 
-	pub fn drop_instance_data(&mut self) -> Result<()> {
-		unsafe {
-			let mut ptr = self.get_instance_data_ptr()?;
-			if !ptr.is_null() {
-				Box::from_raw(ptr);
-			}
+	/// Frees the value previously stored with `set_instance_data`.
+	///
+	/// `T` must be the same type that was passed to `set_instance_data`:
+	/// the property stores the pointer type-erased, so the layout and drop
+	/// glue can only be recovered from the type argument.
+	pub fn drop_instance_data<T>(&mut self) -> Result<()>
+	where
+		T: Sized,
+	{
+		let ptr = self.get_instance_data_ptr()?;
+		if !ptr.is_null() {
+			// Clear the property before freeing, so a failed propSetPointer
+			// leaves the value (and the pointer to it) intact.
+			let mut effect_props: EffectInstance = self.properties()?;
+			suite_fn!(propSetPointer in self.property;
+				effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0,
+				std::ptr::null_mut())?;
+			drop(unsafe { Box::from_raw(ptr as *mut T) });
 		}
 		Ok(())
 	}

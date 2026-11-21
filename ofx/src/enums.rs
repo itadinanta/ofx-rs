@@ -265,6 +265,6 @@ mod tests {
 		);
 		let str_value =
 			unsafe { CStr::from_bytes_with_nul_unchecked(b"OfxImageEffectContextGeneral\0") };
-		assert!(ImageEffectContext::from_cstring(&str_value) == Some(ImageEffectContext::General));
+		assert!(ImageEffectContext::from_cstring(str_value) == Some(ImageEffectContext::General));
 	}
 }

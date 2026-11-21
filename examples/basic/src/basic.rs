@@ -200,7 +200,7 @@ impl Execute for SimplePlugin {
 				let time = in_args.get_time()?;
 				// TODO: what happens if render_window < full size?
 				let render_window = in_args.get_render_window()?;
-				let instance_data: &mut MyInstanceData = effect.get_instance_data()?;
+				let instance_data: &mut MyInstanceData = effect.get_instance_data_mut()?;
 
 				let source_image = instance_data.source_clip.get_image(time)?;
 				let output_image = instance_data.output_clip.get_image_mut(time)?;
@@ -565,8 +565,8 @@ impl Execute for SimplePlugin {
 
 impl SimplePlugin {
 	fn set_per_component_scale_enabledness(effect: &mut ImageEffectHandle) -> Result<()> {
-		let instance_data: &mut MyInstanceData = effect.get_instance_data()?;
 		let input_clip = effect.get_simple_input_clip()?;
+		let instance_data: &mut MyInstanceData = effect.get_instance_data_mut()?;
 		let is_input_rgb = input_clip.get_connected()? && input_clip.get_components()?.is_rgb();
 		instance_data
 			.per_component_scale_param

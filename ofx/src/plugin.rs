@@ -99,6 +99,10 @@ pub struct PluginContext {
 
 pub trait Runnable: Sized + Send + Sync {
 	fn run(&mut self, thread_index: UnsignedInt, thread_max: UnsignedInt);
+
+	/// # Safety
+	/// This is the callback that's exposed to the OpenFX API. We assume that the callback
+	/// value "me" points to an instance of Runnable.
 	unsafe extern "C" fn run_myself(
 		thread_index: UnsignedInt,
 		thread_max: UnsignedInt,
@@ -218,7 +222,7 @@ impl MapAction for PluginDescriptor {
 				BeginInstanceChanged => map_args!(BeginInstanceChanged(in_args)),
 				InstanceChanged => map_args!(InstanceChanged(in_args)),
 				EndInstanceChanged => map_args!(EndInstanceChanged(in_args)),
-				DestroyInstance => map_args!(DestroyInstance()), // handled by the library
+				DestroyInstance => map_args!(DestroyInstance()), // handled by the plugin
 				_ => Err(Error::InvalidAction),
 			}
 		} else {
@@ -248,11 +252,8 @@ impl Filter for PluginDescriptor {
 		action: &mut Action,
 		_status: Result<Int>,
 	) -> Result<Int> {
-		match action {
-			Action::DestroyInstance(ref mut effect) => effect.drop_instance_data(),
-			_ => Ok(()),
-		}?;
-
+		// The instance data is freed by the plugin: drop_instance_data
+		// is generic and the library does not know the concrete type.
 		OK
 	}
 }

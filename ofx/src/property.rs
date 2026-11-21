@@ -428,7 +428,7 @@ pub trait RawWritable: AsProperties + Sized + Clone {
 
 impl<R> Readable for R where R: AsProperties + Clone {}
 
-impl<W> Writable for W where W: AsProperties + ?Sized + Clone {}
+impl<W> Writable for W where W: AsProperties + Clone {}
 
 pub trait StringId {
 	fn c_string(self) -> Result<CString>;
