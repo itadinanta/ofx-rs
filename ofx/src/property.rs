@@ -1228,8 +1228,6 @@ object_properties! { EffectDescriptor {
 	OpenGLRenderSupported		read+write,
 	ClipPreferencesSlaveParam	read+write,
 	FilePath					read,
-	// convenience extras
-	Labels						write,
 }}
 
 // Image Effect Instance

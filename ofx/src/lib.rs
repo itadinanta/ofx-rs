@@ -39,6 +39,7 @@ pub use plugin::*;
 pub use property::*;
 use registry::*;
 pub use result::*;
+pub use types::Time;
 pub use types::*;
 pub use util::*;
 

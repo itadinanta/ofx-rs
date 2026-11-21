@@ -25,11 +25,7 @@ impl PropertySetHandle {
 	}
 
 	pub(crate) fn empty() -> Self {
-		panic!("Do not use, only for type validation testing");
-		PropertySetHandle {
-			inner: std::ptr::null::<OfxPropertySetStruct>() as *mut _,
-			property: unsafe { Rc::new(*std::ptr::null()) },
-		}
+		unimplemented!("Do not use, only for type validation testing")
 	}
 }
 
