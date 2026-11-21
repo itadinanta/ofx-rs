@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 plugin_module!(
 	"net.itadinanta.ofx-rs.basic",
 	ApiVersion(1),
-	PluginVersion(1, 0),
+	PluginVersion(1, 1),
 	SimplePlugin::new
 );
 

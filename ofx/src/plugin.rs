@@ -152,6 +152,8 @@ impl Display for PluginDescriptor {
 }
 
 impl MapAction for PluginDescriptor {
+	// The action pointer is supplied by the host as a NUL-terminated C string.
+	#[allow(clippy::not_unsafe_ptr_arg_deref)]
 	fn map_action(
 		&self,
 		action: CharPtr,

@@ -22,6 +22,9 @@ macro_rules! raw_getter_impl {
 		where
 			R: Readable + AsProperties,
 		{
+			// The name pointer is always a crate-internal static NUL-terminated
+			// constant supplied by the safe property API.
+			#[allow(clippy::not_unsafe_ptr_arg_deref)]
 			fn get_at($readable: &R, $c_name: CharPtr, $index: usize) -> Result<Self> {
 				let value = { $stmt };
 				debug!(
@@ -43,6 +46,7 @@ macro_rules! raw_setter_impl {
 		where
 			W: Writable + AsProperties,
 		{
+			#[allow(clippy::not_unsafe_ptr_arg_deref)]
 			fn set_at($writable: &mut W, $c_name: CharPtr, $index: usize, $value: &Self) -> Result<()>
 				$stmt
 		}

@@ -496,11 +496,11 @@ impl ImageEffectHandle {
 	}
 
 	pub fn get_output_clip(&self) -> Result<ClipInstance> {
-		self.clip_get_handle(ofx_sys::kOfxImageEffectOutputClipName)
+		self.clip_get_handle(kOfxImageEffectOutputClipName)
 	}
 
 	pub fn get_simple_input_clip(&self) -> Result<ClipInstance> {
-		self.clip_get_handle(ofx_sys::kOfxImageEffectSimpleSourceClipName)
+		self.clip_get_handle(kOfxImageEffectSimpleSourceClipName)
 	}
 
 	pub fn get_clip(&self, name: &str) -> Result<ClipInstance> {
@@ -509,11 +509,11 @@ impl ImageEffectHandle {
 	}
 
 	pub fn new_output_clip(&self) -> Result<ClipDescriptor> {
-		self.clip_define(ofx_sys::kOfxImageEffectOutputClipName)
+		self.clip_define(kOfxImageEffectOutputClipName)
 	}
 
 	pub fn new_simple_input_clip(&self) -> Result<ClipDescriptor> {
-		self.clip_define(ofx_sys::kOfxImageEffectSimpleSourceClipName)
+		self.clip_define(kOfxImageEffectSimpleSourceClipName)
 	}
 
 	pub fn new_clip(&self, name: &str) -> Result<ClipDescriptor> {
@@ -687,13 +687,12 @@ where
 mod tests {
 	use super::*;
 	use crate::property;
-	use crate::property::*;
 
 	// do not run, just compile!
 	fn prop_host() {
 		let mut handle = EffectInstance(PropertySetHandle::empty());
 
 		handle.get::<property::Type::Property>();
-		handle.get::<property::IsBackground::Property>();
+		handle.get::<IsBackground::Property>();
 	}
 }
