@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 #![allow(unused)]
 
 use ofx_sys::OfxStatus;

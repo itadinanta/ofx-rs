@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt;

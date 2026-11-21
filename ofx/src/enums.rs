@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use ofx_sys::*;
 use std::ffi::CStr;
 
@@ -53,14 +54,14 @@ macro_rules! identified_enum {
 		impl IdentifiedEnum for $name {
 			fn to_bytes(&self) -> &'static [u8] {
 				match *self {
-					$($name::$key => concat_idents!(kOfx, $name, $key)),
+					$($name::$key => paste!([< kOfx $name $key >])),
 					*
 				}
 			}
 
 			fn from_bytes(ofx_name: &[u8]) -> Option<Self> {
 				// TODO: use PHF or some sort of hashing
-				$(if ofx_name == &concat_idents!(kOfx, $name, $key)[..] { Some($name::$key) } else)
+				$(if ofx_name == &paste!([< kOfx $name $key >])[..] { Some($name::$key) } else)
 				*
 				{ None }
 			}
@@ -266,5 +267,4 @@ mod tests {
 			unsafe { CStr::from_bytes_with_nul_unchecked(b"OfxImageEffectContextGeneral\0") };
 		assert!(ImageEffectContext::from_cstring(&str_value) == Some(ImageEffectContext::General));
 	}
-
 }

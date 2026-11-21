@@ -1,11 +1,12 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 #![allow(unused)]
-#![feature(concat_idents)]
-#![feature(specialization)]
 
 extern crate ofx_sys;
 #[macro_use]
 extern crate log;
 extern crate log4rs;
+#[macro_use]
+extern crate paste;
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -30,16 +31,16 @@ mod types;
 mod registry;
 mod image;
 pub use action::*;
+pub use enums::Type;
 pub use enums::*;
-pub use enums::Type as Type;
 pub use handle::*;
+pub use image::*;
 pub use plugin::*;
 pub use property::*;
+use registry::*;
 pub use result::*;
 pub use types::*;
 pub use util::*;
-pub use image::*;
-use registry::*;
 
 pub use ofx_sys::{OfxHost, OfxPlugin, OfxPropertySetHandle};
 pub use registry::{
@@ -57,4 +58,3 @@ macro_rules! register_modules {
 		build_plugin_registry!(register_plugins);
 	};
 }
-

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use enums::{BitDepth, ImageComponent};
 use std::marker::PhantomData;
 use types::*;

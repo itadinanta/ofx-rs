@@ -1,4 +1,4 @@
-#![feature(concat_idents)]
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 
 use enums::{
 	BitDepth, Change, HostNativeOrigin, IdentifiedEnum, ImageComponent, ImageEffectContext,
@@ -57,7 +57,7 @@ macro_rules! trace_setter {
 			unsafe { CStr::from_ptr($c_name) },
 			$index,
 			unsafe { CStr::from_bytes_with_nul_unchecked($value) }
-			)
+		)
 	};
 
 	($writable: expr, $c_name:expr, $index: expr, $value:expr) => {
@@ -67,7 +67,7 @@ macro_rules! trace_setter {
 			unsafe { CStr::from_ptr($c_name) },
 			$index,
 			$value
-			)
+		)
 	};
 }
 

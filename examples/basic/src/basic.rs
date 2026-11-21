@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use ofx::*;
 use std::sync::{Arc, Mutex};
 
@@ -241,7 +242,7 @@ impl Execute for SimplePlugin {
 									render_window,
 								)
 							})
-						}};
+					}};
 				}
 
 				macro_rules! process_tiles {
@@ -249,7 +250,7 @@ impl Execute for SimplePlugin {
 						let mut queue =
 							TileDispatch::new(tiles!($rgba_format, $mask_format).collect());
 						plugin_context.run_in_threads(num_threads, &mut queue)?;
-						}};
+					}};
 				}
 				match (
 					output_image.get_pixel_depth()?,

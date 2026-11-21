@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use enums::*;
 use image::*;
 use ofx_sys::*;
@@ -9,6 +10,7 @@ use std::ffi::{CStr, CString};
 use std::fmt;
 use std::marker::PhantomData;
 use std::rc::Rc;
+use types::Time;
 use types::*;
 
 #[derive(Debug, Clone)]
@@ -449,7 +451,6 @@ impl HasProperties<EffectDescriptor> for ImageEffectHandle {
 		)))
 	}
 }
-
 
 impl ImageEffectHandle {
 	fn clip_define(&self, clip_name: &[u8]) -> Result<ClipDescriptor> {

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use action::*;
 use ofx_sys::*;
 use plugin::*;
@@ -197,7 +198,7 @@ macro_rules! register_plugin {
 			$module::new_instance(),
 			$module::set_host,
 			$module::main_entry,
-			);
+		);
 	};
 }
 
