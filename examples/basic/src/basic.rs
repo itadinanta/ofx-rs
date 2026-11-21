@@ -422,7 +422,10 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			DestroyInstance(ref mut _effect) => OK,
+			DestroyInstance(ref mut effect) => {
+				effect.drop_instance_data::<MyInstanceData>()?;
+				OK
+			}
 
 			DescribeInContext(ref mut effect, ref in_args) => {
 				let mut output_clip = effect.new_output_clip()?;

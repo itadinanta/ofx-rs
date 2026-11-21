@@ -16,5 +16,9 @@ write.connectInput(0, under_test)
 
 app1.render(write, 1, 1)
 
+# Close the project while the session is alive so the plugin receives
+# kOfxActionDestroyInstance (quit() alone would skip it).
+app1.closeProject()
+
 quit()
 
