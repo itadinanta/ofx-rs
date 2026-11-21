@@ -384,8 +384,8 @@ impl Execute for SimplePlugin {
 			}
 
 			CreateInstance(ref mut effect) => {
-				let mut effect_props: EffectInstance = effect.properties()?;
-				let mut param_set = effect.parameter_set()?;
+				let effect_props: EffectInstance = effect.properties()?;
+				let param_set = effect.parameter_set()?;
 
 				let is_general_effect = effect_props.get_context()?.is_general();
 				let per_component_scale_param = param_set.parameter(PARAM_SCALE_COMPONENTS_NAME)?;

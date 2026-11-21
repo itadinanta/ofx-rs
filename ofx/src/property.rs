@@ -378,7 +378,7 @@ pub trait RawReadable: AsProperties + Sized + Clone {
 	{
 		let c_buf = id.c_string()?;
 		let c_name = c_buf.as_ptr();
-		<R as RawGetter<Self>>::get_at(&self, c_name, index)
+		<R as RawGetter<Self>>::get_at(self, c_name, index)
 	}
 }
 
@@ -685,7 +685,7 @@ mod tests {
 		}
 	}
 	pub trait CanSetDummyProperty: Writable {
-		fn set_dummy_property<'a>(&mut self, value: &'a [u8]) -> Result<()> {
+		fn set_dummy_property(&mut self, value: &[u8]) -> Result<()> {
 			self.set::<DummyProperty>(value)
 		}
 	}

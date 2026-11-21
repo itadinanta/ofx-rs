@@ -86,7 +86,7 @@ pub struct PluginDescriptor {
 	host: Option<OfxHost>,
 	suites: Option<Suites>,
 	cached_handle: Option<ImageEffectHandle>,
-	instance: Box<Execute>,
+	instance: Box<dyn Execute>,
 	global_action_index: EnumIndex<GlobalAction>,
 	image_effect_action_index: EnumIndex<ImageEffectAction>,
 	ofx_plugin: OfxPlugin, // need an owned copy for the lifetime of the plugin
@@ -307,7 +307,7 @@ impl PluginDescriptor {
 		name: &'static str,
 		api_version: ApiVersion,
 		plugin_version: PluginVersion,
-		instance: Box<Execute>,
+		instance: Box<dyn Execute>,
 		set_host: SetHost,
 		main_entry: MainEntry,
 	) -> PluginDescriptor {
@@ -501,6 +501,6 @@ impl PluginDescriptor {
 
 impl Plugin for PluginDescriptor {
 	fn suites(&self) -> &Suites {
-		&self.suites.as_ref().unwrap()
+		self.suites.as_ref().unwrap()
 	}
 }

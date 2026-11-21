@@ -274,7 +274,7 @@ impl Image {
 		}
 	}
 
-	pub fn get_descriptor<T>(&self) -> Result<ImageDescriptor<T>>
+	pub fn get_descriptor<T>(&self) -> Result<ImageDescriptor<'_, T>>
 	where
 		T: PixelFormat,
 	{
@@ -285,7 +285,7 @@ impl Image {
 		Ok(ImageDescriptor::new(bounds, row_bytes, ptr))
 	}
 
-	fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptorMut<T>>
+	fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptorMut<'_, T>>
 	where
 		T: PixelFormat,
 	{
@@ -296,7 +296,7 @@ impl Image {
 		Ok(ImageDescriptorMut::new(bounds, row_bytes, ptr))
 	}
 
-	pub fn get_tiles_mut<T>(&mut self, count: usize) -> Result<Vec<ImageTileMut<T>>>
+	pub fn get_tiles_mut<T>(&mut self, count: usize) -> Result<Vec<ImageTileMut<'_, T>>>
 	where
 		T: PixelFormat,
 	{

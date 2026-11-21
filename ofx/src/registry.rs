@@ -23,14 +23,14 @@ impl Registry {
 		name: &'static str,
 		api_version: ApiVersion,
 		plugin_version: PluginVersion,
-		instance: Box<Execute>,
+		instance: Box<dyn Execute>,
 		set_host: SetHost,
 		main_entry: MainEntry,
 	) -> usize {
 		let plugin_index = self.plugins.len();
 
 		self.plugin_modules
-			.insert(module_name.to_owned(), plugin_index as usize);
+			.insert(module_name.to_owned(), plugin_index);
 
 		let plugin = PluginDescriptor::new(
 			plugin_index,
@@ -52,15 +52,15 @@ impl Registry {
 	}
 
 	pub fn get_plugin_mut(&mut self, index: usize) -> &mut PluginDescriptor {
-		&mut self.plugins[index as usize]
+		&mut self.plugins[index]
 	}
 
 	pub fn get_plugin(&self, index: usize) -> &PluginDescriptor {
-		&self.plugins[index as usize]
+		&self.plugins[index]
 	}
 
 	pub fn ofx_plugin(&'static self, index: Int) -> &'static OfxPlugin {
-		&self.plugins[index as usize].ofx_plugin()
+		self.plugins[index as usize].ofx_plugin()
 	}
 
 	pub fn dispatch(&mut self, plugin_module: &str, message: RawMessage) -> Result<Int> {
