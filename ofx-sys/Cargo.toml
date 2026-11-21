@@ -25,6 +25,3 @@ path="src/lib.rs"
 
 [build-dependencies]
 bindgen = "0.73"
-
-[dev-dependencies]
-cgmath = "0.18"
