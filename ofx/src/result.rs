@@ -1,13 +1,14 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
+use crate::types::*;
 use ofx_sys::*;
 use std::fmt;
 use std::fmt::Display;
-use types::*;
 
 pub use ofx_sys::eOfxStatus_ErrBadHandle;
 pub use ofx_sys::eOfxStatus_ErrBadIndex;
 pub use ofx_sys::eOfxStatus_ErrValue;
-pub use ofx_sys::eOfxStatus_ReplyDefault;
 pub use ofx_sys::eOfxStatus_OK;
+pub use ofx_sys::eOfxStatus_ReplyDefault;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Error {

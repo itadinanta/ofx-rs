@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use super::*;
 use ofx_sys::*;
 use std::ffi::{CStr, CString};
@@ -55,5 +56,8 @@ macro_rules! image_clip_prop_depth {
 
 #[macro_export]
 macro_rules! static_str {
-	($name:expr) => { unsafe { CStr::from_bytes_with_nul_unchecked($name).as_ptr() } }
+	($name:expr) => {{
+		let value = $name;
+		unsafe { CStr::from_bytes_with_nul_unchecked(value).as_ptr() }
+	}};
 }

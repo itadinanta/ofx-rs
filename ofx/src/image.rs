@@ -1,6 +1,7 @@
-use enums::{BitDepth, ImageComponent};
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
+use crate::enums::{BitDepth, ImageComponent};
+use crate::types::*;
 use std::marker::PhantomData;
-use types::*;
 
 pub trait ChannelFormat {
 	fn range_max() -> f32;
@@ -26,7 +27,7 @@ impl ChannelFormat for f32 {
 impl ChannelFormat for u16 {
 	#[inline]
 	fn range_max() -> f32 {
-		f32::from(std::u16::MAX)
+		f32::from(u16::MAX)
 	}
 	fn from_f32(src: f32) -> Self {
 		let clamp = Self::range_max();
@@ -41,7 +42,7 @@ impl ChannelFormat for u16 {
 impl ChannelFormat for u8 {
 	#[inline]
 	fn range_max() -> f32 {
-		f32::from(std::u8::MAX)
+		f32::from(u8::MAX)
 	}
 	#[inline]
 	fn from_f32(src: f32) -> Self {
@@ -203,7 +204,7 @@ pub trait PixelFormat: Sized + Copy + Clone {
 }
 
 macro_rules! pixel_format_rgba {
-	($rgba:ty, $channel_value:ty) => {
+	($rgba:ident, $channel_value:ty) => {
 		impl PixelFormat for $rgba {
 			type ChannelValue = $channel_value;
 			fn channel(&self, i: usize) -> &Self::ChannelValue {
@@ -260,12 +261,7 @@ macro_rules! pixel_format_rgba {
 				b: Self::ChannelValue,
 				a: Self::ChannelValue,
 			) -> Self {
-				let mut instance: $rgba = unsafe { std::mem::uninitialized() };
-				instance.r = r;
-				instance.g = g;
-				instance.b = b;
-				instance.a = a;
-				instance
+				$rgba { r, g, b, a }
 			}
 
 			#[inline]
@@ -439,7 +435,7 @@ where
 	}
 
 	fn bytes(&self) -> usize {
-		self.row_bytes.abs() as usize * (self.bounds.y2 - self.bounds.y1) as usize
+		self.row_bytes.unsigned_abs() * (self.bounds.y2 - self.bounds.y1) as usize
 	}
 
 	fn dimensions(&self) -> (u32, u32) {
@@ -516,7 +512,7 @@ where
 
 	pub fn chunks_mut(mut self, chunk_size: usize) -> impl Iterator<Item = ImageBuffer<'a, T>> {
 		let rows = (self.bounds.y2 - self.bounds.y1) as usize;
-		let n_chunks = (rows + chunk_size - 1) / chunk_size;
+		let n_chunks = rows.div_ceil(chunk_size);
 		let rows_per_chunk = chunk_size;
 		let y1 = self.bounds.y1;
 		(0..n_chunks).map(move |chunk| {
@@ -637,7 +633,7 @@ where
 		let (width, height) = self.data.dimensions();
 		let rows_per_chunk = height as usize / n_chunks;
 		self.data
-			.chunks_mut(rows_per_chunk as usize)
+			.chunks_mut(rows_per_chunk)
 			.enumerate()
 			.map(|(chunk_index, chunk)| {
 				let y1 = (chunk_index * rows_per_chunk) as Int;

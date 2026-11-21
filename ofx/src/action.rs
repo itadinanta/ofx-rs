@@ -1,15 +1,16 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::fmt::Display;
 use std::marker::PhantomData;
 
-use enums::*;
-use handle::*;
+use crate::enums::*;
+use crate::handle::*;
+use crate::plugin::PluginContext;
+use crate::result::*;
+use crate::types::*;
 use ofx_sys::*;
-use plugin::PluginContext;
-use result::*;
-use types::*;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum GlobalAction {

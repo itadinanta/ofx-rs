@@ -1,15 +1,17 @@
-use enums::*;
-use image::*;
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
+use crate::enums::*;
+use crate::image::*;
+use crate::property::*;
+use crate::result::*;
+use crate::types::Time;
+use crate::types::*;
 use ofx_sys::*;
-use property::*;
-use result::*;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use types::*;
 
 #[derive(Debug, Clone)]
 pub struct PropertySetHandle {
@@ -23,11 +25,7 @@ impl PropertySetHandle {
 	}
 
 	pub(crate) fn empty() -> Self {
-		panic!("Do not use, only for type validation testing");
-		PropertySetHandle {
-			inner: std::ptr::null::<OfxPropertySetStruct>() as *mut _,
-			property: unsafe { Rc::new(*std::ptr::null()) },
-		}
+		unimplemented!("Do not use, only for type validation testing")
 	}
 }
 
@@ -276,7 +274,7 @@ impl Image {
 		}
 	}
 
-	pub fn get_descriptor<T>(&self) -> Result<ImageDescriptor<T>>
+	pub fn get_descriptor<T>(&self) -> Result<ImageDescriptor<'_, T>>
 	where
 		T: PixelFormat,
 	{
@@ -287,7 +285,7 @@ impl Image {
 		Ok(ImageDescriptor::new(bounds, row_bytes, ptr))
 	}
 
-	fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptorMut<T>>
+	fn get_descriptor_mut<T>(&mut self) -> Result<ImageDescriptorMut<'_, T>>
 	where
 		T: PixelFormat,
 	{
@@ -298,7 +296,7 @@ impl Image {
 		Ok(ImageDescriptorMut::new(bounds, row_bytes, ptr))
 	}
 
-	pub fn get_tiles_mut<T>(&mut self, count: usize) -> Result<Vec<ImageTileMut<T>>>
+	pub fn get_tiles_mut<T>(&mut self, count: usize) -> Result<Vec<ImageTileMut<'_, T>>>
 	where
 		T: PixelFormat,
 	{
@@ -450,7 +448,6 @@ impl HasProperties<EffectDescriptor> for ImageEffectHandle {
 	}
 }
 
-
 impl ImageEffectHandle {
 	fn clip_define(&self, clip_name: &[u8]) -> Result<ClipDescriptor> {
 		let property_set_handle = {
@@ -499,11 +496,11 @@ impl ImageEffectHandle {
 	}
 
 	pub fn get_output_clip(&self) -> Result<ClipInstance> {
-		self.clip_get_handle(ofx_sys::kOfxImageEffectOutputClipName)
+		self.clip_get_handle(kOfxImageEffectOutputClipName)
 	}
 
 	pub fn get_simple_input_clip(&self) -> Result<ClipInstance> {
-		self.clip_get_handle(ofx_sys::kOfxImageEffectSimpleSourceClipName)
+		self.clip_get_handle(kOfxImageEffectSimpleSourceClipName)
 	}
 
 	pub fn get_clip(&self, name: &str) -> Result<ClipInstance> {
@@ -512,11 +509,11 @@ impl ImageEffectHandle {
 	}
 
 	pub fn new_output_clip(&self) -> Result<ClipDescriptor> {
-		self.clip_define(ofx_sys::kOfxImageEffectOutputClipName)
+		self.clip_define(kOfxImageEffectOutputClipName)
 	}
 
 	pub fn new_simple_input_clip(&self) -> Result<ClipDescriptor> {
-		self.clip_define(ofx_sys::kOfxImageEffectSimpleSourceClipName)
+		self.clip_define(kOfxImageEffectSimpleSourceClipName)
 	}
 
 	pub fn new_clip(&self, name: &str) -> Result<ClipDescriptor> {
@@ -553,8 +550,18 @@ impl ImageEffectHandle {
 		=> data_ptr }
 	}
 
-	// TODO: this is not safe enough
-	pub fn get_instance_data<T>(&self) -> Result<&mut T>
+	pub fn get_instance_data<T>(&self) -> Result<&T>
+	where
+		T: Sized,
+	{
+		unsafe {
+			let ptr = self.get_instance_data_ptr()?;
+			let reference = ptr as *const T;
+			Ok(&*reference)
+		}
+	}
+
+	pub fn get_instance_data_mut<T>(&mut self) -> Result<&mut T>
 	where
 		T: Sized,
 	{
@@ -565,12 +572,24 @@ impl ImageEffectHandle {
 		}
 	}
 
-	pub fn drop_instance_data(&mut self) -> Result<()> {
-		unsafe {
-			let mut ptr = self.get_instance_data_ptr()?;
-			if !ptr.is_null() {
-				Box::from_raw(ptr);
-			}
+	/// Frees the value previously stored with `set_instance_data`.
+	///
+	/// `T` must be the same type that was passed to `set_instance_data`:
+	/// the property stores the pointer type-erased, so the layout and drop
+	/// glue can only be recovered from the type argument.
+	pub fn drop_instance_data<T>(&mut self) -> Result<()>
+	where
+		T: Sized,
+	{
+		let ptr = self.get_instance_data_ptr()?;
+		if !ptr.is_null() {
+			// Clear the property before freeing, so a failed propSetPointer
+			// leaves the value (and the pointer to it) intact.
+			let mut effect_props: EffectInstance = self.properties()?;
+			suite_fn!(propSetPointer in self.property;
+				effect_props.0.inner, kOfxPropInstanceData.as_ptr() as *const i8, 0,
+				std::ptr::null_mut())?;
+			drop(unsafe { Box::from_raw(ptr as *mut T) });
 		}
 		Ok(())
 	}
@@ -689,14 +708,13 @@ where
 
 mod tests {
 	use super::*;
-	use property;
-	use property::*;
+	use crate::property;
 
 	// do not run, just compile!
 	fn prop_host() {
 		let mut handle = EffectInstance(PropertySetHandle::empty());
 
 		handle.get::<property::Type::Property>();
-		handle.get::<property::IsBackground::Property>();
+		handle.get::<IsBackground::Property>();
 	}
 }

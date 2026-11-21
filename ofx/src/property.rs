@@ -1,19 +1,19 @@
-#![feature(concat_idents)]
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 
-use enums::{
+use crate::enums::{
 	BitDepth, Change, HostNativeOrigin, IdentifiedEnum, ImageComponent, ImageEffectContext,
 	ImageEffectRender, ImageField, ImageFieldExtraction, ImageFieldOrder, ParamDoubleType,
 	Type as EType,
 };
-use handle::Image;
-use handle::*;
+use crate::handle::Image;
+use crate::handle::*;
+use crate::result;
+use crate::result::*;
+use crate::types::*;
 use ofx_sys::*;
-use result;
-use result::*;
 use std::ffi::{CStr, CString};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use types::*;
 
 macro_rules! raw_getter_impl {
 	(|$readable:ident, $c_name:ident, $index:ident| -> $value_type: ty $stmt:block) => {
@@ -22,6 +22,9 @@ macro_rules! raw_getter_impl {
 		where
 			R: Readable + AsProperties,
 		{
+			// The name pointer is always a crate-internal static NUL-terminated
+			// constant supplied by the safe property API.
+			#[allow(clippy::not_unsafe_ptr_arg_deref)]
 			fn get_at($readable: &R, $c_name: CharPtr, $index: usize) -> Result<Self> {
 				let value = { $stmt };
 				debug!(
@@ -43,6 +46,7 @@ macro_rules! raw_setter_impl {
 		where
 			W: Writable + AsProperties,
 		{
+			#[allow(clippy::not_unsafe_ptr_arg_deref)]
 			fn set_at($writable: &mut W, $c_name: CharPtr, $index: usize, $value: &Self) -> Result<()>
 				$stmt
 		}
@@ -57,7 +61,7 @@ macro_rules! trace_setter {
 			unsafe { CStr::from_ptr($c_name) },
 			$index,
 			unsafe { CStr::from_bytes_with_nul_unchecked($value) }
-			)
+		)
 	};
 
 	($writable: expr, $c_name:expr, $index: expr, $value:expr) => {
@@ -67,7 +71,7 @@ macro_rules! trace_setter {
 			unsafe { CStr::from_ptr($c_name) },
 			$index,
 			$value
-			)
+		)
 	};
 }
 
@@ -378,7 +382,7 @@ pub trait RawReadable: AsProperties + Sized + Clone {
 	{
 		let c_buf = id.c_string()?;
 		let c_name = c_buf.as_ptr();
-		<R as RawGetter<Self>>::get_at(&self, c_name, index)
+		<R as RawGetter<Self>>::get_at(self, c_name, index)
 	}
 }
 
@@ -424,7 +428,7 @@ pub trait RawWritable: AsProperties + Sized + Clone {
 
 impl<R> Readable for R where R: AsProperties + Clone {}
 
-impl<W> Writable for W where W: AsProperties + ?Sized + Clone {}
+impl<W> Writable for W where W: AsProperties + Clone {}
 
 pub trait StringId {
 	fn c_string(self) -> Result<CString>;
@@ -685,7 +689,7 @@ mod tests {
 		}
 	}
 	pub trait CanSetDummyProperty: Writable {
-		fn set_dummy_property<'a>(&mut self, value: &'a [u8]) -> Result<()> {
+		fn set_dummy_property(&mut self, value: &[u8]) -> Result<()> {
 			self.set::<DummyProperty>(value)
 		}
 	}
@@ -1228,8 +1232,6 @@ object_properties! { EffectDescriptor {
 	OpenGLRenderSupported		read+write,
 	ClipPreferencesSlaveParam	read+write,
 	FilePath					read,
-	// convenience extras
-	Labels						write,
 }}
 
 // Image Effect Instance

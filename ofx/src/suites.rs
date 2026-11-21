@@ -1,5 +1,6 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
+use crate::result::*;
 use ofx_sys::*;
-use result::*;
 use std::borrow::Borrow;
 use std::rc::Rc;
 
@@ -28,8 +29,6 @@ macro_rules! suite_call {
 macro_rules! suite_fn {
 	($($tail:tt)*) => { to_result!{suite_call!($($tail)*)} }
 }
-
-
 
 #[allow(clippy::too_many_arguments)]
 impl Suites {

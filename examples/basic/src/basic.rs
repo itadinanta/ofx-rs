@@ -1,10 +1,11 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use ofx::*;
 use std::sync::{Arc, Mutex};
 
 plugin_module!(
 	"net.itadinanta.ofx-rs.basic",
 	ApiVersion(1),
-	PluginVersion(1, 0),
+	PluginVersion(1, 1),
 	SimplePlugin::new
 );
 
@@ -199,7 +200,7 @@ impl Execute for SimplePlugin {
 				let time = in_args.get_time()?;
 				// TODO: what happens if render_window < full size?
 				let render_window = in_args.get_render_window()?;
-				let instance_data: &mut MyInstanceData = effect.get_instance_data()?;
+				let instance_data: &mut MyInstanceData = effect.get_instance_data_mut()?;
 
 				let source_image = instance_data.source_clip.get_image(time)?;
 				let output_image = instance_data.output_clip.get_image_mut(time)?;
@@ -241,7 +242,7 @@ impl Execute for SimplePlugin {
 									render_window,
 								)
 							})
-						}};
+					}};
 				}
 
 				macro_rules! process_tiles {
@@ -249,7 +250,7 @@ impl Execute for SimplePlugin {
 						let mut queue =
 							TileDispatch::new(tiles!($rgba_format, $mask_format).collect());
 						plugin_context.run_in_threads(num_threads, &mut queue)?;
-						}};
+					}};
 				}
 				match (
 					output_image.get_pixel_depth()?,
@@ -383,8 +384,8 @@ impl Execute for SimplePlugin {
 			}
 
 			CreateInstance(ref mut effect) => {
-				let mut effect_props: EffectInstance = effect.properties()?;
-				let mut param_set = effect.parameter_set()?;
+				let effect_props: EffectInstance = effect.properties()?;
+				let param_set = effect.parameter_set()?;
 
 				let is_general_effect = effect_props.get_context()?.is_general();
 				let per_component_scale_param = param_set.parameter(PARAM_SCALE_COMPONENTS_NAME)?;
@@ -421,7 +422,10 @@ impl Execute for SimplePlugin {
 				OK
 			}
 
-			DestroyInstance(ref mut _effect) => OK,
+			DestroyInstance(ref mut effect) => {
+				effect.drop_instance_data::<MyInstanceData>()?;
+				OK
+			}
 
 			DescribeInContext(ref mut effect, ref in_args) => {
 				let mut output_clip = effect.new_output_clip()?;
@@ -564,8 +568,8 @@ impl Execute for SimplePlugin {
 
 impl SimplePlugin {
 	fn set_per_component_scale_enabledness(effect: &mut ImageEffectHandle) -> Result<()> {
-		let instance_data: &mut MyInstanceData = effect.get_instance_data()?;
 		let input_clip = effect.get_simple_input_clip()?;
+		let instance_data: &mut MyInstanceData = effect.get_instance_data_mut()?;
 		let is_input_rgb = input_clip.get_connected()? && input_clip.get_components()?.is_rgb();
 		instance_data
 			.per_component_scale_param

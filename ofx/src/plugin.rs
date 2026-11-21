@@ -1,18 +1,19 @@
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 #![feature(plugin)]
 
-use action::*;
-use enums::*;
-use handle::*;
+use crate::action::*;
+use crate::enums::*;
+use crate::handle::*;
+use crate::property::*;
+use crate::result::*;
+use crate::suites::*;
+use crate::types::*;
 use ofx_sys::*;
-use property::*;
-use result::*;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
-use suites::*;
-use types::*;
 
 pub struct ApiVersion(pub Int);
 pub struct PluginVersion(pub UnsignedInt, pub UnsignedInt);
@@ -85,7 +86,7 @@ pub struct PluginDescriptor {
 	host: Option<OfxHost>,
 	suites: Option<Suites>,
 	cached_handle: Option<ImageEffectHandle>,
-	instance: Box<Execute>,
+	instance: Box<dyn Execute>,
 	global_action_index: EnumIndex<GlobalAction>,
 	image_effect_action_index: EnumIndex<ImageEffectAction>,
 	ofx_plugin: OfxPlugin, // need an owned copy for the lifetime of the plugin
@@ -98,6 +99,10 @@ pub struct PluginContext {
 
 pub trait Runnable: Sized + Send + Sync {
 	fn run(&mut self, thread_index: UnsignedInt, thread_max: UnsignedInt);
+
+	/// # Safety
+	/// This is the callback that's exposed to the OpenFX API. We assume that the callback
+	/// value "me" points to an instance of Runnable.
 	unsafe extern "C" fn run_myself(
 		thread_index: UnsignedInt,
 		thread_max: UnsignedInt,
@@ -151,6 +156,8 @@ impl Display for PluginDescriptor {
 }
 
 impl MapAction for PluginDescriptor {
+	// The action pointer is supplied by the host as a NUL-terminated C string.
+	#[allow(clippy::not_unsafe_ptr_arg_deref)]
 	fn map_action(
 		&self,
 		action: CharPtr,
@@ -165,14 +172,14 @@ impl MapAction for PluginDescriptor {
 			($action:ident(in_args)) => {
 				Ok(Action::$action(
 					self.new_image_effect_raw(handle)?,
-					self.typed_properties(build_typed::<concat_idents!($action, InArgs)>, in_args)?,
+					self.typed_properties(paste!([< $action InArgs >]::new), in_args)?,
 					))
 			};
 			($action:ident(out_args)) => {
 				Ok(Action::$action(
 					self.new_image_effect_raw(handle)?,
 					self.typed_properties(
-						build_typed::<concat_idents!($action, OutArgs)>,
+						paste!([< $action OutArgs >]::new),
 						out_args,
 					)?,
 					))
@@ -180,9 +187,9 @@ impl MapAction for PluginDescriptor {
 			($action:ident(in_args, out_args)) => {
 				Ok(Action::$action(
 					self.new_image_effect_raw(handle)?,
-					self.typed_properties(build_typed::<concat_idents!($action, InArgs)>, in_args)?,
+					self.typed_properties(paste!([< $action InArgs >]::new), in_args)?,
 					self.typed_properties(
-						build_typed::<concat_idents!($action, OutArgs)>,
+						paste!([< $action OutArgs >]::new),
 						out_args,
 					)?,
 					))
@@ -215,7 +222,7 @@ impl MapAction for PluginDescriptor {
 				BeginInstanceChanged => map_args!(BeginInstanceChanged(in_args)),
 				InstanceChanged => map_args!(InstanceChanged(in_args)),
 				EndInstanceChanged => map_args!(EndInstanceChanged(in_args)),
-				DestroyInstance => map_args!(DestroyInstance()), // handled by the library
+				DestroyInstance => map_args!(DestroyInstance()), // handled by the plugin
 				_ => Err(Error::InvalidAction),
 			}
 		} else {
@@ -245,11 +252,8 @@ impl Filter for PluginDescriptor {
 		action: &mut Action,
 		_status: Result<Int>,
 	) -> Result<Int> {
-		match action {
-			Action::DestroyInstance(ref mut effect) => effect.drop_instance_data(),
-			_ => Ok(()),
-		}?;
-
+		// The instance data is freed by the plugin: drop_instance_data
+		// is generic and the library does not know the concrete type.
 		OK
 	}
 }
@@ -306,7 +310,7 @@ impl PluginDescriptor {
 		name: &'static str,
 		api_version: ApiVersion,
 		plugin_version: PluginVersion,
-		instance: Box<Execute>,
+		instance: Box<dyn Execute>,
 		set_host: SetHost,
 		main_entry: MainEntry,
 	) -> PluginDescriptor {
@@ -332,7 +336,7 @@ impl PluginDescriptor {
 					stringify!($id),
 					stringify!($id)
 					);
-				global_action_index.insert(concat_idents!(kOfxAction, $id), GlobalAction::$id)
+				global_action_index.insert(paste!([< kOfxAction $id >]), GlobalAction::$id)
 			};
 		}
 		macro_rules! image_effect_add {
@@ -343,7 +347,7 @@ impl PluginDescriptor {
 					stringify!($id)
 					);
 				image_effect_action_index.insert(
-					concat_idents!(kOfxImageEffectAction, $id),
+					paste!([< kOfxImageEffectAction $id >]),
 					ImageEffectAction::$id,
 					)
 			};
@@ -434,11 +438,9 @@ impl PluginDescriptor {
 				unsafe {
 					let suiteptr = fetch_suite(
 						host.host as OfxPropertySetHandle,
-						CStr::from_bytes_with_nul_unchecked(concat_idents!(
-							kOfx,
-							$suite_name,
-							Suite
-						))
+						CStr::from_bytes_with_nul_unchecked(
+							paste!([< kOfx $suite_name Suite >])
+						)
 						.as_ptr(),
 						$suite_version,
 						);
@@ -452,15 +454,11 @@ impl PluginDescriptor {
 							suiteptr
 						);
 						unsafe {
-							Some(*unsafe {
-								suiteptr
-									as *const concat_idents!(
-										Ofx,
-										$suite_name,
-										Suite,
-										$suite_version
-									)
-							})
+							paste! {
+								Some(*unsafe {
+									suiteptr as *const [< Ofx $suite_name Suite $suite_version >]
+								})
+							}
 							}
 						}
 					}
@@ -506,6 +504,6 @@ impl PluginDescriptor {
 
 impl Plugin for PluginDescriptor {
 	fn suites(&self) -> &Suites {
-		&self.suites.as_ref().unwrap()
+		self.suites.as_ref().unwrap()
 	}
 }

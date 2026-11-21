@@ -1,9 +1,11 @@
-use action::*;
+// Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
+use crate::action::*;
+use crate::plugin::*;
+use crate::result::*;
+use crate::types::*;
 use ofx_sys::*;
-use plugin::*;
-use result::*;
+use std::cell::UnsafeCell;
 use std::collections::HashMap;
-use types::*;
 
 #[derive(Default)]
 pub struct Registry {
@@ -22,14 +24,14 @@ impl Registry {
 		name: &'static str,
 		api_version: ApiVersion,
 		plugin_version: PluginVersion,
-		instance: Box<Execute>,
+		instance: Box<dyn Execute>,
 		set_host: SetHost,
 		main_entry: MainEntry,
 	) -> usize {
 		let plugin_index = self.plugins.len();
 
 		self.plugin_modules
-			.insert(module_name.to_owned(), plugin_index as usize);
+			.insert(module_name.to_owned(), plugin_index);
 
 		let plugin = PluginDescriptor::new(
 			plugin_index,
@@ -51,15 +53,15 @@ impl Registry {
 	}
 
 	pub fn get_plugin_mut(&mut self, index: usize) -> &mut PluginDescriptor {
-		&mut self.plugins[index as usize]
+		&mut self.plugins[index]
 	}
 
 	pub fn get_plugin(&self, index: usize) -> &PluginDescriptor {
-		&self.plugins[index as usize]
+		&self.plugins[index]
 	}
 
 	pub fn ofx_plugin(&'static self, index: Int) -> &'static OfxPlugin {
-		&self.plugins[index as usize].ofx_plugin()
+		self.plugins[index as usize].ofx_plugin()
 	}
 
 	pub fn dispatch(&mut self, plugin_module: &str, message: RawMessage) -> Result<Int> {
@@ -74,6 +76,9 @@ impl Registry {
 	}
 }
 
+/// # Safety
+/// This function is called directly by the host.
+/// It's the caller's responsibility to ensure `host` points at a valid OfxHost
 pub unsafe fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
 	unsafe {
 		get_registry_mut()
@@ -82,7 +87,14 @@ pub unsafe fn set_host_for_plugin(plugin_module: &str, host: *mut OfxHost) {
 	}
 }
 
-static mut _GLOBAL_REGISTRY: Option<Registry> = None;
+// Interior-mutable global: `get_registry`/`get_registry_mut` hand out
+// `&'static` and `&'static mut` references, so the cell must not be
+// synchronized. Same (unchecked) access discipline as the previous
+// `static mut Option<Registry>`.
+struct GlobalRegistry(UnsafeCell<Option<Registry>>);
+// SAFETY: identical to the previous `static mut` - no concurrent access guarantee.
+unsafe impl Sync for GlobalRegistry {}
+static _GLOBAL_REGISTRY: GlobalRegistry = GlobalRegistry(UnsafeCell::new(None));
 
 pub fn main_entry_for_plugin(
 	plugin_module: &str,
@@ -112,7 +124,7 @@ where
 	F: Fn(&mut Registry),
 {
 	unsafe {
-		if _GLOBAL_REGISTRY.is_none() {
+		if (*_GLOBAL_REGISTRY.0.get()).is_none() {
 			use log4rs::append::console::*;
 			use log4rs::config::*;
 
@@ -135,17 +147,17 @@ where
 			for plugin in &registry.plugins {
 				info!("Registered plugin {}", plugin);
 			}
-			_GLOBAL_REGISTRY = Some(registry);
+			*_GLOBAL_REGISTRY.0.get() = Some(registry);
 		}
 	}
 }
 
 fn get_registry_mut() -> &'static mut Registry {
-	unsafe { _GLOBAL_REGISTRY.as_mut().unwrap() }
+	unsafe { (*_GLOBAL_REGISTRY.0.get()).as_mut().unwrap() }
 }
 
 pub fn get_registry() -> &'static Registry {
-	unsafe { _GLOBAL_REGISTRY.as_ref().unwrap() }
+	unsafe { (*_GLOBAL_REGISTRY.0.get()).as_ref().unwrap() }
 }
 
 #[macro_export]
@@ -197,7 +209,7 @@ macro_rules! register_plugin {
 			$module::new_instance(),
 			$module::set_host,
 			$module::main_entry,
-			);
+		);
 	};
 }
 
