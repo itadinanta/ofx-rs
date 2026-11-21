@@ -1,19 +1,19 @@
 // Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 #![feature(plugin)]
 
-use action::*;
-use enums::*;
-use handle::*;
+use crate::action::*;
+use crate::enums::*;
+use crate::handle::*;
 use ofx_sys::*;
-use property::*;
-use result::*;
+use crate::property::*;
+use crate::result::*;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
-use suites::*;
-use types::*;
+use crate::suites::*;
+use crate::types::*;
 
 pub struct ApiVersion(pub Int);
 pub struct PluginVersion(pub UnsignedInt, pub UnsignedInt);

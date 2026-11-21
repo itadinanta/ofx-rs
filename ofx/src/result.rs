@@ -2,7 +2,7 @@
 use ofx_sys::*;
 use std::fmt;
 use std::fmt::Display;
-use types::*;
+use crate::types::*;
 
 pub use ofx_sys::eOfxStatus_ErrBadHandle;
 pub use ofx_sys::eOfxStatus_ErrBadIndex;

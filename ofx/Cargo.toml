@@ -1,9 +1,9 @@
 [package]
 name = "ofx"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Nicola Orru <nigu.orru@gmail.com>"]
 keywords = ["ofx", "openfx", "effects", "natron", "nuke"]
-#edition = "2018"
+edition = "2018"
 description = "Bindings for OpenFX 1.4"
 repository = "https://github.com/itadinanta/ofx-rs"
 license = "Apache-2.0"
@@ -15,10 +15,8 @@ crate-type = ["lib"]
 path="src/lib.rs"
 
 [dependencies]
-libc = "0.2"
 log="0.4"
-log4rs = "0.8"
-ofx_sys = "0.2"
+log4rs = "1.4"
+ofx_sys = { path = "../ofx-sys", version = "0.3" }
 paste = "1"
-phf = "0.7"
 

@@ -1,19 +1,19 @@
 // Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 
-use enums::{
+use crate::enums::{
 	BitDepth, Change, HostNativeOrigin, IdentifiedEnum, ImageComponent, ImageEffectContext,
 	ImageEffectRender, ImageField, ImageFieldExtraction, ImageFieldOrder, ParamDoubleType,
 	Type as EType,
 };
-use handle::Image;
-use handle::*;
+use crate::handle::Image;
+use crate::handle::*;
 use ofx_sys::*;
-use result;
-use result::*;
+use crate::result;
+use crate::result::*;
 use std::ffi::{CStr, CString};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use types::*;
+use crate::types::*;
 
 macro_rules! raw_getter_impl {
 	(|$readable:ident, $c_name:ident, $index:ident| -> $value_type: ty $stmt:block) => {

@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
 use ofx_sys::*;
-use result::*;
+use crate::result::*;
 use std::borrow::Borrow;
 use std::rc::Rc;
 

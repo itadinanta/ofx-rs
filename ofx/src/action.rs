@@ -5,12 +5,12 @@ use std::fmt;
 use std::fmt::Display;
 use std::marker::PhantomData;
 
-use enums::*;
-use handle::*;
+use crate::enums::*;
+use crate::handle::*;
 use ofx_sys::*;
-use plugin::PluginContext;
-use result::*;
-use types::*;
+use crate::plugin::PluginContext;
+use crate::result::*;
+use crate::types::*;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum GlobalAction {

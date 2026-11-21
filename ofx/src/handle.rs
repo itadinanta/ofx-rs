@@ -1,17 +1,17 @@
 // Copyright (c) 2026 Nico Orru <https://itadinanta.net> - All rights reserved.
-use enums::*;
-use image::*;
+use crate::enums::*;
+use crate::image::*;
 use ofx_sys::*;
-use property::*;
-use result::*;
+use crate::property::*;
+use crate::result::*;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use types::Time;
-use types::*;
+use crate::types::Time;
+use crate::types::*;
 
 #[derive(Debug, Clone)]
 pub struct PropertySetHandle {
@@ -690,8 +690,8 @@ where
 
 mod tests {
 	use super::*;
-	use property;
-	use property::*;
+	use crate::property;
+	use crate::property::*;
 
 	// do not run, just compile!
 	fn prop_host() {
